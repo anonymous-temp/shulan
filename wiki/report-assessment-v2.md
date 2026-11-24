@@ -263,6 +263,7 @@
 | `timeout` | 规划总时限内未完成 |
 | `rule_fallback` | 本节有程序补齐的条目 |
 | `priority_rule_cluster_added` | P0 事项无集群承接，程序补了规则主题 |
+| `uncovered_priority_item` / `uncovered_reported_symptom` | 终检时仍有 P0 事项无集群承接、或已确认的主诉无条目（程序无法补齐时） |
 | `source_baseline_used` | 逐格背景批次失败，用来源基线（只含本格主记录） |
 | `no_imbalance` | 集群为空且无失衡来源 |
 | `no_reported_symptoms` | 问卷没有确认的不适 |

@@ -1707,15 +1707,17 @@ async def plan_assessment_content(client, blueprint, subject, *, deadline=None, 
             section_status[key] = status[key]
     try:
         problem_codes = _problem_metadata(packet)
-        accepted['clusters'], rule_clusters = _ensure_priority_coverage(
-            accepted['clusters'], rules, facts, handles, problem_codes,
-        )
         imbalance = _imbalance_present(packet, facts, rules)
         fallback_clusters = []
         if imbalance and not accepted['clusters']:
-            fallback_clusters = _fallback_clusters(packet, facts, handles, rules,
-                                                   {row.get('code') for row in accepted['clusters']})
-            accepted['clusters'] = fallback_clusters
+            # Themes for the non-P0 problems; P0 items get their own rule theme below.
+            fallback_clusters = _fallback_clusters(packet, facts, handles, rules, set())
+            accepted['clusters'] = list(fallback_clusters)
+        accepted['clusters'], rule_clusters = _ensure_priority_coverage(
+            accepted['clusters'], rules, facts, handles, problem_codes,
+        )
+        program_clusters = [*rule_clusters, *fallback_clusters] if fallback_clusters or not any(
+            row.get('origin') is None for row in accepted['clusters']) else []
         fallback_symptoms = _fallback_symptoms(packet, facts, handles, accepted['symptoms'])
         accepted['symptoms'] = [*accepted['symptoms'], *fallback_symptoms]
         fallback_lifestyle = [] if accepted['lifestyleFactors'] else _fallback_lifestyle(facts, handles)
@@ -1743,6 +1745,11 @@ async def plan_assessment_content(client, blueprint, subject, *, deadline=None, 
             entry['reasons'].append('items_dropped_in_final_check')
             if entry['state'] == 'reviewed':
                 entry['state'] = 'partial'
+        for key, _ in section_issues:
+            entry = section_status.setdefault(key, _section_status((key,))[key])
+            entry['reasons'].append('uncovered_priority_item' if key == 'clusters' else 'uncovered_reported_symptom')
+            if entry['state'] == 'reviewed':
+                entry['state'] = 'partial'
         origins = {key: {row.get('code'): row.get('origin', 'model') for row in accepted[key] if isinstance(row, dict)}
                    for key in ('clusters', 'symptoms', 'lifestyleFactors')}
         for key, mapping in origins.items():
@@ -1751,7 +1758,7 @@ async def plan_assessment_content(client, blueprint, subject, *, deadline=None, 
         if rule_clusters:
             entry = section_status.setdefault('clusters', _section_status(('clusters',))['clusters'])
             entry['reasons'].append('priority_rule_cluster_added')
-        _finish_status(section_status, 'clusters', result['clusters'], fallback=fallback_clusters,
+        _finish_status(section_status, 'clusters', result['clusters'], fallback=program_clusters,
                        empty_reason=None if imbalance else 'no_imbalance')
         if rule_clusters and section_status['clusters']['state'] == 'reviewed':
             section_status['clusters']['state'] = 'partial'

@@ -370,7 +370,9 @@ def test_abnormal_findings_without_reviewed_themes_get_a_rule_theme():
     plan, _ = run(planner, person_with_findings())
 
     assert plan['clusterState'] == 'clusters_present'
-    assert any(row['priority'] == 'P0' and row['origin'] == 'red_flag_rule' for row in plan['clusters'])
+    origins = {(row['origin'], row['priority'], tuple(row['problemCodes'])) for row in plan['clusters']}
+    assert origins == {('red_flag_rule', 'P0', ('pF',)), ('rule_fallback', 'P1', ('pB',))}
+    assert plan['sectionStatus']['clusters']['state'] == 'fallback'
 
 
 def test_problem_without_p0_and_without_themes_gets_fallback_theme():
