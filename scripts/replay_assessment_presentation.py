@@ -43,7 +43,9 @@ def replay(run_dir: Path, output: Path) -> dict:
     view = build_assessment_presentation(**kwargs)
     issues = assessment_projection_issues(view, kwargs['blueprint'])
     body = json.loads((run_dir / 'callback.json').read_text(encoding='utf-8'))
-    body['data']['assessmentPresentation'] = json.loads(json.dumps(view, ensure_ascii=False, default=str))
+    # The projection is a pydantic model; the callback carries its aliased JSON form.
+    public = view.model_dump(mode='json', by_alias=True) if hasattr(view, 'model_dump') else view
+    body['data']['assessmentPresentation'] = json.loads(json.dumps(public, ensure_ascii=False, default=str))
     output.mkdir(parents=True, exist_ok=True)
     (output / 'callback.json').write_text(json.dumps(body, ensure_ascii=False, indent=1), encoding='utf-8')
     frontend = build_frontend_evaluation_callback(body)
