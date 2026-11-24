@@ -55,6 +55,11 @@ def _arguments(argv=None):
     )
     parser.add_argument('--report-id', default=None, help='local finalReportId; defaults to a timestamp')
     parser.add_argument('--no-html', action='store_true', help='skip the local HTML preview')
+    parser.add_argument(
+        '--checkpoint',
+        action='store_true',
+        help='also pickle the six-chapter projection inputs to presentation_inputs.pkl for offline replay',
+    )
     return parser.parse_args(argv)
 
 
@@ -160,6 +165,28 @@ def _build_pipeline(local_files):
     return pipeline, runtime
 
 
+def _capture_presentation_inputs(path):
+    """Pickle the keyword arguments of the six-chapter projection when it runs.
+
+    Replaying them with ``scripts/replay_assessment_presentation.py`` re-runs the
+    deterministic projection, callback and preview without any model call.
+    """
+    import pickle
+
+    from modules.report import assessment_presentation
+
+    original = assessment_presentation.build_assessment_presentation
+
+    def capture(**kwargs):
+        try:
+            path.write_bytes(pickle.dumps(kwargs, protocol=pickle.HIGHEST_PROTOCOL))
+        except Exception as error:  # a checkpoint never decides the run's outcome
+            print(f'checkpoint skipped: {type(error).__name__}: {error}', file=sys.stderr)
+        return original(**kwargs)
+
+    assessment_presentation.build_assessment_presentation = capture
+
+
 async def _run(args):
     from modules.report.artifacts import bind_report_batch
     from modules.report.artifacts import reset_report_batch
@@ -172,6 +199,8 @@ async def _run(args):
     output.mkdir(parents=True, exist_ok=True)
     request = ReportRequest.model_validate_json(Path(args.input).read_text(encoding='utf-8'))
     pipeline, runtime = _build_pipeline(_local_files(args.file))
+    if args.checkpoint:
+        _capture_presentation_inputs(output / 'presentation_inputs.pkl')
     report_id = args.report_id or 'local-' + time.strftime('%Y%m%d-%H%M%S')
     token = bind_report_batch(
         store=None, final_report_id=report_id, user_id=request.user_id, session_id=request.session_id
