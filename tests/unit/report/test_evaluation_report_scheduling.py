@@ -1,5 +1,6 @@
 import asyncio
 from dataclasses import dataclass
+from dataclasses import field
 from types import SimpleNamespace
 
 import pytest
@@ -10,6 +11,10 @@ from modules.report.evaluation_report import _author_chapters
 @dataclass
 class Plan:
     chapters: list
+    # No ``_assessment_content_plan`` on the data: these cases cover the
+    # dependency-driven body/summary/overview schedule, not the source-planned
+    # sweep (covered in test_assessment_source_receipts.py).
+    data: object = field(default_factory=SimpleNamespace)
 
 
 def chapter(code, number):

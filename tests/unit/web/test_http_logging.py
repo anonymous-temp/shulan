@@ -28,6 +28,10 @@ class _Records(logging.Handler):
         self.records = []
 
     def emit(self, record):
+        # Development hosts may probe a newly opened local port with ``GET /``.
+        # The test app routes no ``/``, so such access logs are foreign noise.
+        if ' method=GET path=/ ' in record.getMessage():
+            return
         self.records.append(record)
 
 
