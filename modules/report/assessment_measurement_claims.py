@@ -505,6 +505,7 @@ def advice_authority_issue(candidate, advice, *, inventory=()):
     # Advice fragments can include several siblings. A single action may not
     # borrow a specialty, specific test, or interval from another sibling.
     failures = []
+    unconditional, complete = [], []
     for item in advice:
         quote = _normal(item.get('sourceQuote'))
         if not quote:
@@ -515,6 +516,18 @@ def advice_authority_issue(candidate, advice, *, inventory=()):
             if issue is None:
                 return None
             failures.append(issue)
+        unconditional.extend(source for _, source, _ in spans if not _CONDITION_START.match(source))
+        complete.append(quote)
+    # One retelling may join sibling actions of the selected orders ("复查大便常规
+    #及隐血，并至消化内科就诊"). Every named specialty, test, action and interval
+    # must still come from those orders, and their conditions still apply.
+    for source in ('，'.join(unconditional), '；'.join(complete)):
+        if source and len(failures) > 1 and all(
+            _advice_action_match(_advice_instruction(term, item), source, _normal(statement)) is None
+            for item in advice
+            if item.get('sourceQuote')
+        ):
+            return None
     return failures[0] if failures else None
 
 

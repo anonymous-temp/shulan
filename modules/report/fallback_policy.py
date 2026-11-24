@@ -16,8 +16,16 @@ REPORT_GENERATION_CONCURRENCY = 20
 
 # Evaluate model work is bounded both within one report and across the
 # application. Admission of 20 reports must not create 20 independent pools.
-EVALUATE_MODEL_CONCURRENCY = 6
-EVALUATE_SHARED_MODEL_CONCURRENCY = 12
+# One report's chapter batches run a write -> review -> grounding chain each;
+# with six slots, batches queued for a slot for about 4,300 seconds in total
+# per real report (2026-11-24). Twelve per report, and a shared ceiling that
+# still lets two reports run at full width, keeps one report near 20 minutes.
+EVALUATE_MODEL_CONCURRENCY = 12
+EVALUATE_SHARED_MODEL_CONCURRENCY = 24
+# Optional authoring (the last repair sweep and legacy compatibility prose) is
+# scheduled only when it can finish by this point after generation started.
+# Unfinished duties then keep their reviewed sentences or a source-only text.
+EVALUATE_AUTHORING_TARGET_SECONDS = 1140.0
 
 
 @dataclass(frozen=True)

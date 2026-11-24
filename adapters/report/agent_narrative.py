@@ -36,7 +36,7 @@ _CHAPTER_TASKS = frozenset({
     'plan_source_bound_assessment_content', 'review_source_bound_assessment_content',
 })
 
-# Application-wide pool, with a separate six-slot execution pool below.
+# Application-wide pool, with a separate per-report execution pool below.
 MODEL_CONCURRENCY = EVALUATE_SHARED_MODEL_CONCURRENCY
 
 
