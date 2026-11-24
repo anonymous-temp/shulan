@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="zh-CN">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>Shulan Chat 对话 API Lab</title>
+        <link rel="stylesheet" href="./common.css">
+    </head>
+    <body>
+        <main class="shell lab-shell">
+            <header class="topbar">
+                <div>
+                    <p class="eyebrow">Live API laboratory</p>
+                    <h1>Chat 对话</h1>
+                    <p class="subtitle">真实调用 LLM 并保存对话。支持完整响应、SSE、历史和医生 custom 卡片；卡片可在 AI 输出期间插入。</p>
+                </div>
+            </header>
+            <nav class="nav-links lab-nav" aria-label="接口页面">
+                <a class="nav-link" href="./index.html"><span>全部接口</span></a>
+                <a class="nav-link" href="./health.html"><span>健康检查</span><small lang="en">Health Check</small></a>
+                <a class="nav-link" href="./interpret.html"><span>报告解读</span><small lang="en">Analysis</small></a>
+                <a class="nav-link" href="./record.html"><span>建档问答</span><small lang="en">Record</small></a>
+                <a class="nav-link active" aria-current="page" href="./chat.html"><span>智能对话</span><small lang="en">Chat</small></a>
+                <a class="nav-link" href="./record-preview.html"><span>整卷问卷</span><small lang="en">Questionnaire</small></a>
+                <a class="nav-link" href="./health-analysis.html"><span>健康分析</span><small lang="en">Health Analysis</small></a>
+                <a class="nav-link" href="./report.html"><span>最终报告</span><small lang="en">Report</small></a>
+                <a class="nav-link" href="./health-profile.html"><span>健康画像</span><small lang="en">Profile</small></a>
+                <a class="nav-link" href="./health-profile-view.html"><span>画像展示</span><small lang="en">Profile View</small></a>
+            </nav>
+            <section id="lab-context" data-lab-section="连接与身份" class="connection lab-context" aria-label="公共测试设置">
+            </section>
+            <div class="lab-workspace">
+                <div class="lab-main">
+                    <section class="panel" id="chat-conversation" data-lab-section="对话">
+                        <div class="panel-head">
+                            <h2>对话</h2>
+                        </div>
+                        <div class="panel-body">
+                            <div class="actions">
+                                <button class="button secondary" data-action="chat.suggestions">推荐问题</button>
+                                <button class="button ghost" data-action="chat.history">加载历史</button>
+                                <button id="edit-custom" class="button ghost">编辑医生卡片</button>
+                            </div>
+                            <div id="suggestion-list" class="suggestions">
+                            </div>
+                        </div>
+                        <div id="conversation" class="conversation">
+                            <p class="empty">发送消息后显示模型回复和推理过程。</p>
+                        </div>
+                        <div class="panel-body">
+                            <div class="field">
+                                <label for="message">消息（表单快捷输入）</label>
+                                <textarea id="message" placeholder="例如：最近睡眠不好，经常凌晨两点才睡。">
+                                </textarea>
+                            </div>
+                            <p class="hint">与发送接口的 message 表单同步。JSON 模式请在接口参数区编辑；发送使用当前编辑方式。</p>
+                            <div class="actions">
+                                <button class="button" data-action="chat.send.complete">完整响应</button>
+                                <button class="button secondary" data-action="chat.send.stream">SSE 流式响应</button>
+                            </div>
+                        </div>
+                    </section>
+                    <section id="api-editor" data-lab-section="请求编辑" class="panel">
+                    </section>
+                    <section class="panel" id="lab-response" data-lab-section="响应 JSON">
+                        <div class="panel-head">
+                            <h2>接口结果</h2>
+                        </div>
+                        <div id="api-result" class="result-json" aria-live="polite">尚未发送请求。</div>
+                    </section>
+                </div>
+                <details class="panel lab-log" id="lab-network-log" data-lab-section="网络记录">
+                    <summary class="lab-disclosure">原始网络记录</summary>
+                    <div class="panel-head">
+                        <button id="clear-log" class="button ghost">清空</button>
+                    </div>
+                    <pre id="raw-log" class="log">
+                    </pre>
+                </details>
+            </div>
+        </main>
+        <script src="./lab-core.js">
+        </script>
+        <script src="./api-contracts.js">
+        </script>
+        <script src="./json-viewer.js"></script>
+        <script src="./common.js">
+        </script>
+        <script src="./chat.js">
+        </script>
+    </body>
+</html>

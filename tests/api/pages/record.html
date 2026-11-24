@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="zh-CN">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>Shulan Record 建档问答 API Lab</title>
+        <link rel="stylesheet" href="./common.css">
+    </head>
+    <body>
+        <main class="shell lab-shell">
+            <header class="topbar">
+                <div>
+                    <p class="eyebrow">Live API laboratory</p>
+                    <h1>Record 建档问答</h1>
+                    <p class="subtitle">动态建档、补充答疑与自动完成。请求可能调用真实模型、解析报告并写入会话和健康画像。</p>
+                </div>
+            </header>
+            <nav class="nav-links lab-nav" aria-label="接口页面">
+                <a class="nav-link" href="./index.html"><span>全部接口</span></a>
+                <a class="nav-link" href="./health.html"><span>健康检查</span><small lang="en">Health Check</small></a>
+                <a class="nav-link" href="./interpret.html"><span>报告解读</span><small lang="en">Analysis</small></a>
+                <a class="nav-link active" aria-current="page" href="./record.html"><span>建档问答</span><small lang="en">Record</small></a>
+                <a class="nav-link" href="./chat.html"><span>智能对话</span><small lang="en">Chat</small></a>
+                <a class="nav-link" href="./record-preview.html"><span>整卷问卷</span><small lang="en">Questionnaire</small></a>
+                <a class="nav-link" href="./health-analysis.html"><span>健康分析</span><small lang="en">Health Analysis</small></a>
+                <a class="nav-link" href="./report.html"><span>最终报告</span><small lang="en">Report</small></a>
+                <a class="nav-link" href="./health-profile.html"><span>健康画像</span><small lang="en">Profile</small></a>
+                <a class="nav-link" href="./health-profile-view.html"><span>画像展示</span><small lang="en">Profile View</small></a>
+            </nav>
+            <section id="lab-context" data-lab-section="连接与身份" class="connection lab-context" aria-label="公共测试设置">
+            </section>
+            <div class="lab-workspace">
+                <div class="lab-main">
+                    <section id="record-attachments" class="panel" aria-labelledby="record-files-title">
+                        <div class="panel-head">
+                            <h2 id="record-files-title">本次建档附件</h2>
+                            <span id="record-file-count" class="status">0 / 5 份</span>
+                        </div>
+                        <div class="panel-body">
+                            <p class="hint">附件随“创建建档”一同发送，可选，最多 5 份。当前接口接收公网文件 URL 或已有 documentId；本地文件需先上传至文件服务，取得可直接下载的地址。</p>
+                            <div class="form-grid">
+                                <div class="field">
+                                    <label for="record-file-source">文件来源</label>
+                                    <select id="record-file-source">
+                                        <option value="url">文件 URL</option>
+                                        <option value="documentId">已有 documentId</option>
+                                    </select>
+                                </div>
+                                <div id="record-file-type-field" class="field">
+                                    <label for="record-file-type">文件类型 fileType</label>
+                                    <select id="record-file-type">
+                                        <option value="">自动识别（不发送）</option>
+                                        <option value="pdf">PDF</option>
+                                        <option value="image">图片（JPG / PNG / BMP / GIF）</option>
+                                    </select>
+                                </div>
+                                <div class="field full">
+                                    <label id="record-file-value-label" for="record-file-value">文件 URL</label>
+                                    <input id="record-file-value" type="text" placeholder="https://example.com/report.pdf" autocomplete="off" aria-describedby="record-file-hint">
+                                    <span id="record-file-hint" class="hint">使用 HTTP(S) 直接下载地址，单份不超过 50 MiB；URL 无法识别格式时，请选择 PDF 或图片。</span>
+                                </div>
+                            </div>
+                            <div class="actions">
+                                <button id="record-file-add" type="button" class="button secondary">添加下一份</button>
+                                <button id="record-file-edit" type="button" class="button ghost">编辑完整 fileList</button>
+                            </div>
+                            <p id="record-file-mode" class="hint"></p>
+                            <p id="record-file-message" class="hint" role="status" aria-live="polite"></p>
+                            <ol id="record-file-list" class="record-file-list" aria-label="本次建档附件列表"></ol>
+                        </div>
+                    </section>
+                    <section class="panel" id="record-flow" data-lab-section="建档流程">
+                        <div class="panel-head">
+                            <h2>建档流程</h2>
+                        </div>
+                        <div class="panel-body">
+                            <div class="actions">
+                                <button class="button" data-action="record.create">创建建档</button>
+                                <button class="button secondary" data-action="record.status">恢复当前问题</button>
+                                <button class="button ghost" data-action="record.history">获取历史</button>
+                            </div>
+                        </div>
+                        <div id="question-area" class="question-area">
+                            <p class="empty">创建或恢复会话后显示问题。也可在参数区独立调用任意接口。</p>
+                        </div>
+                        <div class="panel-body">
+                            <div class="field">
+                                <label for="other-answer">回答 / 补充疑问 other（表单快捷输入）</label>
+                                <textarea id="other-answer" placeholder="填写当前回答；补充阶段可一次提出多个疑问。"></textarea>
+                            </div>
+                            <p class="hint">提交回答后自动推进或完成建档。选项和结构化模板填写 answer，文字填写 other；other 非空时服务端优先使用它。JSON 模式按参数区草稿发送。</p>
+                            <div class="actions">
+                                <button id="submit" class="button" data-action="record.answer.complete" disabled>完整响应</button>
+                                <button id="submit-stream" class="button secondary" data-action="record.answer.stream" disabled>SSE 流式响应</button>
+                                <button id="no-more" class="button ghost" hidden>填入“没有了”</button>
+                            </div>
+                        </div>
+                    </section>
+                    <section id="api-editor" data-lab-section="请求编辑" class="panel">
+                    </section>
+                    <section class="panel" id="lab-response" data-lab-section="响应 JSON">
+                        <div class="panel-head">
+                            <h2>接口结果</h2>
+                        </div>
+                        <div id="api-result" class="result-json" aria-live="polite">尚未发送请求。</div>
+                    </section>
+                </div>
+                <details class="panel lab-log" id="lab-network-log" data-lab-section="网络记录">
+                    <summary class="lab-disclosure">原始网络记录</summary>
+                    <div class="panel-head">
+                        <button id="clear-log" class="button ghost">清空</button>
+                    </div>
+                    <pre id="raw-log" class="log">
+                    </pre>
+                </details>
+            </div>
+        </main>
+        <script src="./lab-core.js">
+        </script>
+        <script src="./api-contracts.js">
+        </script>
+        <script src="./json-viewer.js"></script>
+        <script src="./common.js">
+        </script>
+        <script src="./record-files.js"></script>
+        <script src="./record.js">
+        </script>
+    </body>
+</html>

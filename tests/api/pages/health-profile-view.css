@@ -1,0 +1,957 @@
+/* The page shell, controls and panels use common.css; these rules only lay out profile data. */
+.hpv-query-controls {
+    display: flex;
+    align-items: end;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.hpv-query-controls .field {
+    flex: 0 1 22rem;
+    min-width: 0;
+}
+
+.hpv-query-controls .actions {
+    margin: 0;
+}
+
+#lab-profile-query .hint a {
+    color: var(--accent-dark);
+}
+
+.hpv-section-head,
+.hpv-section-head > div,
+.hpv-title-line,
+.hpv-identifiers,
+.hpv-grade-line {
+    display: flex;
+    align-items: center;
+}
+
+.hpv-section-head {
+    justify-content: space-between;
+}
+
+.hpv-stage {
+    container-type: inline-size;
+    min-width: 0;
+}
+
+.hpv-stage.is-empty {
+    display: grid;
+    place-items: center;
+    min-height: 300px;
+}
+
+.hpv-placeholder {
+    display: grid;
+    justify-items: center;
+    width: min(460px, calc(100% - 40px));
+    gap: 10px;
+    padding: 54px 24px;
+    color: var(--muted);
+    text-align: center;
+    line-height: 1.7;
+}
+
+.hpv-placeholder strong {
+    color: var(--ink);
+    font-size: 19px;
+}
+
+.hpv-placeholder-mark {
+    display: grid;
+    width: 62px;
+    height: 62px;
+    place-items: center;
+    margin-bottom: 5px;
+    border-radius: 50%;
+    color: white;
+    background: var(--accent);
+    font-size: 34px;
+    font-weight: 300;
+}
+
+.hpv-stage.has-error .hpv-placeholder-mark {
+    background: linear-gradient(145deg, #db6e66, #a83d36);
+}
+
+.hpv-directory {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--line);
+    background: #f8faf9;
+}
+
+.hpv-directory a {
+    padding: 5px 8px;
+    border-radius: 5px;
+    color: var(--accent-dark);
+    font-size: 13px;
+    text-decoration: none;
+}
+
+.hpv-directory a:hover { background: var(--soft); text-decoration: underline; }
+:is(#hpv-overview, #hpv-indicators, #hpv-facts, #hpv-evidence) { scroll-margin-top: 5.25rem; }
+@media (max-width: 600px) {
+    :is(#hpv-overview, #hpv-indicators, #hpv-facts, #hpv-evidence) { scroll-margin-top: 8px; }
+}
+
+.hpv-dashboard {
+    min-width: 0;
+}
+
+.hpv-patient-banner {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 18px;
+    align-items: center;
+    padding: 18px;
+    border-bottom: 1px solid var(--line);
+    background: var(--paper);
+}
+
+.hpv-avatar {
+    display: grid;
+    width: 58px;
+    height: 58px;
+    place-items: center;
+    border: 4px solid #d8f3ed;
+    border-radius: 50%;
+    color: white;
+    background: var(--accent);
+    font-size: 24px;
+    font-weight: 800;
+}
+
+.hpv-patient-copy {
+    min-width: 0;
+}
+
+.hpv-title-line {
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.hpv-title-line h2 {
+    margin: 0;
+    color: var(--ink);
+    font-size: 23px;
+}
+
+.hpv-subject-tag,
+.hpv-count,
+.hpv-evidence-status,
+.hpv-alert-level {
+    display: inline-flex;
+    width: fit-content;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    font-weight: 800;
+}
+
+.hpv-subject-tag {
+    padding: 4px 9px;
+    color: #147764;
+    background: #e0f5f0;
+    font-size: 11px;
+}
+
+.hpv-profile-meta,
+.hpv-identifiers {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 18px;
+    margin-top: 10px;
+}
+
+.hpv-meta-item {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 5px;
+    color: #2f4e48;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.hpv-meta-item small,
+.hpv-identifiers,
+.hpv-updated span {
+    color: #7d8c88;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.hpv-identifiers strong {
+    color: #526861;
+    font-weight: 650;
+}
+
+.hpv-updated {
+    display: grid;
+    justify-items: end;
+    gap: 4px;
+    color: #294b44;
+    font-size: 12px;
+}
+
+.hpv-dashboard-content {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    background: #fff;
+}
+
+.hpv-indicator-column,
+.hpv-evidence-column,
+.hpv-insight-column,
+.hpv-fact-column {
+    min-width: 0;
+    padding: 18px;
+    border-bottom: 1px solid var(--line);
+    scroll-margin-top: 64px;
+}
+
+.hpv-insight-column {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+    gap: 12px;
+}
+
+.hpv-patient-banner {
+    scroll-margin-top: 64px;
+}
+
+.hpv-section-head {
+    min-height: 32px;
+    gap: 10px;
+}
+
+.hpv-section-head > div {
+    min-width: 0;
+    gap: 9px;
+}
+
+.hpv-section-head h3 {
+    margin: 0;
+    color: var(--ink);
+    font-size: 15px;
+}
+
+.hpv-section-head.compact {
+    align-items: flex-start;
+}
+
+.hpv-section-icon {
+    display: grid;
+    flex: none;
+    width: 21px;
+    height: 21px;
+    place-items: center;
+    border-radius: 7px;
+    color: #11836d;
+    background: #e2f5f0;
+    font-size: 12px;
+    font-weight: 900;
+}
+
+.hpv-count,
+.hpv-evidence-status {
+    padding: 4px 8px;
+    color: #4e6c65;
+    background: #eef4f2;
+    font-size: 10px;
+}
+
+.hpv-evidence-status.ready {
+    color: #0d765f;
+    background: #ddf4ed;
+}
+
+.hpv-evidence-status.empty,
+.hpv-evidence-status.not_requested {
+    color: #755e2b;
+    background: #fbf1d8;
+}
+
+.hpv-evidence-status.unavailable {
+    color: #8b403a;
+    background: #f8e4e2;
+}
+
+.hpv-section-description {
+    margin: 8px 0 17px 30px;
+    color: #82918d;
+    font-size: 11px;
+    line-height: 1.55;
+}
+
+.hpv-indicator-groups,
+.hpv-fact-groups,
+.hpv-evidence-list,
+.hpv-alert-list,
+.hpv-summary-content {
+    display: grid;
+    gap: 14px;
+    margin-top: 16px;
+}
+
+.hpv-fact-group,
+.hpv-indicator-group {
+    min-width: 0;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: #fff;
+}
+
+.hpv-fact-group-head,
+.hpv-indicator-group-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 11px 14px;
+    border-radius: 9px;
+    color: var(--ink);
+    background: var(--soft);
+    font-size: 13px;
+}
+
+.hpv-fact-group-head > span,
+.hpv-indicator-group-head > span {
+    margin-inline-start: auto;
+    color: var(--muted);
+    white-space: nowrap;
+    font-size: 12px;
+}
+
+.hpv-fact-group-head,
+.hpv-indicator-group-head,
+.hpv-fact-row {
+    cursor: pointer;
+    list-style: none;
+}
+
+.hpv-fact-group-head::-webkit-details-marker,
+.hpv-indicator-group-head::-webkit-details-marker,
+.hpv-fact-row::-webkit-details-marker {
+    display: none;
+}
+
+.hpv-fact-group-head::before,
+.hpv-indicator-group-head::before,
+.hpv-fact-row::before,
+.hpv-indicator-item > summary .hpv-indicator-name::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    flex: none;
+    border-right: 1.5px solid currentColor;
+    border-bottom: 1.5px solid currentColor;
+    transform: rotate(-45deg);
+}
+
+.hpv-fact-group[open] > summary,
+.hpv-indicator-group[open] > summary {
+    border-bottom-right-radius: 0;
+    border-bottom-left-radius: 0;
+}
+
+.hpv-fact-group[open] > summary::before,
+.hpv-indicator-group[open] > summary::before,
+.hpv-fact-item[open] > summary::before,
+.hpv-indicator-item[open] > summary .hpv-indicator-name::before {
+    transform: rotate(45deg);
+}
+
+.hpv-fact-list.is-scrollable {
+    max-height: min(52vh, 450px);
+    overflow: auto;
+    scroll-padding-top: 32px;
+}
+
+.hpv-fact-item + .hpv-fact-item {
+    border-top: 1px solid var(--line);
+}
+
+.hpv-fact-columns,
+.hpv-fact-row {
+    display: grid;
+    grid-template-columns: 8px minmax(0, 1fr) minmax(0, 1.5fr) minmax(0, 1fr) 4rem;
+    grid-template-areas: "marker name value reference status";
+    align-items: center;
+    gap: 8px 12px;
+    padding: 9px 14px;
+    color: var(--ink);
+    font-size: 13px;
+}
+
+.hpv-fact-columns {
+    position: sticky;
+    top: 0;
+    padding-block: 6px;
+    border-bottom: 1px solid var(--line);
+    color: var(--muted);
+    background: #f8faf9;
+    font-size: 12px;
+}
+
+.hpv-fact-column-status { grid-area: status; justify-self: end; }
+
+.hpv-fact-row::before {
+    grid-area: marker;
+}
+
+.hpv-fact-row:hover,
+.hpv-fact-item[open] > summary {
+    background: var(--paper);
+}
+
+.hpv-fact-name {
+    grid-area: name;
+    overflow-wrap: anywhere;
+}
+
+.hpv-fact-value {
+    grid-area: value;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 3px 8px;
+    min-width: 0;
+}
+
+.hpv-fact-result-text,
+.hpv-fact-reference {
+    overflow-wrap: anywhere;
+}
+
+.hpv-fact-item:not([open]) .hpv-fact-result-text {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+}
+
+.hpv-fact-reference {
+    grid-area: reference;
+    color: var(--muted);
+}
+
+.hpv-fact-reference-label {
+    display: none;
+}
+
+.hpv-fact-row:focus-visible {
+    outline: 2px solid var(--accent-dark);
+    outline-offset: -2px;
+}
+
+.hpv-fact-status {
+    grid-area: status;
+    justify-self: end;
+    padding: 3px 7px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 750;
+}
+
+.hpv-fact-status.active {
+    color: #0d765f;
+    background: #ddf4ed;
+}
+
+.hpv-fact-status.pending {
+    color: #755e2b;
+    background: #fbf1d8;
+}
+
+.hpv-fact-status.disputed {
+    color: #8b403a;
+    background: #f8e4e2;
+}
+
+.hpv-fact-meta {
+    display: grid;
+    gap: 5px;
+    margin: 0;
+    padding: 10px 14px 12px 34px;
+    background: var(--paper);
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.hpv-fact-meta-field {
+    display: grid;
+    grid-template-columns: 7em minmax(0, 1fr);
+    gap: 10px;
+}
+
+.hpv-fact-meta-field dd {
+    margin: 0;
+    color: var(--ink);
+    overflow-wrap: anywhere;
+}
+
+.hpv-indicator-row {
+    display: grid;
+    grid-template-columns: minmax(140px, 1.3fr) minmax(90px, 0.8fr) minmax(100px, 0.85fr) 60px 72px;
+    min-width: 520px;
+    gap: 8px;
+    align-items: center;
+    padding: 11px 12px;
+    border-top: 1px solid #edf1f0;
+    color: #536963;
+    font-size: 11px;
+}
+
+.hpv-indicator-row > * {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.hpv-indicator-item > summary {
+    cursor: pointer;
+    list-style: none;
+}
+
+.hpv-indicator-item > summary::-webkit-details-marker {
+    display: none;
+}
+
+.hpv-indicator-item > summary .hpv-indicator-name {
+    position: relative;
+}
+
+.hpv-indicator-item > summary .hpv-indicator-name,
+.hpv-table-head > :first-child {
+    padding-inline-start: 14px;
+}
+
+.hpv-indicator-item > summary .hpv-indicator-name::before {
+    position: absolute;
+    inset-inline-start: 0;
+    top: 4px;
+}
+
+.hpv-indicator-item > summary:hover,
+.hpv-indicator-item[open] > summary {
+    background: var(--paper);
+}
+
+.hpv-indicator-item > summary:focus-visible,
+.hpv-indicator-history-item > summary:focus-visible {
+    outline: 2px solid var(--accent-dark);
+    outline-offset: -2px;
+}
+
+.hpv-indicator-history {
+    padding: 10px 14px 12px 26px;
+    border-top: 1px solid var(--line);
+    background: var(--paper);
+    font-size: 12px;
+}
+
+.hpv-indicator-history-list {
+    margin: 5px 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.hpv-indicator-history-item > summary {
+    padding: 6px 0;
+    cursor: pointer;
+    overflow-wrap: anywhere;
+}
+
+.hpv-indicator-history-item > summary > span {
+    margin-inline-end: 8px;
+    color: var(--muted);
+}
+
+.hpv-table-head {
+    min-height: 34px;
+    padding-block: 7px;
+    color: #899793;
+    border-top: 0;
+    background: #fff;
+    font-size: 10px;
+    font-weight: 750;
+}
+
+.hpv-indicator-name {
+    display: grid;
+    min-width: 0;
+    gap: 2px;
+}
+
+.hpv-indicator-name .hpv-fact-status {
+    grid-area: auto;
+    justify-self: start;
+    padding: 2px 5px;
+    font-size: 9px;
+}
+
+.hpv-indicator-name strong {
+    color: var(--ink);
+    font-size: 12px;
+}
+
+.hpv-indicator-name small,
+.hpv-citation-list small {
+    color: #85938f;
+    line-height: 1.35;
+}
+
+.hpv-observed-at {
+    font-size: 9px;
+}
+
+.hpv-result {
+    color: #274d45;
+    font-weight: 760;
+}
+
+.hpv-reference {
+    color: #71827d;
+}
+
+.hpv-result-judgment {
+    display: grid;
+    gap: 2px;
+    align-content: center;
+}
+
+.hpv-judgment-basis,
+.hpv-judgment-reference {
+    font-size: 9px;
+    line-height: 1.35;
+}
+
+.hpv-judgment-basis {
+    color: var(--muted);
+}
+
+.hpv-judgment-reference {
+    color: #77592f;
+}
+
+.hpv-interpretation {
+    justify-self: start;
+    color: #697c77;
+    font-size: 10px;
+    font-weight: 800;
+}
+
+.hpv-interpretation.normal {
+    color: #19826b;
+}
+
+.hpv-interpretation.high,
+.hpv-interpretation.low,
+.hpv-interpretation.abnormal {
+    color: #e17039;
+}
+
+.hpv-interpretation.critical {
+    color: #bc3731;
+}
+
+.hpv-indicator-trends {
+    display: grid;
+    justify-items: center;
+    text-align: center;
+}
+
+.hpv-recorded-trend {
+    color: #697c77;
+    font-size: 10px;
+    line-height: 1.35;
+}
+
+.hpv-trend {
+    justify-self: center;
+    font-size: 16px;
+    font-weight: 900;
+}
+
+.hpv-trend.up {
+    color: #e2673d;
+}
+
+.hpv-trend.down {
+    color: #20a68a;
+}
+
+.hpv-trend.stable,
+.hpv-trend.unknown {
+    color: #8b9995;
+}
+
+.hpv-evidence-card {
+    padding: 15px 15px 15px 13px;
+    border-left: 3px solid #24a88d;
+    border-radius: 0 12px 12px 0;
+    background: linear-gradient(90deg, #f0faf7, #fff 58%);
+}
+
+.hpv-evidence-title {
+    display: grid;
+    grid-template-columns: 24px minmax(0, 1fr);
+    gap: 9px;
+    align-items: start;
+}
+
+.hpv-evidence-title h4 {
+    margin: 2px 0 0;
+    color: #224a41;
+    font-size: 13px;
+    line-height: 1.45;
+}
+
+.hpv-evidence-index {
+    display: grid;
+    width: 22px;
+    height: 22px;
+    place-items: center;
+    border-radius: 50%;
+    color: #fff;
+    background: #1ca188;
+    font-size: 11px;
+    font-weight: 850;
+}
+
+.hpv-grade-line {
+    flex-wrap: wrap;
+    gap: 7px;
+    margin: 8px 0 0 33px;
+}
+
+.hpv-grade-line span {
+    padding: 3px 7px;
+    border-radius: 999px;
+    color: #197763;
+    background: #def4ed;
+    font-size: 9px;
+    font-weight: 750;
+}
+
+.hpv-conclusion {
+    margin: 10px 0 0 33px;
+    color: #526c66;
+    font-size: 11px;
+    line-height: 1.7;
+}
+
+.hpv-citation-list {
+    display: grid;
+    gap: 5px;
+    margin: 10px 0 0 33px;
+    padding: 0;
+    list-style: none;
+}
+
+.hpv-citation-list li {
+    display: grid;
+    gap: 2px;
+    padding-left: 11px;
+    position: relative;
+    color: #657b75;
+    font-size: 10px;
+    line-height: 1.5;
+}
+
+.hpv-citation-list li::before {
+    position: absolute;
+    top: 0;
+    left: 0;
+    color: #1ba186;
+    content: "·";
+}
+
+.hpv-citation-list a {
+    color: #176f5e;
+    text-decoration: none;
+}
+
+.hpv-citation-list a:hover {
+    text-decoration: underline;
+}
+
+.hpv-insight-card {
+    padding: 12px 14px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--paper);
+}
+
+.hpv-alert-list {
+    gap: 10px;
+}
+
+.hpv-alert-row {
+    display: grid;
+    grid-template-columns: 8px minmax(0, 1fr) auto;
+    gap: 8px;
+    align-items: center;
+    color: #3f5953;
+    font-size: 11px;
+}
+
+.hpv-alert-row strong {
+    font-weight: 680;
+    line-height: 1.5;
+}
+
+.hpv-alert-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #e8932f;
+}
+
+.hpv-alert-row.critical .hpv-alert-dot {
+    background: #d54b43;
+    box-shadow: 0 0 0 4px rgba(213, 75, 67, 0.1);
+}
+
+.hpv-alert-level {
+    padding: 3px 7px;
+    color: #c36d1a;
+    background: #fff0db;
+    font-size: 9px;
+}
+
+.hpv-alert-row.critical .hpv-alert-level {
+    color: #a73832;
+    background: #f9e1df;
+}
+
+.hpv-summary-content {
+    gap: 16px;
+}
+
+.hpv-summary-row {
+    display: grid;
+    grid-template-columns: 66px minmax(0, 1fr);
+    gap: 9px;
+    align-items: start;
+}
+
+.hpv-summary-row strong {
+    color: #15816c;
+    font-size: 11px;
+}
+
+.hpv-summary-row p {
+    white-space: pre-line;
+    margin: 0;
+    color: #566c67;
+    font-size: 11px;
+    line-height: 1.75;
+}
+
+.hpv-pending-card {
+    grid-column: 1 / -1;
+    padding: 13px 14px;
+    border: 1px solid #ecd39e;
+    border-radius: 12px;
+    color: #72551d;
+    background: #fff8e8;
+}
+
+.hpv-pending-card strong,
+.hpv-pending-card span {
+    display: block;
+}
+
+.hpv-pending-card strong {
+    font-size: 11px;
+}
+
+.hpv-pending-card span {
+    margin-top: 4px;
+    font-size: 10px;
+    line-height: 1.55;
+}
+
+.hpv-empty-state {
+    padding: 24px 18px;
+    border: 1px dashed #d7e2df;
+    border-radius: 12px;
+    color: #84928e;
+    background: rgba(247, 244, 237, 0.45);
+    font-size: 11px;
+    line-height: 1.7;
+    text-align: center;
+}
+
+.hpv-indicator-table {
+    max-height: min(52vh, 450px);
+    overflow: auto;
+}
+
+.hpv-indicator-table .hpv-table-head {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+.hpv-identifiers {
+    overflow-wrap: anywhere;
+}
+
+@container (max-width: 660px) {
+    .hpv-insight-column {
+        grid-template-columns: minmax(0, 1fr);
+    }
+    .hpv-patient-banner {
+        grid-template-columns: auto minmax(0, 1fr);
+        gap: 12px;
+    }
+    .hpv-updated {
+        grid-column: 2;
+        justify-items: start;
+    }
+    .hpv-title-line h2 {
+        font-size: 19px;
+    }
+    .hpv-identifiers {
+        display: grid;
+        gap: 5px;
+    }
+    .hpv-indicator-column,
+    .hpv-evidence-column,
+    .hpv-insight-column,
+    .hpv-fact-column {
+        padding: 18px 14px;
+    }
+}
+
+@container (max-width: 560px) {
+    .hpv-indicator-row {
+        grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 0.9fr) minmax(2.6rem, 0.65fr) minmax(2rem, 0.65fr);
+        min-width: 0;
+        padding-inline: 8px;
+        gap: 5px;
+    }
+}
+
+@container (max-width: 430px) {
+    .hpv-fact-columns { display: none; }
+    .hpv-fact-list.is-scrollable { scroll-padding-top: 0; }
+    .hpv-fact-row {
+        grid-template-columns: 8px minmax(0, 1fr) auto;
+        grid-template-areas:
+            "marker name status"
+            ". value value"
+            ". reference reference";
+        row-gap: 3px;
+    }
+    .hpv-fact-reference-label {
+        display: inline;
+        margin-inline-end: 0.5em;
+    }
+}

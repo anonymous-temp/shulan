@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="zh-CN">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>Shulan 最终健康报告 API Lab</title>
+        <link rel="stylesheet" href="./common.css">
+    </head>
+    <body>
+        <main class="shell lab-shell">
+            <header class="topbar">
+                <div>
+                    <p class="eyebrow">Live API laboratory</p>
+                    <h1>最终健康报告</h1>
+                    <p class="subtitle">生成请求启动真实后台任务并触发外部回调；列表和详情接口读取已保存的报告产物。</p>
+                </div>
+            </header>
+            <nav class="nav-links lab-nav" aria-label="接口页面">
+                <a class="nav-link" href="./index.html"><span>全部接口</span></a>
+                <a class="nav-link" href="./health.html"><span>健康检查</span><small lang="en">Health Check</small></a>
+                <a class="nav-link" href="./interpret.html"><span>报告解读</span><small lang="en">Analysis</small></a>
+                <a class="nav-link" href="./record.html"><span>建档问答</span><small lang="en">Record</small></a>
+                <a class="nav-link" href="./chat.html"><span>智能对话</span><small lang="en">Chat</small></a>
+                <a class="nav-link" href="./record-preview.html"><span>整卷问卷</span><small lang="en">Questionnaire</small></a>
+                <a class="nav-link" href="./health-analysis.html"><span>健康分析</span><small lang="en">Health Analysis</small></a>
+                <a class="nav-link active" aria-current="page" href="./report.html"><span>最终报告</span><small lang="en">Report</small></a>
+                <a class="nav-link" href="./health-profile.html"><span>健康画像</span><small lang="en">Profile</small></a>
+                <a class="nav-link" href="./health-profile-view.html"><span>画像展示</span><small lang="en">Profile View</small></a>
+            </nav>
+            <section id="lab-context" data-lab-section="连接与身份" class="connection lab-context" aria-label="公共测试设置">
+            </section>
+            <div class="lab-workspace">
+                <div class="lab-main">
+                    <section id="api-editor" data-lab-section="请求编辑" class="panel">
+                    </section>
+                    <section class="panel" id="mock-callback-title-section" data-lab-section="模拟回调" aria-labelledby="mock-callback-title">
+                        <div class="panel-head">
+                            <h2 id="mock-callback-title">开发用模拟回调</h2>
+                            <button id="copy-callback-url" class="button ghost" type="button">复制回调地址</button>
+                        </div>
+                        <div class="panel-body">
+                            <label class="field" for="mock-callback-url">
+                                后端配置 SHULAN_REPORT_CALLBACK_URL
+                                <input id="mock-callback-url" type="text" readonly spellcheck="false">
+                            </label>
+                            <p class="hint">使用 <code>python -m tests.api.serve_pages</code> 启动页面服务，即可通过此地址接收回调并返回 HTTP 200；纯静态托管不提供此接口。后端配置此地址并重启后，对新受理的报告生效。</p>
+                            <p class="hint">地址必须能从后端访问，localhost 指后端所在机器或容器。已受理批次保留原回调地址；修改配置并重启后，可执行 <code>python -m scripts.report_callbacks migrate-pending</code> 将积压任务整体切换到当前配置地址。</p>
+                            <p id="callback-url-status" class="hint" role="status" aria-live="polite"></p>
+                        </div>
+                    </section>
+                    <section class="panel" id="report-batches" data-lab-section="报告批次">
+                        <div class="panel-head">
+                            <h2>报告批次</h2>
+                            <button id="next-reports" class="button ghost" disabled>填入下一页游标</button>
+                        </div>
+                        <div class="panel-body">
+                            <p class="hint">受理响应包含 finalReportId；点击批次可填入详情查询。生成结果与回调投递状态分别展示；未确认的回调会由服务端持续补投。</p>
+                            <div id="report-progress" aria-live="polite"></div>
+                            <div id="report-list" class="data-list">
+                            </div>
+                        </div>
+                    </section>
+                    <section class="panel" id="lab-response" data-lab-section="响应 JSON">
+                        <div class="panel-head">
+                            <h2>接口结果</h2>
+                        </div>
+                        <div id="api-result" class="result-json" aria-live="polite">尚未发送请求。</div>
+                    </section>
+                </div>
+                <details class="panel lab-log" id="lab-network-log" data-lab-section="网络记录">
+                    <summary class="lab-disclosure">原始网络记录</summary>
+                    <div class="panel-head">
+                        <button id="clear-log" class="button ghost">清空</button>
+                    </div>
+                    <pre id="raw-log" class="log">
+                    </pre>
+                </details>
+            </div>
+        </main>
+        <script src="./lab-core.js">
+        </script>
+        <script src="./api-contracts.js">
+        </script>
+        <script src="./json-viewer.js"></script>
+        <script src="./common.js">
+        </script>
+        <script src="./report.js">
+        </script>
+    </body>
+</html>

@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Shulan 整卷问卷 API Lab</title>
+    <link rel="stylesheet" href="./common.css">
+    <link rel="stylesheet" href="./record-preview.css">
+</head>
+<body>
+<main class="shell lab-shell">
+    <header class="topbar"><div>
+        <p class="eyebrow">Live API laboratory</p><h1>整卷健康问卷</h1>
+        <p class="subtitle">生成、恢复和填写整份问卷。提交答案后更新画像与当前会话，并继续使用 Chat。</p>
+    </div></header>
+            <nav class="nav-links lab-nav" aria-label="接口页面">
+                <a class="nav-link" href="./index.html"><span>全部接口</span></a>
+                <a class="nav-link" href="./health.html"><span>健康检查</span><small lang="en">Health Check</small></a>
+                <a class="nav-link" href="./interpret.html"><span>报告解读</span><small lang="en">Analysis</small></a>
+                <a class="nav-link" href="./record.html"><span>建档问答</span><small lang="en">Record</small></a>
+                <a class="nav-link" href="./chat.html"><span>智能对话</span><small lang="en">Chat</small></a>
+                <a class="nav-link active" aria-current="page" href="./record-preview.html"><span>整卷问卷</span><small lang="en">Questionnaire</small></a>
+                <a class="nav-link" href="./health-analysis.html"><span>健康分析</span><small lang="en">Health Analysis</small></a>
+                <a class="nav-link" href="./report.html"><span>最终报告</span><small lang="en">Report</small></a>
+                <a class="nav-link" href="./health-profile.html"><span>健康画像</span><small lang="en">Profile</small></a>
+                <a class="nav-link" href="./health-profile-view.html"><span>画像展示</span><small lang="en">Profile View</small></a>
+            </nav>
+    <section id="lab-context" data-lab-section="连接与身份" class="connection lab-context" aria-label="公共测试设置"></section>
+    <div class="lab-workspace"><div class="lab-main">
+                    <section id="questionnaire-attachments" class="panel" aria-labelledby="questionnaire-files-title">
+                        <div class="panel-head">
+                            <h2 id="questionnaire-files-title">问卷资料</h2>
+                            <span id="questionnaire-file-count" class="status">0 / 5 份</span>
+                        </div>
+                        <div class="panel-body">
+                            <p class="hint">附件随“生成整卷问卷”发送，可选，最多 5 份。仅接收文件 URL 或当前用户的 documentId；本页不预先调用报告解读。已有文档可能已进入健康画像。</p>
+                            <div class="form-grid">
+                                <div class="field">
+                                    <label for="questionnaire-file-source">文件来源</label>
+                                    <select id="questionnaire-file-source">
+                                        <option value="url">文件 URL</option>
+                                        <option value="documentId">已有 documentId</option>
+                                    </select>
+                                </div>
+                                <div id="questionnaire-file-type-field" class="field">
+                                    <label for="questionnaire-file-type">文件类型 fileType</label>
+                                    <select id="questionnaire-file-type">
+                                        <option value="">自动识别（不发送）</option>
+                                        <option value="pdf">PDF</option>
+                                        <option value="image">图片（JPG / PNG / BMP / GIF）</option>
+                                    </select>
+                                </div>
+                                <div class="field full">
+                                    <label id="questionnaire-file-value-label" for="questionnaire-file-value">文件 URL</label>
+                                    <input id="questionnaire-file-value" type="text" placeholder="https://example.com/report.pdf" autocomplete="off" aria-describedby="questionnaire-file-hint">
+                                    <span id="questionnaire-file-hint" class="hint">使用 HTTP(S) 直接下载地址，单份不超过 50 MiB；URL 无法识别格式时，请选择 PDF 或图片。</span>
+                                </div>
+                            </div>
+                            <div class="actions">
+                                <button id="questionnaire-file-add" type="button" class="button secondary">添加下一份</button>
+                                <button id="questionnaire-file-edit" type="button" class="button ghost">编辑完整 fileList</button>
+                            </div>
+                            <p id="questionnaire-file-mode" class="hint"></p>
+                            <p id="questionnaire-file-message" class="hint" role="status" aria-live="polite"></p>
+                            <ol id="questionnaire-file-list" class="questionnaire-file-list" aria-label="问卷资料列表"></ol>
+                        </div>
+                    </section>
+        <section class="panel" id="questionnaire-flow" data-lab-section="问卷流程">
+            <div class="panel-head"><h2>问卷流程</h2></div>
+            <div class="panel-body">
+                <div class="actions">
+                    <button id="questionnaire-generate" class="button" data-action="questionnaire.create">生成整卷问卷</button>
+                    <button id="questionnaire-restore" class="button secondary" data-action="questionnaire.status">恢复当前问卷</button>
+                    <button id="questionnaire-submit" class="button" data-action="questionnaire.submit" disabled>提交整卷答案</button>
+                    <a id="questionnaire-chat" class="button secondary" href="./chat.html" hidden>继续 Chat（完整 / SSE）</a>
+                </div>
+                <p id="questionnaire-status" class="hint" role="status" aria-live="polite">生成或恢复当前会话的问卷。刷新后可点击“恢复当前问卷”。</p>
+                <p id="questionnaire-mode" class="hint">所有题目均可选填；不确定可留空，不会自动选择“不清楚”或“以上均无”。</p>
+                <div id="questionnaire-downloads" class="actions"></div>
+            </div>
+        </section>
+        <section id="questionnaire-factors" data-lab-section="独立因素分析" class="panel" hidden aria-label="独立因素分析"></section>
+        <section id="questionnaire-risk" data-lab-section="风险分析" class="panel" hidden></section>
+        <section id="questionnaire-client" data-lab-section="问卷结果" class="panel" hidden></section>
+        <section class="panel" id="questionnaire-answers" data-lab-section="客户问卷"><div class="panel-head"><h2>客户问卷</h2></div>
+            <div id="questionnaire-form" class="panel-body"><p class="empty">问卷就绪后在这里填写。</p></div>
+        </section>
+        <section id="questionnaire-interview" data-lab-section="访谈" class="panel" hidden></section>
+        <section id="questionnaire-reports" data-lab-section="报告" class="panel" hidden></section>
+        <section id="api-editor" data-lab-section="请求编辑" class="panel"></section>
+        <details class="panel" id="lab-response" data-lab-section="响应 JSON">
+            <summary class="lab-disclosure">原始响应 JSON</summary>
+            <div id="api-result" class="result-json" aria-live="polite">尚未发送请求。</div>
+        </details>
+    </div><details class="panel lab-log" id="lab-network-log" data-lab-section="网络记录">
+        <summary class="lab-disclosure">原始网络记录</summary>
+        <div class="panel-head"><button id="clear-log" class="button ghost">清空</button></div>
+        <pre id="raw-log" class="log"></pre>
+    </details></div>
+</main>
+<script src="./lab-core.js"></script>
+<script src="./api-contracts.js"></script>
+<script src="./json-viewer.js"></script>
+<script src="./common.js"></script>
+<script src="./record-files.js"></script>
+<script src="./record-factors.js"></script>
+<script src="./record-preview.js"></script>
+</body>
+</html>

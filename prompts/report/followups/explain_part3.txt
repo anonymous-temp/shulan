@@ -1,0 +1,103 @@
+# 任务指令
+你正在编写《用户报告解读参考手册》的**第三部分：干预方案**。
+目标：让用户认同方案逻辑、清楚执行细节、接受产品方向、确认就医安排。
+
+# 输入数据
+【受检者与报告信息】
+${meta_json}
+
+【第三部分素材】
+${part_json}
+
+素材字段说明：
+- `blocks`：报告 3.1 到 3.7 的各节正文，每条含 `code` 章节代码、`title` 章节标题、`content` 正文、`evidence_refs` 引用文献编号。常见 `code`：
+  - `strategy` 总体思路；
+  - `diet` 饮食与饮水、`exercise` 运动与久坐管理、`sleep` 睡眠压力与日常行为；
+  - `microbiome_rationale` 调节理由、`probiotics` 益生菌评估、`prebiotics` 膳食底物与益生元、`barrier` 肠道屏障支持、`microbiome_followup` 调节后的观察与复评；
+  - `nutrition` 个性化营养素补充；
+  - `clinical_followup` 医疗就医建议清单、`monitoring` 复查与监测计划、`alerts` 需要及时就医的情况、`avoid` 不建议的做法。
+- `plan`：四个固定阶段的行动安排。
+- `examinations`：建议的检查项目，含名称、目的与理由。
+- `microbe_overview`：菌群汇总口径（共几项、几项超标、几项缺乏）与整体说明，用于产品衔接第二步指出缺口。
+
+# 本部分的讲解要求
+
+1. **先讲为什么这样设计**：按已有方案说明生活方式、菌群调节、营养支持各自的适用条件，再逐项讲做什么；没有相关方案时，不默认三类干预都适用。
+2. **三支柱顺序不可颠倒**：`lifestyle` 生活方式 → `microbiome` 菌群与肠屏障 → `nutrition` 营养素。
+3. **生活方式先讲**：仅复述已有饮食、饮水和运动安排；频率、强度、摄入目标须来自素材，不根据年龄补全默认目标。可说明产品不能替代生活方式管理。
+4. **就医清单单独成环节**：`clinical_followup_talk` 逐项讲 `examinations`，每项都要有一句确认话术，请用户回应；级别最高的那项必须确认到"打算哪天去"。
+5. **产品衔接按四步法**，仅在已有个体建议支持时展开，顺序不可颠倒，且只能出现在本部分；缺少依据时保留字段但不补造需求或推荐：
+   - 第一步 机制：讲清问题与菌群/营养素之间的机制关系；
+   - 第二步 需求：数值逐字引用已有结果，说明报告实际支持的关注点，不把菌群丰度偏低或功能潜能直接等同营养缺乏或补充需要；
+   - 第三步 方向：仅复述已有选择依据和适用限制，不自行指定菌株、剂量、疗程或品牌；
+   - 第四步 衔接：说明具体配方由健康管理师根据报告来配，配好了再详细讲。
+   **不报价、不逼单、不承诺疗效与时间。**
+6. **如果素材里明确写了目前不适合自行选用益生菌或不需要补充剂**，必须照这个口径讲，不得反过来推荐产品。这种情况下产品衔接只做机制与观察记录的铺垫。
+7. **严禁**：不得弱化就医必要性；不得把 `alerts`（需要及时就医的情况）讲成可以先观察；不得自行增加素材里没有的补充剂、剂量或品牌。
+
+# 字数与条数约束
+- `pillars` 仅保留素材支持的条目，按 lifestyle、microbiome、nutrition 排序，每条 `script.text` 不超过 250 字；无素材时返回 []。
+- `plan_talk` 与输入 `plan` 中有实际行动内容的阶段一一对应，`phase` 照抄，每条不超过 120 字；无行动内容时返回 []。
+- `clinical_followup_talk.items` 与输入 `examinations` 一一对应，`name` 照抄。
+- `key_points` 3 到 5 条，`script.body` 2 到 5 段（每段不超过 120 字），`visual_guide` 1 到 4 条，`faq` 5 到 8 条，`cautions` 三个列表各 1 到 3 条。
+
+# 输出格式
+请严格遵守以下 JSON Schema（`kind` 与 `code` 字段照抄）：
+{
+  "part_no": 3,
+  "title": "第三部分 干预方案",
+  "key_points": [{"text": "…", "anchor": "3.1"}],
+  "pillars": [
+    {
+      "code": "lifestyle",
+      "title": "支柱一：个性化生活方式干预",
+      "script": {"kind": "script", "text": "照读话术"}
+    },
+    {
+      "code": "microbiome",
+      "title": "支柱二：个性化肠道菌群与肠屏障调节",
+      "script": {"kind": "script", "text": "照读话术"}
+    },
+    {
+      "code": "nutrition",
+      "title": "支柱三：个性化营养素补充",
+      "script": {"kind": "script", "text": "照读话术"}
+    }
+  ],
+  "plan_talk": [
+    {"phase": "照抄输入的阶段名", "script": {"kind": "script", "text": "这个阶段要做什么"}}
+  ],
+  "clinical_followup_talk": {
+    "kind": "script",
+    "intro": "就医清单的开场话术",
+    "items": [
+      {
+        "name": "照抄输入的检查名称",
+        "purpose": "照抄输入的目的",
+        "talk": "为什么要做这项的照读话术",
+        "confirm": "请用户确认时间的一句话"
+      }
+    ]
+  },
+  "product_bridge": {
+    "kind": "script",
+    "step1_mechanism": "第一步 机制",
+    "step2_need": "第二步 需求，用报告数据指出缺口",
+    "step3_direction": "第三步 方向",
+    "step4_handoff": "第四步 衔接",
+    "forbidden": ["不报价", "不逼单", "不承诺疗效与时间"]
+  },
+  "script": {
+    "kind": "script",
+    "opening": "本部分开场",
+    "body": ["三位一体逻辑与过渡话术"],
+    "closing": "小结并转场到第四部分"
+  },
+  "visual_guide": [
+    {"anchor": "3.5", "target": "text", "order": ["先指哪一段", "再指哪一段"], "talk": "指着报告说的话"}
+  ],
+  "faq": [{"question": "…", "answer": "…", "source": "报告 3.2 / 文献[2]"}],
+  "cautions": {"must_say": ["…"], "easy_wrong": ["…"], "forbidden": ["…"]}
+}
+
+`target` 只能取 `radar`、`score`、`table`、`text` 四者之一。

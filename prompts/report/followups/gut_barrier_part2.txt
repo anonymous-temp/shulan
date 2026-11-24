@@ -1,0 +1,84 @@
+# 任务指令
+你正在编写《肠道屏障报告解读参考手册》的**第二章：相关疾病风险评估**。
+目标：让用户理解这一章是在讲「屏障与炎症可能牵连到哪些系统」，同时**不把没有做出的风险分层讲成结论**。
+
+# 输入数据
+【受检者与报告信息】
+${meta_json}
+
+【第二章素材】
+${part_json}
+
+素材字段说明：
+- `systems`：2.1–2.7 各系统的风险表，每行含 `disease` 疾病、`risk_index` 风险指数、`risk_level` 风险等级、`mechanism` 机制关联。
+- `stats`：`total` 总条数、`assessed` 本次做出分层的条数、`unassessed` 未评估条数、`assessed_rows` 已分层的具体行。
+- `clinical_background`：个体临床背景表（本次/既往检查摘要），为 null 表示本次没有。**这是本章唯一的个性化素材，有就必须讲。**
+- `summary_points`：本章小结原文。
+- `extra_blocks`：本章的其它块。
+
+# 本章的讲解要求
+
+1. **先讲这一章是干什么的**（`risk_overview`）：这一章是把屏障与炎症和各个系统的疾病做机制关联，不是体检结论，更不是诊断。
+2. **「未评估」的口径**（`risk_overview.must_say`，必须原样说出口）：
+   「这一章里写『未评估』的，是这次还没有做出风险分层，不是没有风险，也不是风险低。要做分层需要补充定量结果。」
+   - `stats.assessed` 为 0 时，这句是本章的主线；
+   - `assessed_rows` 有内容时，先讲已分层的那几条（照抄疾病名与等级），再用这句解释其余为什么是「未评估」。
+3. **逐系统讲**（`systems`）：`title` 与 `diseases` 照抄输入，不增不减不改名。`talk` 用一两句说清这个系统和屏障/炎症的关联方向，可以引用 `mechanism` 原文的意思，但要讲明白**那是一般机制，不是这位受检者的个人结论**。
+4. **个体临床背景**（`background_talk`）：`clinical_background` 有内容时逐行讲，检查日期、项目、数值、原报告参考范围逐字照抄；这是本章唯一能落到本人的内容，必须讲，并说明「这些是既有检查记录，和本次屏障检测放在一起看」。为 null 时整块省略。
+5. **本章小结**（`summary_talk`）：`points` 照抄原文，`talk` 做口语化改写，落到「下一步建议做什么检查、找哪个科」。
+6. **文献标记不要念**：机制原文里的 `[4]`、`[补19]` 这类标记写进话术时去掉，需要溯源写进 `source`。
+7. **禁止**：不得自己给出风险指数、风险等级或患病概率；不得把「未评估」说成没有风险；不得把机制关联说成这位受检者已经发生的病理过程；不得对报告未收录的疾病展开讲解。
+
+# 字数与条数约束
+- `key_points`：3 到 5 条，每条不超过 40 字。
+- `script.body`：2 到 5 段，每段不超过 120 字。
+- `risk_overview.text`：不超过 200 字。
+- `systems`：条数与输入完全一致，每条 `talk` 不超过 120 字。
+- `background_talk.talk`：不超过 200 字。
+- `summary_talk.talk`：不超过 150 字。
+- `visual_guide`：1 到 4 条。
+- `faq`：5 到 8 条，每条 `answer` 不超过 120 字。
+- `cautions` 三个列表各 1 到 3 条。
+
+# 输出格式
+请严格遵守以下 JSON Schema（`kind` 字段照抄）：
+{
+  "part_no": 2,
+  "title": "第二章 相关疾病风险评估",
+  "key_points": [{"text": "…", "anchor": "2.1"}],
+  "script": {
+    "kind": "script",
+    "opening": "本章开场",
+    "body": ["照读话术"],
+    "closing": "小结并收束到下一步"
+  },
+  "risk_overview": {
+    "kind": "script",
+    "text": "这一章整体怎么讲的照读话术",
+    "must_say": "这一章里写「未评估」的，是这次还没有做出风险分层，不是没有风险，也不是风险低。要做分层需要补充定量结果。"
+  },
+  "systems": [
+    {
+      "title": "照抄输入的系统标题",
+      "diseases": ["照抄输入的疾病名"],
+      "talk": "这个系统怎么讲的照读话术"
+    }
+  ],
+  "background_talk": {
+    "kind": "script",
+    "talk": "个体临床背景的照读话术；输入为 null 时这里写空字符串"
+  },
+  "summary_talk": {
+    "kind": "script",
+    "points": ["照抄本章小结原文"],
+    "talk": "小结的照读话术"
+  },
+  "visual_guide": [
+    {"anchor": "2.1", "target": "table", "order": ["先指哪一列", "再指哪一列"], "talk": "指着表说的话"}
+  ],
+  "faq": [{"question": "…", "answer": "…", "source": "报告 2.1"}],
+  "cautions": {"must_say": ["…"], "easy_wrong": ["…"], "forbidden": ["…"]}
+}
+
+`target` 只能取 `table`、`cards`、`bands`、`text` 四者之一；本章以 `table` 为主。
+`anchor` 只能取 "2.1" 到 "2.7"。

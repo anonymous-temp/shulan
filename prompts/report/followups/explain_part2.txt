@@ -1,0 +1,82 @@
+# 任务指令
+你正在编写《用户报告解读参考手册》的**第二部分：主要问题分析**。
+这一部分是整本手册的核心：让用户理解"问题从哪来、会向哪去、为什么现在干预最有效"，从而建立专业信任与行动意愿。
+
+# 输入数据
+【受检者与报告信息】
+${meta_json}
+
+【第二部分素材】
+${part_json}
+
+素材字段说明：
+- `problems`：临床问题数组（已按优先级排序），每条含：
+  - `no` 序号、`problem` 问题名、`priority` 优先级；
+  - `certainty`：确定性标记。取值为 `suspected` 或问题名含"待复核""可能""疑似"时，话术必须带限定语，不得说成已确认；
+  - `indicators`：该问题的原始来源记录（含原值、参考范围、日期），报数时逐字引用；
+  - `significance` 一句话说明、`causes` 可能的原因、`mechanism` 发生发展的机制、`outlook` 需要关注的后续变化、`action` 怎么办先做什么、`goal` 本阶段目标；
+  - `evidence_refs` 与 `evidence_brief`：本问题引用的文献编号与标题。
+- `microbiome_analysis`：报告 2.6 肠道菌群分析（辅助说明）的正文。
+- `data_gaps`：资料缺口说明，保留在 `cautions` 或 `faq`；影响结论理解时，照读话术也需简短说明限制。
+
+# 本部分的讲解要求
+
+1. **每个问题严格按五段展开**，顺序不可调整：现状是什么 → 可能的原因 → 发生发展的机制 → 需要关注的后续变化 → 怎么办先做什么。每段都要写成可直接照读的话术。
+   - `status`（现状）：基于 `indicators` 与 `significance` 写，仅引用实际存在的原始数值与参考范围；缺少其中一项时不得补造。
+   - `causes`、`mechanism`、`outlook`、`action`：分别改写自素材的同名字段，只做口语化，不添加新结论。
+2. **机制讲解规范**：先给结论再讲原理；每段机制控制在 2 分钟内能讲完（不超过 200 字）；专业名词必须配大白话类比。
+3. **类比口径**：允许使用并保持统一的类比——肠道黏膜=城墙、有益菌=护林员、内脏脂肪=内分泌工厂、血脂沉积=血管壁水垢、胰岛素抵抗=胰岛在"加班"。没有合适类比时就直说，不要硬造。
+4. **限定语**：`certainty` 为 `suspected` 的问题，`status` 和 `outlook` 都必须带"目前还没确定性质""需要进一步查清楚"这类限定；`outlook` 里不得估计患病概率。
+5. **菌群讲法**：`microbiome_talk` 仅改写实际存在的 `microbiome_analysis`，保留关联与因果的区别，不自行把菌群认定为多个问题的共同病因；没有该素材时保留空内容。涉及菌群模型风险时，在 `must_say` 里声明"这是菌群模型评估出的风险倾向，不等于疾病诊断"。绝对不要逐条讲具体菌名。
+6. **严禁**：不得把风险倾向说成"您会得某某病"；不得对报告未收录的问题展开讲解；不得跳过任何一个 `problems` 条目。
+
+# 字数与条数约束
+- `problems` 数量与输入一致，一条不多一条不少，`no` 与 `problem` 照抄输入。
+- `five_steps` 每段不超过 200 字。
+- `goal` 一句话，照抄或轻改输入的 `goal`。
+- `analogy` 一句话，不超过 40 字；没有合适类比时写这个问题不需要类比。
+- `key_points` 3 到 5 条，`script.body` 2 到 5 段（每段不超过 120 字），`visual_guide` 1 到 4 条，`faq` 5 到 8 条，`cautions` 三个列表各 1 到 3 条。
+
+# 输出格式
+请严格遵守以下 JSON Schema（`kind` 字段照抄）：
+{
+  "part_no": 2,
+  "title": "第二部分 主要问题分析",
+  "key_points": [{"text": "…", "anchor": "2.1"}],
+  "problems": [
+    {
+      "no": 1,
+      "problem": "照抄输入的问题名",
+      "priority": "照抄输入的优先级",
+      "certainty_note": "给解读人的限定语提示；确定性明确时写这项已有明确记录",
+      "five_steps": {
+        "status":    {"kind": "script", "text": "一、现状是什么"},
+        "causes":    {"kind": "script", "text": "二、可能的原因"},
+        "mechanism": {"kind": "script", "text": "三、发生发展的机制"},
+        "outlook":   {"kind": "script", "text": "四、需要关注的后续变化"},
+        "action":    {"kind": "script", "text": "五、怎么办、先做什么"}
+      },
+      "goal": "本阶段目标",
+      "analogy": "术语大白话类比",
+      "evidence_refs": ["照抄输入的文献编号"]
+    }
+  ],
+  "microbiome_talk": {
+    "kind": "script",
+    "text": "2.6 肠道菌群分析的整体讲法",
+    "must_say": "这是菌群模型评估出的风险倾向，不等于疾病诊断。"
+  },
+  "script": {
+    "kind": "script",
+    "opening": "本部分开场",
+    "body": ["讲解节奏提示与过渡话术"],
+    "closing": "小结并转场到第三部分"
+  },
+  "visual_guide": [
+    {"anchor": "2.1", "target": "text", "order": ["先指哪一段", "再指哪一段"], "talk": "指着报告说的话"}
+  ],
+  "faq": [{"question": "…", "answer": "…", "source": "报告 2.1 / 文献[1]"}],
+  "cautions": {"must_say": ["…"], "easy_wrong": ["…"], "forbidden": ["…"]}
+}
+
+`target` 只能取 `radar`、`score`、`table`、`text` 四者之一；本部分以 `text` 为主。

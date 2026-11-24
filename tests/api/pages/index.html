@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Shulan API Lab</title>
+    <link rel="stylesheet" href="./common.css">
+</head>
+<body>
+<main class="shell lab-shell">
+    <header class="topbar">
+        <div>
+            <p class="eyebrow">Live API laboratory</p>
+            <h1>Shulan 真实接口实验室</h1>
+            <p class="subtitle">业务接口调用你指定的真实 Tornado 服务；最终报告可使用页面服务内置的模拟回调。请选择一个业务入口开始联调。</p>
+        </div>
+    </header>
+    <nav class="nav-links lab-nav" aria-label="接口页面">
+        <a class="nav-link active" aria-current="page" href="./index.html"><span>全部接口</span></a>
+        <a class="nav-link" href="./health.html"><span>健康检查</span><small lang="en">Health Check</small></a>
+        <a class="nav-link" href="./interpret.html"><span>报告解读</span><small lang="en">Analysis</small></a>
+        <a class="nav-link" href="./record.html"><span>建档问答</span><small lang="en">Record</small></a>
+        <a class="nav-link" href="./chat.html"><span>智能对话</span><small lang="en">Chat</small></a>
+        <a class="nav-link" href="./record-preview.html"><span>整卷问卷</span><small lang="en">Questionnaire</small></a>
+        <a class="nav-link" href="./health-analysis.html"><span>健康分析</span><small lang="en">Health Analysis</small></a>
+        <a class="nav-link" href="./report.html"><span>最终报告</span><small lang="en">Report</small></a>
+        <a class="nav-link" href="./health-profile.html"><span>健康画像</span><small lang="en">Profile</small></a>
+        <a class="nav-link" href="./health-profile-view.html"><span>画像展示</span><small lang="en">Profile View</small></a>
+    </nav>
+
+    <section id="lab-context" data-lab-section="连接与身份" class="connection lab-context" aria-label="公共测试设置"></section>
+    <section class="panel" id="lab-entries" data-lab-section="接口入口">
+        <div class="panel-head"><h2>接口页面</h2><span id="api-entry-count" class="status"></span></div>
+        <div class="panel-body api-catalog">
+            <section class="api-entry-group">
+                <h3>服务检查</h3>
+                <div class="api-grid">
+                    <a class="api-card" href="./health.html"><strong>健康检查</strong><span>检查服务连通性与运行环境。</span></a>
+                </div>
+            </section>
+            <section class="api-entry-group">
+                <h3>信息采集与分析</h3>
+                <div class="api-grid">
+                    <a class="api-card" href="./interpret.html"><strong>报告解读</strong><span>提交文件 URL，验证解析、解读与保存。</span></a>
+                    <a class="api-card" href="./record.html"><strong>建档问答</strong><span>测试建档、补充问答、恢复与历史查询。</span></a>
+                    <a class="api-card" href="./chat.html"><strong>智能对话</strong><span>测试多轮对话、医生卡片与历史查询。</span></a>
+                    <a class="api-card" href="./record-preview.html"><strong>整卷问卷</strong><span>生成、恢复和提交问卷，随后进入对话。</span></a>
+                    <a class="api-card" href="./health-analysis.html"><strong>健康分析</strong><span>读取三类资料，生成评价、建议和问卷。</span></a>
+                </div>
+            </section>
+            <section class="api-entry-group">
+                <h3>最终报告</h3>
+                <div class="api-grid">
+                    <a class="api-card" href="./report.html"><strong>最终报告</strong><span>生成报告，查询报告批次及详情。</span></a>
+                </div>
+            </section>
+            <section class="api-entry-group">
+                <h3>健康画像</h3>
+                <div class="api-grid">
+                    <a class="api-card" href="./health-profile.html"><strong>健康画像</strong><span>查询画像和主体，管理事实与变更。</span></a>
+                    <a class="api-card" href="./health-profile-view.html"><strong>画像展示</strong><span>查看事实、趋势、异常、综述与循证。</span></a>
+                </div>
+            </section>
+        </div>
+    </section>
+</main>
+<script src="./lab-core.js"></script>
+<script src="./api-contracts.js"></script>
+<script src="./json-viewer.js"></script>
+<script src="./common.js"></script>
+<script>ApiLab.initialize(); document.querySelector("#api-entry-count").textContent = `${document.querySelectorAll(".api-card").length} 个入口 · ${ApiLabContracts.length} 个接口`;</script>
+</body>
+</html>

@@ -1,0 +1,41 @@
+{
+  "description": "Independent diagnostic anchors from PDF pages 8, 11, 12, 43, 45, 48, 53, 106-108. Visual transcription includes six assessment rows, four zero values, three disease risk scores and five short-chain fatty acid scores. The PDF uses a selected legend for the latter; its OCR legend alone cannot establish the selected grade. Source IDs locate archived DocMind cells. This is a sampled acceptance set, not an exhaustive gold standard.",
+  "reportTime": "2026-09-03",
+  "reportDateEvidence": "The cover and page 22 identify the same sample: submitted on 2026-09-01, report dated 2026-09-03. These result anchors belong to that report; the submission date is not their report date.",
+  "required": [
+    {"sourceId":"t211r1","itemName":"Bacteroides plebeius","resultValue":"27.8333","flag":"偏高"},
+    {"sourceId":"t701r3","itemName":"豚鼠气单胞菌","resultValue":"0.0003↑","flag":"偏高"},
+    {"sourceId":"t701r4","itemName":"结核分枝杆菌","resultValue":"0.0002↑","flag":"偏高"},
+    {"sourceId":"t730r1","itemName":"平常拟杆菌","resultValue":"27.8333↑","flag":"偏高"},
+    {"sourceId":"t1355r1","itemName":"芽孢杆菌纲","resultValue":"0.3127","flag":"偏低"},
+    {"sourceId":"t1355r7","itemName":"β-变形菌纲","resultValue":"1.6698","flag":"偏高"},
+    {"sourceId":"t1362r4","itemName":"伯克氏菌目","resultValue":"2.5232","flag":"偏高"},
+    {"sourceId":"t1369r3","itemName":"乳杆菌科","resultValue":"0.0016","flag":"偏低"},
+    {"sourceId":"t1372r7","itemName":"萨特氏菌属","resultValue":"1.7086","flag":"偏高"},
+    {"sourceId":"t157r1","itemName":"肠道菌群种类评估","resultValue":"1247","rawFlag":"缺乏","flag":"偏低","kind":"assessment"},
+    {"sourceId":"t157r2","itemName":"肠道菌群多样性评估","resultValue":"5.1764","flag":"正常","kind":"assessment"},
+    {"sourceId":"t157r3","itemName":"肠道菌群致病潜力评估","resultValue":"1.7864","rawFlag":"失衡","flag":null,"kind":"assessment"},
+    {"sourceId":"t157r4","itemName":"肠道膳食纤维需求","resultValue":"34","rawFlag":"需求高","flag":null,"kind":"assessment"},
+    {"sourceId":"t157r5","itemName":"肠道菌群生物膜合成能力评估","resultValue":"14.43","flag":"正常","kind":"assessment"},
+    {"sourceId":"t157r6","itemName":"肠道菌群氧化胁迫耐受评估","resultValue":"173.3028","flag":"正常","kind":"assessment"},
+    {"sourceId":"t681r16","itemName":"乳酸乳球菌","resultValue":"0","flag":null,"kind":"measurement"},
+    {"sourceId":"t681r17","itemName":"干酪乳杆菌","resultValue":"0","flag":null,"kind":"measurement"},
+    {"sourceId":"t681r18","itemName":"丁酸梭菌","resultValue":"0","flag":null,"kind":"measurement"},
+    {"sourceId":"t681r19","itemName":"枯草芽孢杆菌","resultValue":"0","flag":null,"kind":"measurement"},
+    {"sourceId":"t224r1","itemName":"便秘","resultValue":"35.56","flag":null,"kind":"assessment"},
+    {"sourceId":"t224r2","itemName":"炎症性肠病","resultValue":"30","flag":null,"kind":"assessment"},
+    {"sourceId":"t224r3","itemName":"溃疡性结肠炎","resultValue":"30","flag":null,"kind":"assessment"},
+    {"sourceId":"t661r1","itemName":"甲酸","resultValue":"44","flag":null,"kind":"assessment"},
+    {"sourceId":"t661r2","itemName":"乙酸","resultValue":"50","flag":null,"kind":"assessment"},
+    {"sourceId":"t661r3","itemName":"丙酸","resultValue":"29","flag":null,"kind":"assessment"},
+    {"sourceId":"t661r4","itemName":"丁酸","resultValue":"60","flag":null,"kind":"assessment"},
+    {"sourceId":"t661r5","itemName":"戊酸","resultValue":"68","flag":null,"kind":"assessment"}
+  ],
+  "forbidden": [
+    {"resultValue":"分"},
+    {"resultValue":"异常（<150或>213）"},
+    {"itemName":"癫痫正相关菌","resultValue":"10种"},
+    {"itemName":"癫痫负相关菌","resultValue":"10种"},
+    {"resultValue":"较弱正常较弱较弱三正常"}
+  ]
+}

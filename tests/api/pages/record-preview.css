@@ -1,0 +1,41 @@
+.survey-page { margin: 8px 0; border: 1px solid var(--line); border-radius: 8px; }
+.survey-page > summary small { margin-left: 10px; color: var(--muted); font-weight: 400; }
+.survey-page-body { padding: 12px; }
+.survey-page-body .survey-question:last-child { margin-bottom: 0; }
+.survey-question { border: 0; padding: 0; margin: 0 0 16px; min-width: 0; }
+.survey-question legend { font-weight: 600; margin: 0 0 10px; }
+.survey-bridge { white-space: pre-line; margin: 0 0 8px; color: #465a56; }
+.survey-options { display: flex; flex-wrap: wrap; gap: 6px; }
+.survey-choice { display: flex; align-items: flex-start; gap: 10px; max-width: 100%; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; cursor: pointer; }
+.survey-choice input { width: auto; margin: 4px 0 0; flex-shrink: 0; }
+.survey-choice span { overflow-wrap: anywhere; }
+.survey-text { width: 100%; box-sizing: border-box; }
+.survey-guidance { padding-left: 22px; }
+.survey-guidance li { margin-bottom: 14px; }
+.survey-copy { white-space: pre-wrap; overflow-wrap: anywhere; }
+#questionnaire-chat[hidden] { display: none; }
+#questionnaire-status { white-space: pre-line; overflow-wrap: anywhere; }
+#questionnaire-downloads { margin-top: 12px; }
+.survey-report-table-wrap { overflow-x: auto; margin: 16px 0; }
+.survey-report-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.survey-report-table th, .survey-report-table td { padding: 10px 12px; text-align: left; vertical-align: top; border-bottom: 1px solid #dce2e6; }
+.survey-report-table th { background: #f3f6f5; white-space: nowrap; }
+.survey-report-table td { min-width: 72px; overflow-wrap: anywhere; }
+.survey-report-abnormal { color: #a13824; font-weight: 600; }
+.survey-imaging { margin: 18px 0; }
+.survey-imaging h4 { margin: 0 0 6px; }
+.survey-report-raw { margin-top: 16px; }
+.survey-report-raw > summary { cursor: pointer; color: #465a56; margin-bottom: 10px; }
+.factor-fold { margin: 12px 0; border: 1px solid #dce2e6; border-radius: 8px; min-width: 0; }
+.factor-fold > summary { padding: 12px 14px; cursor: pointer; font-weight: 600; overflow-wrap: anywhere; }
+.factor-fold-body { padding: 0 14px 12px; min-width: 0; }
+.factor-fold-body h4 { margin: 14px 0 6px; }
+.factor-fold-body .factor-fold { background: #fff; }
+.factor-answer + .factor-answer { border-top: 1px solid #dce2e6; padding-top: 8px; margin-top: 12px; }
+.factor-json { max-width: 100%; overflow: auto; }
+.factor-status { white-space: pre-line; overflow-wrap: anywhere; font-weight: 600; }
+#questionnaire-factors .panel-head { flex-wrap: wrap; gap: 10px; }
+@media (max-width: 600px) {
+    .factor-fold > summary { padding: 10px; }
+    .factor-fold-body { padding: 0 10px 10px; }
+}

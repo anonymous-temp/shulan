@@ -1,0 +1,736 @@
+{
+  "templateVersion": "gut-barrier-static.v14",
+  "reportSchemaVersion": "gut-barrier-public.v2",
+  "sourceVersions": {
+    "contentVersion": "gut-barrier-content-20261010-v4-barrier-only",
+    "templateVersion": "gut-barrier-five-chapters-20261010-v4-barrier-only"
+  },
+  "sectionOrder": [
+    "overview",
+    "disease_risks",
+    "repair_plan",
+    "appendix"
+  ],
+  "overviewInsertions": [
+    {
+      "anchor": {
+        "kind": "table",
+        "title": "1.2 检测项目与结果总览"
+      },
+      "position": "before",
+      "block": {
+        "kind": "paragraph",
+        "title": null,
+        "text": "本次从屏障相关代谢、黏膜上皮状态及内毒素信号三个方面进行评价，各项结果相互补充。"
+      }
+    },
+    {
+      "anchor": {
+        "kind": "table",
+        "title": "1.2 检测项目与结果总览"
+      },
+      "position": "after",
+      "block": {
+        "kind": "list",
+        "title": "指标意义",
+        "items": [
+          "D-乳酸主要与细菌糖代谢有关。血中水平受肠腔生成、跨屏障吸收及机体清除共同影响；升高可作为肠腔代谢与通透性变化的间接线索，与DAO、LPS联合观察更有助于区分相关环节。",
+          "二胺氧化酶（DAO）在小肠绒毛上皮中较为丰富。上皮受损时，细胞内DAO释放可影响血中活性，因此本项指标用于观察黏膜上皮完整性；它并非内镜或组织病理损伤程度的直接测量。",
+          "细菌脂多糖（LPS）是革兰阴性菌外膜的组成成分，也称内毒素。血中信号升高与内毒素暴露相关；LPS可经免疫受体识别启动炎症反应，是连接屏障状态与全身炎症的一条机制线索。"
+        ]
+      }
+    }
+  ],
+  "overviewSlots": [],
+  "diseaseIntroduction": {
+    "kind": "paragraph",
+    "title": null,
+    "text": "肠道屏障受损与慢性低度炎症是多种慢性疾病与机体衰老的共同上游机制。本章基于本次检测结果与相关健康评估，评估相关疾病风险。风险等级（低、中、高）为基于检测指标的健康风险评估推断，用于风险提示与预防参考，不构成疾病诊断。"
+  },
+  "diseaseMechanisms": [
+    {
+      "tableTitle": "2.1 消化系统疾病风险评估",
+      "diseaseName": "代谢相关脂肪性肝病",
+      "diseaseCode": "nafld",
+      "columnIndex": 3,
+      "mechanism": "肠道吸收的细菌产物可经门静脉进入肝脏。实验研究中，LPS–TLR4 信号促进肝内炎症反应，并增强肝星状细胞对 TGF-β 的纤维化反应；这一肠–肝轴过程可与脂质代谢异常相互影响。[4][补9]"
+    },
+    {
+      "tableTitle": "2.1 消化系统疾病风险评估",
+      "diseaseName": "肠易激综合征",
+      "diseaseCode": "ibs",
+      "columnIndex": 3,
+      "mechanism": "部分腹泻型肠易激综合征患者存在黏膜通透性增加，并与黏膜肥大细胞增多相关。黏膜免疫激活与内脏敏感性变化，为腹痛、腹胀和排便习惯改变提供机制解释。[补10,11]"
+    },
+    {
+      "tableTitle": "2.1 消化系统疾病风险评估",
+      "diseaseName": "炎症性肠病",
+      "diseaseCode": "ibd",
+      "columnIndex": 3,
+      "mechanism": "黏液层和上皮连接保护减弱，可增加肠腔微生物与黏膜免疫系统的接触；免疫调节异常又可反向损伤屏障。在易感背景下，两者共同参与持续或反复的肠道炎症。[补12]"
+    },
+    {
+      "tableTitle": "2.1 消化系统疾病风险评估",
+      "diseaseName": "肝硬化",
+      "diseaseCode": "cirrhosis",
+      "columnIndex": 3,
+      "mechanism": "在慢性肝损伤背景下，细菌产物相关的 TLR4–MyD88–NF-κB 信号可增强 TGF-β 促纤维化作用，涉及肝星状细胞激活及胶原沉积。它说明炎症与纤维化的联系，不等同于本次已发现肝硬化。[补9]"
+    },
+    {
+      "tableTitle": "2.2 代谢系统疾病风险评估",
+      "diseaseName": "2型糖尿病",
+      "diseaseCode": "type2_diabetes",
+      "columnIndex": 3,
+      "mechanism": "LPS 相关先天免疫信号可促使脂肪组织释放 TNF-α、IL-6 等炎症介质，与胰岛素敏感性下降相联系。动物实验和人体脂肪组织研究支持代谢性炎症这一环节，个体糖代谢状态仍由血糖等资料评价。[4,6]"
+    },
+    {
+      "tableTitle": "2.2 代谢系统疾病风险评估",
+      "diseaseName": "肥胖",
+      "diseaseCode": "obesity",
+      "columnIndex": 3,
+      "mechanism": "脂肪组织不仅储存能量，也参与免疫反应。LPS 相关信号可增加脂肪组织炎症介质释放；动物研究中伴随脂肪组织免疫细胞聚集及体重增加，形成代谢负荷与炎症相互影响的机制线索。[4,6]"
+    },
+    {
+      "tableTitle": "2.2 代谢系统疾病风险评估",
+      "diseaseName": "高脂血症",
+      "diseaseCode": "hyperlipidemia",
+      "columnIndex": 3,
+      "mechanism": "炎症反应可改变脂肪酸动员及富含甘油三酯脂蛋白的代谢；人体低剂量内毒素刺激研究观察到相关脂质变化。实际 LDL-C、总胆固醇和甘油三酯结果，应与这一通用机制分开判断。[补13]"
+    },
+    {
+      "tableTitle": "2.2 代谢系统疾病风险评估",
+      "diseaseName": "高尿酸血症",
+      "diseaseCode": "hyperuricemia",
+      "columnIndex": 3,
+      "mechanism": "尿酸除经肾脏排泄外，也经肠道排泄；ABCG2 等转运功能变化可影响肾外尿酸清除。炎症与代谢异常可同时存在，但屏障三项升高并不能直接证明尿酸生成过多或排泄障碍。[补14]"
+    },
+    {
+      "tableTitle": "2.3 心脑血管系统疾病风险评估",
+      "diseaseName": "动脉粥样硬化",
+      "diseaseCode": "atherosclerosis",
+      "columnIndex": 3,
+      "mechanism": "动物研究中，TLR4/MyD88 免疫信号与血管壁炎症及斑块形成相关。[补15]"
+    },
+    {
+      "tableTitle": "2.3 心脑血管系统疾病风险评估",
+      "diseaseName": "冠心病",
+      "diseaseCode": "coronary_heart_disease",
+      "columnIndex": 3,
+      "mechanism": "血管壁炎症与脂质负荷共同参与动脉粥样硬化，局部免疫细胞活化与斑块进展相关。[补15]"
+    },
+    {
+      "tableTitle": "2.3 心脑血管系统疾病风险评估",
+      "diseaseName": "高血压",
+      "diseaseCode": "hypertension",
+      "columnIndex": 3,
+      "mechanism": "炎症介质与血管内皮功能及重构相联系。实验研究中，血管紧张素Ⅱ诱导的 IL-6 信号可促进内皮素相关表达及肾脏纤维化；这一过程与血压调节有关，但不替代规范血压测量。[补16]"
+    },
+    {
+      "tableTitle": "2.3 心脑血管系统疾病风险评估",
+      "diseaseName": "脑卒中",
+      "diseaseCode": "stroke",
+      "columnIndex": 3,
+      "mechanism": "部分缺血性卒中与动脉粥样硬化及血栓形成相关；血管壁炎症是斑块形成机制中的一个环节。[补15]"
+    },
+    {
+      "tableTitle": "2.4 精神系统疾病风险评估",
+      "diseaseName": "抑郁症",
+      "diseaseCode": "depression",
+      "columnIndex": 3,
+      "mechanism": "部分抑郁或焦虑人群研究观察到血浆 LPS、zonulin 与 FABP2 升高，并与菌群改变相关，提示屏障与外周炎症是肠–脑轴的研究环节。这类关联不等同于情绪障碍已被检测确诊。[补19]"
+    },
+    {
+      "tableTitle": "2.4 精神系统疾病风险评估",
+      "diseaseName": "焦虑症",
+      "diseaseCode": "anxiety",
+      "columnIndex": 3,
+      "mechanism": "肠道感觉、免疫信号及微生物代谢与脑功能相互联系。将部分肠易激综合征患者菌群移植至无菌小鼠后，研究观察到屏障改变、先天免疫激活及焦虑样行为；该实验不能直接推定受检者患焦虑症。[补11,19]"
+    },
+    {
+      "tableTitle": "2.5 神经系统疾病风险评估",
+      "diseaseName": "阿尔茨海默病",
+      "diseaseCode": "alzheimers",
+      "columnIndex": 3,
+      "mechanism": "肠–脑轴研究关注菌群、外周炎症与中枢淀粉样蛋白相关改变之间的联系。认知受损老年人研究观察到特定菌群及外周炎症标志物与脑淀粉样沉积相关，但尚不能由屏障三指标预测个体认知疾病。[补17]"
+    },
+    {
+      "tableTitle": "2.5 神经系统疾病风险评估",
+      "diseaseName": "帕金森病",
+      "diseaseCode": "parkinsons",
+      "columnIndex": 3,
+      "mechanism": "在 α-突触核蛋白过表达小鼠中，菌群及其代谢物可影响小胶质细胞活化、神经炎症和运动表现。这为肠道信号参与神经退行过程提供实验线索，不等于已在人群中建立相同的风险计算关系。[补18]"
+    },
+    {
+      "tableTitle": "2.6 免疫系统疾病风险评估",
+      "diseaseName": "类风湿性关节炎",
+      "diseaseCode": "rheumatoid_arthritis",
+      "columnIndex": 3,
+      "mechanism": "类风湿性关节炎患者研究观察到结肠紧密连接蛋白 ZO-1 减少，以及 LBP、sCD14 等标志物与疾病活动度关联。屏障与全身炎症可能相互影响，免疫耐受及关节病变仍需专项临床评价。[补20]"
+    },
+    {
+      "tableTitle": "2.6 免疫系统疾病风险评估",
+      "diseaseName": "系统性红斑狼疮",
+      "diseaseCode": "systemic_lupus",
+      "columnIndex": 3,
+      "mechanism": "遗传易感动物中，特定肠道共生菌移位可激活适应性免疫和自身抗体反应；部分自身免疫患者组织亦发现相关细菌线索。这支持“易感性—微生物接触—免疫激活”的研究路径，而非普遍适用的单一病因。[补21]"
+    },
+    {
+      "tableTitle": "2.7 肿瘤风险评估",
+      "diseaseName": "结直肠癌",
+      "diseaseCode": "colorectal_cancer",
+      "columnIndex": 3,
+      "mechanism": "在肠腺瘤实验模型中，局部屏障缺陷使微生物产物更易接触免疫细胞，激活 IL-23/IL-17 等促炎通路并支持肿瘤生长。该局部微环境机制不等同于屏障检测具有结直肠癌筛查能力。[补22]"
+    },
+    {
+      "tableTitle": "2.7 肿瘤风险评估",
+      "diseaseName": "肝癌",
+      "diseaseCode": "liver_cancer",
+      "columnIndex": 3,
+      "mechanism": "慢性肝损伤、炎症和纤维化共同构成部分肝癌的发生背景。动物研究中，肠道菌群及 TLR4 信号可促进已受损肝脏的肿瘤进展；个体风险还需结合病毒性肝炎、肝硬化等明确危险因素。[补23]"
+    },
+    {
+      "tableTitle": "2.7 肿瘤风险评估",
+      "diseaseName": "肺癌",
+      "diseaseCode": "lung_cancer",
+      "columnIndex": 3,
+      "mechanism": "IL-1β 等炎症通路与肿瘤微环境相关。既往心肌梗死且炎症升高人群的探索性试验分析发现抗炎干预与肺癌事件变化有关；这一特定人群结果并未建立肠道屏障损伤导致肺癌的因果关系。[补24]"
+    }
+  ],
+  "fixedSections": [
+    {
+      "id": "repair_plan",
+      "title": "第三章 肠道屏障分层修复方案",
+      "subtitle": "",
+      "blocks": [
+        {
+          "kind": "paragraph",
+          "title": "3.1 修复总原则：五阶段原则",
+          "text": "肠道屏障修复遵循“去除—改善—重建—修复—平衡”五阶段原则。去除阶段通过健康评估识别并减少不良饮食、药物使用、生活方式及环境暴露等持续影响因素；改善阶段以营养支持改善肠上皮细胞能量代谢、细胞更新与黏膜环境；重建阶段在具备临床适应证时采用肠道菌群移植（FMT）重建微生态；修复阶段依据菌群功能与医学评估，以靶向功能菌群调节（MDF）支持有益代谢、黏液层和上皮连接；平衡阶段通过饮食、运动、睡眠和行为管理维持肠道稳态。五阶段是通用的分层干预框架，实际采用哪些环节及先后顺序，应结合症状、疾病、营养状态和安全条件确定。"
+        },
+        {
+          "kind": "paragraph",
+          "title": "3.2 肠道营养补充",
+          "text": "肠道营养补充通过经口、肠内或有适应证的静脉途径，为肠上皮提供能量底物与合成原料，并支持黏膜微循环和抗氧化防御，形成“原料—能量—信号—抗炎”支撑。主要围绕三条机制主线。\n\n一、上皮能量代谢。谷氨酰胺参与肠上皮细胞代谢，丙氨酰-谷氨酰胺是临床使用的双肽制剂形式之一；膳食纤维经菌群发酵产生丁酸等短链脂肪酸，也可为上皮供能并参与信号调节。Caco-2细胞研究显示，丁酸可通过AMPK促进紧密连接组装。[补1]\n\n二、细胞合成与连接更新。氨基酸和核苷酸参与蛋白质、核酸合成及细胞更新；精氨酸、核苷酸和ω-3脂肪酸组成的免疫营养配方，在重大肿瘤手术等特定临床背景中有指南支持。[补25] 营养底物可为连接更新提供条件，个人是否需要补充及能否改善occludin、claudin、ZO-1等连接蛋白，应依据营养缺乏、疾病状态和治疗方案判断。\n\n三、抗氧化防御与黏膜环境。谷胱甘肽参与细胞氧化还原平衡。静脉还原型谷胱甘肽能否改善某位受检者的黏膜微循环、组织供氧或屏障功能，需由具体适应证和临床证据判断，不能仅凭机制作出疗效承诺。\n\n能经口或肠内获得足够营养时通常优先采用相应途径；摄入不足或肠内途径不可行时，再由临床团队评估肠外支持。静脉医疗营养须结合营养状态、肝肾功能、过敏、年龄、妊娠及监测条件，由医师确定制剂、剂量和疗程。[补4]"
+        },
+        {
+          "kind": "paragraph",
+          "title": "3.3 肠道菌群移植（FMT）",
+          "text": "肠道菌群移植（FMT）是将经严格筛查供者的粪便微生物群规范制备后，通过肠溶胶囊、结肠镜、灌肠或经管途径递送至受者胃肠道，以重建肠道微生态为目标的医疗干预。菌群重建可能影响黏液层、微生物代谢和黏膜免疫环境。\n\n目前较明确的指南推荐集中在复发性艰难梭菌感染等特定情境；对溃疡性结肠炎、克罗恩病、储袋炎及肠易激综合征，不建议在临床试验之外常规实施。其他消化系统或肠外疾病是否适用，须依据对应疾病的临床研究与指南判断，不能由机制研究概括为普遍疗效。[补5]\n\n实施前应明确疾病诊断与既往规范治疗，评估免疫及营养状态，并完成供者、病原体和制备质量筛查。实施后监测感染风险、症状和耐受，再结合菌群功能、营养底物和随访结果决定是否衔接MDF；严重免疫抑制人群需进行更严格的安全评估。"
+        },
+        {
+          "kind": "paragraph",
+          "title": "3.4 靶向功能菌群调节（MDF）",
+          "text": "靶向功能菌群调节（Microbiota-Directed Function modulation，MDF）依据菌群测序、消化道表现、营养状态和医学评估，围绕屏障相关功能通路选择功能菌株与营养底物，以支持短链脂肪酸生成、黏液层环境、上皮连接和黏膜免疫稳态。\n\n功能评估需区分菌群相对丰度、功能推断和实际临床表现；屏障指标变化不能直接确定某个菌株缺失。菌株与底物的选择应核对菌株编号、产品组成、适用人群、剂量和安全性证据。Caco-2细胞研究显示，丁酸可通过AMPK促进紧密连接组装，为“短链脂肪酸—上皮连接”路径提供机制依据。[补1] 该细胞研究不等同于某一菌株、产品或人群已证实疗效。\n\n对于已接受FMT且有后续管理需要的人群，MDF可结合膳食底物与随访，用于支持功能恢复和定植维护。活菌、灭活菌与后生元的组成和证据不同；后生元应依ISAPP共识定义及具体产品证据解读，不能与活菌制剂自动互换。[14] 免疫抑制、粒细胞减少或重症人群，应先完成感染风险与产品安全评估。"
+        },
+        {
+          "kind": "paragraph",
+          "title": "3.5 生活方式干预",
+          "text": "生活方式干预通过饮食、运动、睡眠、情绪与行为等可调控因素，改善肠上皮营养、菌群生态及代谢免疫环境，是屏障稳态的长期维护基础，也可作为有适应证FMT与MDF后的协同管理。\n\n饮食方面，以蔬菜、水果、全谷、豆类、坚果和优质蛋白增加食物多样性，减少高糖、过量高脂、超加工食品和过量酒精；膳食纤维可为菌群发酵提供底物，促进短链脂肪酸生成。成人可在耐受基础上逐步达到每天至少25克食物来源纤维，并记录腹胀、排便与饮水情况；存在狭窄、梗阻风险或明显不耐受时需调整饮食形式。发酵食品与特定益生菌制剂不能等同。[13][补6]\n\n运动方面，规律安排可耐受的有氧活动和主要肌群抗阻练习，减少久坐，并根据年龄、心肺状态、肌力及合并疾病调整。运动主要用于支持体能和代谢健康；出现胸痛、晕厥或明显气短时，应停止运动并及时评估。[补7]\n\n睡眠、情绪与行为方面，保持稳定的睡眠、进餐与排便节律，管理持续压力，戒烟限酒，减少不必要的药物暴露；处方药由医师调整。稳定的营养与生活节律可为菌群定植和上皮更新提供较稳定的环境，随访时结合症状、营养摄入、活动能力、原有疾病及检测趋势持续调整维护方案。"
+        }
+      ],
+      "visible": true
+    }
+  ],
+  "appendixBlocks": [
+    {
+      "kind": "table",
+      "title": "4.1 质控校验",
+      "columns": [
+        "校验项目",
+        "本次记录",
+        "校验项目",
+        "本次记录"
+      ],
+      "rows": [
+        [
+          "姓名",
+          null,
+          "性别",
+          null
+        ],
+        [
+          "年龄",
+          null,
+          "样本类型",
+          null
+        ],
+        [
+          "送检项目",
+          null,
+          "样本状态",
+          null
+        ],
+        [
+          "样本制备质控",
+          null,
+          "检测数据质控",
+          null
+        ],
+        [
+          "检验医师",
+          null,
+          "审核医师",
+          null
+        ]
+      ]
+    },
+    {
+      "kind": "paragraph",
+      "title": null,
+      "text": "未提供的记录不作合格判定。样本质量、制备、分析质控及医师签署以检测机构记录为准。"
+    },
+    {
+      "kind": "table",
+      "title": "4.2 检测方法学介绍",
+      "columns": [
+        "检测指标",
+        "方法学介绍",
+        "评估用途"
+      ],
+      "rows": [
+        [
+          "D-乳酸",
+          "酶偶联比色法（通用方法介绍）",
+          "通过酶反应产生的信号测量D-乳酸；结合代谢与临床背景，观察微生物代谢产物及通透性相关变化"
+        ],
+        [
+          "二胺氧化酶（DAO）",
+          "酶学活性测定（通用方法介绍）",
+          "通过底物反应评价酶活性，为肠上皮相关状态提供辅助信息；活性结果与蛋白浓度测定不能混用"
+        ],
+        [
+          "细菌脂多糖（LPS）",
+          "动态浊度法鲎试验或酶联免疫吸附法等（通用方法介绍）",
+          "观察内毒素相关信号；不同方法的检测对象、单位、干扰及参考范围需分别核对，不能直接互换"
+        ]
+      ]
+    },
+    {
+      "kind": "paragraph",
+      "title": null,
+      "text": "通常流程为样本采集、样本处理、上机检测、结果审核和报告出具；本次方法及质控记录以检测机构实际信息为准。"
+    },
+    {
+      "kind": "list",
+      "title": "4.3 免责声明",
+      "items": [
+        "本报告依据本次获得的检测及相关健康资料提供综合评估，结果不替代疾病诊断。",
+        "疾病机制关联与个人风险数值属于不同概念；未评估项目不表示零风险。",
+        "营养补充及微生态干预需结合适应证、过敏、用药和实际耐受；医疗措施由执业医师审核。",
+        "检测信息与健康资料应妥善保管；如有持续性消化道症状或慢性疾病管理需求，请至正规医疗机构就诊。"
+      ]
+    },
+    {
+      "kind": "paragraph",
+      "title": "风险评估结果说明",
+      "text": "本次风险指数采用1–10分试行规则：1分基准，加上病种相关屏障指标、炎症指标和个体因素的加权贡献，结果保留一位小数；低＜3.4，中3.4–6.6，高≥6.7。D-乳酸、DAO和LPS单项积分相加得到IBFC，屏障贡献按IBFC损伤等级系数与病种屏障权重计算；个体因素在同一领域内取最大贡献，重复资料不加分，既往记录降低权重。指数反映本次资料中的相关因素强度，尚未经过人群校准，不代表患病概率。已配置独立模型的结果沿用该模型的标尺和适用范围。"
+    },
+    {
+      "kind": "references",
+      "title": "4.4 参考文献",
+      "items": [
+        {
+          "citation": "Helander HF, Fändriks L. Surface area of the digestive tract — revisited.",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/24694282/",
+          "year": 2014,
+          "publisher": "Scandinavian Journal of Gastroenterology",
+          "doi": "10.3109/00365521.2014.898326",
+          "location": null
+        },
+        {
+          "citation": "Sender R, Fuchs S, Milo R. Revised Estimates for the Number of Human and Bacteria Cells in the Body.",
+          "url": "https://journals.plos.org/plosbiology/article?id=10.1371/journal.pbio.1002533",
+          "year": 2016,
+          "publisher": "PLOS Biology",
+          "doi": "10.1371/journal.pbio.1002533",
+          "location": null
+        },
+        {
+          "citation": "Sturgeon C, Fasano A. Zonulin, a regulator of epithelial and endothelial barrier functions, and its involvement in chronic inflammatory diseases. Tissue Barriers. 2016;4(4):e1251384；Fasano A. Leaky gut and autoimmune diseases. Clinical Reviews in Allergy & Immunology. 2012;42(1):71–78.",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/28123927/",
+          "year": null,
+          "publisher": null,
+          "doi": "10.1080/21688370.2016.1251384",
+          "location": "第二篇DOI：10.1007/s12016-011-8291-x"
+        },
+        {
+          "citation": "Cani PD, et al. Metabolic endotoxemia initiates obesity and insulin resistance.",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/17456850/",
+          "year": 2007,
+          "publisher": "Diabetes",
+          "doi": "10.2337/db06-1491",
+          "location": "56(7):1761–1772"
+        },
+        {
+          "citation": "Erridge C, et al. A high-fat meal induces low-grade endotoxemia: evidence of a novel mechanism of postprandial inflammation.",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/17991637/",
+          "year": 2007,
+          "publisher": "American Journal of Clinical Nutrition",
+          "doi": "10.1093/ajcn/86.5.1286",
+          "location": "86(5):1286–1292"
+        },
+        {
+          "citation": "Creely SJ, et al. Lipopolysaccharide activates an innate immune system response in human adipose tissue in obesity and type 2 diabetes.",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/17090751/",
+          "year": 2007,
+          "publisher": "American Journal of Physiology-Endocrinology and Metabolism",
+          "doi": "10.1152/ajpendo.00302.2006",
+          "location": "292(3):E740–E747"
+        },
+        {
+          "citation": "Hotamisligil GS. Inflammation and metabolic disorders.",
+          "url": "https://www.nature.com/articles/nature05485",
+          "year": 2006,
+          "publisher": "Nature",
+          "doi": "10.1038/nature05485",
+          "location": "444:860–867"
+        },
+        {
+          "citation": "Franceschi C, et al. Inflamm-aging. An evolutionary perspective on immunosenescence. Annals of the New York Academy of Sciences. 2000;908:244–254；Franceschi C, Campisi J. Chronic inflammation (inflammaging) and its potential contribution to age-associated diseases. The Journals of Gerontology Series A. 2014;69(Suppl 1):S4–S9.",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/24833586/",
+          "year": null,
+          "publisher": null,
+          "doi": "10.1093/gerona/glu057",
+          "location": "第一篇DOI：10.1111/j.1749-6632.2000.tb06651.x"
+        },
+        {
+          "citation": "Qi Y, et al. Intestinal Permeability Biomarker Zonulin is Elevated in Healthy Aging.",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/28676292/",
+          "year": 2017,
+          "publisher": "Journal of the American Medical Directors Association",
+          "doi": "10.1016/j.jamda.2017.05.018",
+          "location": "18(9):810.e1–810.e4"
+        },
+        {
+          "citation": "Younossi ZM, Kalligeros M, Henry L. Epidemiology of metabolic dysfunction-associated steatotic liver disease.",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/39159948/",
+          "year": 2025,
+          "publisher": "Clinical and Molecular Hepatology",
+          "doi": "10.3350/cmh.2024.0431",
+          "location": "31(Suppl):S32–S50"
+        },
+        {
+          "citation": "Younossi ZM, et al. The Global Epidemiology of Nonalcoholic Fatty Liver Disease and Nonalcoholic Steatohepatitis Among Patients With Type 2 Diabetes.",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/38521116/",
+          "year": 2024,
+          "publisher": "Clinical Gastroenterology and Hepatology",
+          "doi": "10.1016/j.cgh.2024.03.006",
+          "location": "22(10):1999–2010.e8"
+        },
+        {
+          "citation": "International Diabetes Federation. IDF Diabetes Atlas, 10th ed.",
+          "url": "https://www.ncbi.nlm.nih.gov/books/NBK581934/",
+          "year": 2021,
+          "publisher": "International Diabetes Federation",
+          "doi": null,
+          "location": null
+        },
+        {
+          "citation": "Wastyk HC, et al. Gut-microbiota-targeted diets modulate human immune status.",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/34256014/",
+          "year": 2021,
+          "publisher": "Cell",
+          "doi": "10.1016/j.cell.2021.06.019",
+          "location": null
+        },
+        {
+          "citation": "Salminen S, et al. The International Scientific Association for Probiotics and Prebiotics (ISAPP) consensus statement on the definition and scope of postbiotics.",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/33948025/",
+          "year": 2021,
+          "publisher": "Nature Reviews Gastroenterology & Hepatology",
+          "doi": "10.1038/s41575-021-00440-6",
+          "location": "18(9):649–667"
+        }
+      ]
+    },
+    {
+      "kind": "references",
+      "title": "营养与微生态干预补充依据",
+      "items": [
+        {
+          "citation": "Peng L, et al. Butyrate Enhances the Intestinal Barrier by Facilitating Tight Junction Assembly via Activation of AMP-Activated Protein Kinase in Caco-2 Cell Monolayers.",
+          "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC2728689/",
+          "year": 2009,
+          "publisher": "The Journal of Nutrition",
+          "doi": "10.3945/jn.109.104638",
+          "location": "139(9):1619–1625"
+        },
+        {
+          "citation": "Goldberg RF, et al. Intestinal alkaline phosphatase is a gut mucosal defense factor maintained by enteral nutrition.",
+          "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC2265168/",
+          "year": 2008,
+          "publisher": "Proceedings of the National Academy of Sciences",
+          "doi": "10.1073/pnas.0712140105",
+          "location": "105(9):3551–3556"
+        },
+        {
+          "citation": "Marchiando AM, et al. Caveolin-1–dependent occludin endocytosis is required for TNF-induced tight junction regulation in vivo.",
+          "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC2854371/",
+          "year": 2010,
+          "publisher": "Journal of Cell Biology",
+          "doi": "10.1083/jcb.200902153",
+          "location": "189(1):111–126"
+        },
+        {
+          "citation": "NICE. Nutrition support for adults: oral nutrition support, enteral tube feeding and parenteral nutrition (CG32).",
+          "url": "https://www.nice.org.uk/guidance/cg32/chapter/recommendations",
+          "year": 2017,
+          "publisher": "National Institute for Health and Care Excellence",
+          "doi": null,
+          "location": "Recommendations 1.3、1.6–1.8"
+        },
+        {
+          "citation": "Peery AF, et al. AGA Clinical Practice Guideline on Fecal Microbiota-Based Therapies for Select Gastrointestinal Diseases.",
+          "url": "https://gastro.org/clinical-guidance/fecal-microbiota-based-therapies-for-select-gastrointestinal-diseases/",
+          "year": 2024,
+          "publisher": "Gastroenterology",
+          "doi": "10.1053/j.gastro.2024.01.008",
+          "location": "166(3):409–434"
+        },
+        {
+          "citation": "World Health Organization. Healthy diet.",
+          "url": "https://www.who.int/news-room/fact-sheets/detail/healthy-diet",
+          "year": null,
+          "publisher": "World Health Organization",
+          "doi": null,
+          "location": null
+        },
+        {
+          "citation": "World Health Organization. WHO guidelines on physical activity and sedentary behaviour.",
+          "url": "https://www.who.int/publications/i/item/9789240015128",
+          "year": 2020,
+          "publisher": "World Health Organization",
+          "doi": null,
+          "location": null
+        },
+        {
+          "citation": "Braniste V, et al. The gut microbiota influences blood-brain barrier permeability in mice.",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/25411471/",
+          "year": 2014,
+          "publisher": "Science Translational Medicine",
+          "doi": "10.1126/scitranslmed.3009759",
+          "location": "6(263):263ra158"
+        },
+        {
+          "citation": "TLR4 enhances TGF-beta signaling and hepatic fibrosis",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/17952090/",
+          "year": 2007,
+          "publisher": "Nature Medicine",
+          "doi": "10.1038/nm1663",
+          "location": "小鼠和细胞实验"
+        },
+        {
+          "citation": "Mucosal mast cell count is associated with intestinal permeability in patients with diarrhea predominant irritable bowel syndrome",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/23667756/",
+          "year": 2013,
+          "publisher": "Journal of Neurogastroenterology and Motility",
+          "doi": "10.5056/jnm.2013.19.2.244",
+          "location": "腹泻型肠易激综合征患者观察研究"
+        },
+        {
+          "citation": "Transplantation of fecal microbiota from patients with irritable bowel syndrome alters gut function and behavior in recipient mice",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/28251905/",
+          "year": 2017,
+          "publisher": "Science Translational Medicine",
+          "doi": "10.1126/scitranslmed.aaf6397",
+          "location": "患者菌群移植至无菌小鼠"
+        },
+        {
+          "citation": "Akkermansia deficiency and mucin depletion are implicated in intestinal barrier dysfunction as earlier event in the development of inflammation in interleukin-10-deficient mice",
+          "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC9869054/",
+          "year": 2023,
+          "publisher": null,
+          "doi": null,
+          "location": "IL-10 缺失小鼠"
+        },
+        {
+          "citation": "Effect of omega-3 ethyl esters on the triglyceride-rich lipoprotein response to endotoxin challenge in healthy young men",
+          "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC10123374/",
+          "year": 2023,
+          "publisher": null,
+          "doi": null,
+          "location": "健康年轻男性内毒素刺激实验"
+        },
+        {
+          "citation": "ABCG2 dysfunction increases the risk of renal overload hyperuricemia",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/24940678/",
+          "year": 2014,
+          "publisher": null,
+          "doi": "10.1080/15257770.2013.866679",
+          "location": "日本男性高尿酸门诊患者"
+        },
+        {
+          "citation": "Lack of Toll-like receptor 4 or myeloid differentiation factor 88 reduces atherosclerosis and alters plaque phenotype in mice deficient in apolipoprotein E",
+          "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC489994/",
+          "year": 2004,
+          "publisher": null,
+          "doi": null,
+          "location": "ApoE 缺失小鼠"
+        },
+        {
+          "citation": "Interleukin 6 underlies angiotensin II-induced hypertension and chronic renal damage",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/22068875/",
+          "year": 2011,
+          "publisher": "Hypertension",
+          "doi": "10.1161/HYPERTENSIONAHA.111.173328",
+          "location": "患者组织及血管紧张素Ⅱ小鼠实验"
+        },
+        {
+          "citation": "Association of brain amyloidosis with pro-inflammatory gut bacterial taxa and peripheral inflammation markers in cognitively impaired elderly",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/27776263/",
+          "year": 2017,
+          "publisher": "Neurobiology of Aging",
+          "doi": "10.1016/j.neurobiolaging.2016.08.019",
+          "location": "认知受损老年人观察研究"
+        },
+        {
+          "citation": "Gut Microbiota Regulate Motor Deficits and Neuroinflammation in a Model of Parkinson's Disease",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/27912057/",
+          "year": 2016,
+          "publisher": "Cell",
+          "doi": "10.1016/j.cell.2016.11.018",
+          "location": "α-突触核蛋白过表达小鼠及患者菌群移植实验"
+        },
+        {
+          "citation": "Increased human intestinal barrier permeability plasma biomarkers zonulin and FABP2 correlated with plasma LPS and altered gut microbiome in anxiety or depression",
+          "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC5851874/",
+          "year": 2018,
+          "publisher": "Gut",
+          "doi": "10.1136/gutjnl-2017-314759",
+          "location": "抑郁或焦虑人群观察研究"
+        },
+        {
+          "citation": "Rheumatoid arthritis is associated with increased gut permeability and bacterial translocation that are reversed by inflammation control",
+          "url": "https://academic.oup.com/rheumatology/article/62/3/1264/6659537",
+          "year": 2023,
+          "publisher": "Rheumatology",
+          "doi": null,
+          "location": "类风湿关节炎患者活检及纵向标志物研究"
+        },
+        {
+          "citation": "Translocation of a gut pathobiont drives autoimmunity in mice and humans",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/29590047/",
+          "year": 2018,
+          "publisher": "Science",
+          "doi": "10.1126/science.aar7201",
+          "location": "自身免疫易感小鼠及患者组织/细胞研究"
+        },
+        {
+          "citation": "Adenoma-linked barrier defects and microbial products drive IL-23/IL-17-mediated tumour growth",
+          "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC3601659/",
+          "year": 2012,
+          "publisher": "Nature",
+          "doi": "10.1038/nature11465",
+          "location": "小鼠肿瘤模型及人类肿瘤组织"
+        },
+        {
+          "citation": "Promotion of hepatocellular carcinoma by the intestinal microbiota and TLR4",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/22516259/",
+          "year": 2012,
+          "publisher": "Cancer Cell",
+          "doi": null,
+          "location": "慢性肝损伤小鼠肿瘤模型"
+        },
+        {
+          "citation": "Effect of interleukin-1β inhibition with canakinumab on incident lung cancer in patients with atherosclerosis: exploratory results from a randomised, double-blind, placebo-controlled trial",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/28855077/",
+          "year": 2017,
+          "publisher": "The Lancet",
+          "doi": "10.1016/S0140-6736(17)32247-X",
+          "location": "既往心肌梗死且炎症升高人群随机试验的探索性分析"
+        },
+        {
+          "citation": "ESPEN guideline on clinical nutrition in surgery – Update 2025.",
+          "url": "https://doi.org/10.1016/j.clnu.2025.08.029",
+          "year": 2025,
+          "publisher": "Clinical Nutrition",
+          "doi": "10.1016/j.clnu.2025.08.029",
+          "location": "53:222–261"
+        }
+      ]
+    }
+  ],
+  "composition": {
+    "overview": "1.1标题先于正文与图形；图头使用同一回调的IBFC及评分占满分比例，轴标签固定为健康、亚健康、疾病，不用损伤等级覆盖阶段名称。满分占比不是人群百分位，不新增阶段判定阈值。",
+    "disease_risks": "原样显示动态回调的八系统22病种及本次补充项目；本次规则已完成评分及已核验模型数值进入风险总览，不将定性或资料不足项目转换为0或低风险。四列及JSON字段不变，空风险指数显示破折号，等级沿用回调文字，不将自定义关注指数重命名为疾病风险。",
+    "appendix": "新报告在冻结回调前按完整可见报告的首次引用顺序统一编号，仅返回实际引用文献；展示层沿用冻结顺序，将固定文案引文映射至对应编号，不另加补充参考。",
+    "data": "所有组成仅供展示；原始 callback.report 不修改，不重新计算临床结果；仅由显式模板版本或已持久化版本映射选择，不按标题、日期或患者内容猜版本。",
+    "referenceDeduplication": "新报告冻结前依据URL、DOI及已知WHO 2020同版指南URL别名统一文献；动态与固定正文共用引用编号。冻结后不改回调正文及文献顺序，历史回放保留原结果。",
+    "displayOnly": "v11仅由显式版本绑定启用；固定第三章、附录4.2与4.3正文及显示配色不进入动态回调，所引用文献进入统一参考列表；4.1本次记录由新回调提供。历史绑定与冻结回调不改写。"
+  },
+  "referencePolicy": {
+    "version": "gut-barrier-pinned-references-v1.20261008",
+    "mode": "pinned_prefix_selected_display",
+    "targetRange": [
+      12,
+      15
+    ],
+    "allowOmittedFixedCitations": true,
+    "pinnedPrefix": [
+      {
+        "citation": "李兰娟. 感染微生态研究进展——肠道菌群对机体代谢影响[J]. 中国微生态学杂志,2009,21(1):1-3. DOI:10.13381/j.cnki.cjm.2009.01.018.",
+        "url": "https://www.sinomed.ac.cn/zh/detail.do?ui=2010489079",
+        "year": 2009,
+        "publisher": "中国微生态学杂志",
+        "doi": "10.13381/j.cnki.cjm.2009.01.018",
+        "location": "21(1):1-3"
+      },
+      {
+        "citation": "中华医学会消化病学分会胃肠功能性疾病协作组,中华医学会消化病学分会胃肠动力学组. 2020年中国肠易激综合征专家共识意见[J]. 中华消化杂志,2020,40(12):803-818. DOI:10.3760/cma.j.cn311367-20201116-00660.",
+        "url": "https://doi.org/10.3760/cma.j.cn311367-20201116-00660",
+        "year": 2020,
+        "publisher": "中华消化杂志",
+        "doi": "10.3760/cma.j.cn311367-20201116-00660",
+        "location": "40(12):803-818"
+      },
+      {
+        "citation": "中华预防医学会微生态学分会. 中国消化道微生态调节剂临床应用共识（2016版）[J]. 中国微生态学杂志,2016,28(6):621-631. DOI:10.13381/j.cnki.cjm.201606001.",
+        "url": "https://doi.org/10.13381/j.cnki.cjm.201606001",
+        "year": 2016,
+        "publisher": "中国微生态学杂志",
+        "doi": "10.13381/j.cnki.cjm.201606001",
+        "location": "28(6):621-631"
+      },
+      {
+        "citation": "中华医学会肠外肠内营养学分会. 成人胃肠功能障碍患者医学营养治疗指南（2025版）[J]. 中华医学杂志,2025,105(1):21-47. DOI:10.3760/cma.j.cn112137-20240815-01881.",
+        "url": "https://doi.org/10.3760/cma.j.cn112137-20240815-01881",
+        "year": 2025,
+        "publisher": "中华医学杂志",
+        "doi": "10.3760/cma.j.cn112137-20240815-01881",
+        "location": "105(1):21-47"
+      },
+      {
+        "citation": "中华医学会肠外肠内营养学分会神经疾病营养支持学组,中华医学会神经病学分会神经重症协作组,中国医师协会神经内科医师分会神经重症专业委员会,等. 神经系统疾病肠内营养支持中国专家共识（第二版）[J]. 中华临床营养杂志,2019,27(4):193-203. DOI:10.3760/cma.j.issn.1674-635X.2019.04.001.",
+        "url": "https://doi.org/10.3760/cma.j.issn.1674-635X.2019.04.001",
+        "year": 2019,
+        "publisher": "中华临床营养杂志",
+        "doi": "10.3760/cma.j.issn.1674-635X.2019.04.001",
+        "location": "27(4):193-203"
+      },
+      {
+        "citation": "中国抗癌协会肿瘤与微生态专业委员会. 肠道微生态与造血干细胞移植相关性中国专家共识[J]. 国际肿瘤学杂志,2021,48(3):129-135. DOI:10.3760/cma.j.cn371439-20210202-00027.",
+        "url": "https://doi.org/10.3760/cma.j.cn371439-20210202-00027",
+        "year": 2021,
+        "publisher": "国际肿瘤学杂志",
+        "doi": "10.3760/cma.j.cn371439-20210202-00027",
+        "location": "48(3):129-135"
+      },
+      {
+        "citation": "中华医学会消化病学分会胃肠激素与黏膜屏障学组. 胃肠道黏膜保护临床专家共识（2021年，福州）[J]. 中华消化杂志,2021,41(12):798-811. DOI:10.3760/cma.j.cn311367-20210930-00524.",
+        "url": "https://doi.org/10.3760/cma.j.cn311367-20210930-00524",
+        "year": 2021,
+        "publisher": "中华消化杂志",
+        "doi": "10.3760/cma.j.cn311367-20210930-00524",
+        "location": "41(12):798-811"
+      },
+      {
+        "citation": "中华医学会肠外肠内营养学分会,中国国际医疗保健促进交流会加速康复外科分会,中国微生态治疗创新联盟,等. 菌群移植标准化方法学的建立与临床应用中国专家共识[J]. 中华胃肠外科杂志,2020,23(增刊):S5-S13. DOI:10.3760/cma.j.cn.441530-20200420-00231.",
+        "url": "https://doi.org/10.3760/cma.j.cn.441530-20200420-00231",
+        "year": 2020,
+        "publisher": "中华胃肠外科杂志",
+        "doi": "10.3760/cma.j.cn.441530-20200420-00231",
+        "location": "23(增刊):S5-S13"
+      }
+    ]
+  }
+}

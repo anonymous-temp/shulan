@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="zh-CN">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>Shulan 用户健康画像展示 API Lab</title>
+        <link rel="stylesheet" href="./common.css">
+        <link rel="stylesheet" href="./health-profile-view.css">
+    </head>
+    <body>
+        <main class="shell lab-shell">
+            <header class="topbar">
+                <div>
+                    <p class="eyebrow">Live API laboratory</p>
+                    <h1>用户画像展示</h1>
+                    <p class="subtitle">读取指定用户和健康主体，展示当前健康事实、指标趋势、循证支持、异常提示与综合建议。</p>
+                </div>
+            </header>
+            <nav class="nav-links lab-nav" aria-label="接口页面">
+                <a class="nav-link" href="./index.html"><span>全部接口</span></a>
+                <a class="nav-link" href="./health.html"><span>健康检查</span><small lang="en">Health Check</small></a>
+                <a class="nav-link" href="./interpret.html"><span>报告解读</span><small lang="en">Analysis</small></a>
+                <a class="nav-link" href="./record.html"><span>建档问答</span><small lang="en">Record</small></a>
+                <a class="nav-link" href="./chat.html"><span>智能对话</span><small lang="en">Chat</small></a>
+                <a class="nav-link" href="./record-preview.html"><span>整卷问卷</span><small lang="en">Questionnaire</small></a>
+                <a class="nav-link" href="./health-analysis.html"><span>健康分析</span><small lang="en">Health Analysis</small></a>
+                <a class="nav-link" href="./report.html"><span>最终报告</span><small lang="en">Report</small></a>
+                <a class="nav-link" href="./health-profile.html"><span>健康画像</span><small lang="en">Profile</small></a>
+                <a class="nav-link active" aria-current="page" href="./health-profile-view.html"><span>画像展示</span><small lang="en">Profile View</small></a>
+            </nav>
+            <section id="lab-context" data-lab-section="连接与身份" class="connection lab-context" aria-label="公共测试设置"></section>
+            <div class="lab-workspace">
+                <div class="lab-main">
+                    <section class="panel" id="lab-profile-query" data-lab-section="画像查询">
+                        <div class="panel-head"><h2>读取用户画像</h2></div>
+                        <div class="panel-body">
+                            <div class="hpv-query-controls">
+                                <div class="field">
+                                    <label for="subject-picker">健康主体</label>
+                                    <select id="subject-picker" disabled><option value="">默认读取本人</option></select>
+                                </div>
+                                <div class="actions">
+                                    <button id="load-profile" class="button" data-request>加载用户画像</button>
+                                    <button id="clear-profile" class="button ghost">清空展示</button>
+                                </div>
+                            </div>
+                            <p class="hint">在<a href="#api-editor">可视化参数表单</a>指定主体 ID 或设置筛选。读取尚无画像的 userId 会初始化本人空画像。</p>
+                        </div>
+                    </section>
+                    <section id="api-editor" data-lab-section="请求编辑" class="panel"></section>
+                    <section class="panel" id="lab-profile-dashboard" data-lab-section="画像结果">
+                        <div class="panel-head"><h2>用户画像概览</h2></div>
+                        <div id="profile-stage" class="hpv-stage is-empty" aria-live="polite">
+                            <div id="profile-placeholder" class="hpv-placeholder">
+                                <div class="hpv-placeholder-mark" aria-hidden="true">+</div>
+                                <strong>尚未加载用户画像</strong>
+                                <span>使用公共 userId 加载画像，查看基本信息、关键指标、循证支持、异常提示与综合建议。</span>
+                            </div>
+                            <article id="profile-dashboard" class="hpv-dashboard" hidden>
+                                <nav class="hpv-directory" aria-label="画像结果目录">
+                                    <a href="#hpv-overview">综述与异常</a>
+                                    <a href="#hpv-indicators">检查趋势</a>
+                                    <a href="#hpv-facts">健康事实</a>
+                                    <a href="#hpv-evidence">循证支持</a>
+                                </nav>
+                                <header id="hpv-overview" tabindex="-1" class="hpv-patient-banner">
+                                    <div id="subject-avatar" class="hpv-avatar" aria-hidden="true">健</div>
+                                    <div class="hpv-patient-copy">
+                                        <div class="hpv-title-line">
+                                            <h2 id="profile-title">用户健康画像</h2>
+                                            <span id="subject-kind" class="hpv-subject-tag">本人</span>
+                                        </div>
+                                        <div id="profile-meta" class="hpv-profile-meta"></div>
+                                        <div class="hpv-identifiers">
+                                            <span>用户：<strong id="profile-user-id">—</strong></span>
+                                            <span>主体：<strong id="profile-subject-id">—</strong></span>
+                                            <span>版本：<strong id="profile-version">—</strong></span>
+                                        </div>
+                                    </div>
+                                    <div class="hpv-updated">
+                                        <span>最近更新</span>
+                                        <strong id="profile-updated-at">—</strong>
+                                    </div>
+                                </header>
+
+                                <div class="hpv-dashboard-content">
+                                    <section class="hpv-insight-column">
+                                        <section class="hpv-insight-card">
+                                            <div class="hpv-section-head compact">
+                                                <div>
+                                                    <span class="hpv-section-icon" aria-hidden="true">!</span>
+                                                    <h3>关键异常与提示</h3>
+                                                </div>
+                                                <span id="alert-count" class="hpv-count">0 项</span>
+                                            </div>
+                                            <div id="alert-list" class="hpv-alert-list"></div>
+                                        </section>
+
+                                        <section class="hpv-insight-card hpv-summary-card">
+                                            <div class="hpv-section-head compact">
+                                                <div>
+                                                    <span class="hpv-section-icon" aria-hidden="true">i</span>
+                                                    <h3>综述与建议</h3>
+                                                </div>
+                                            </div>
+                                            <div id="summary-content" class="hpv-summary-content"></div>
+                                        </section>
+
+                                        <section id="pending-card" class="hpv-pending-card" hidden>
+                                            <strong id="pending-count">0 条信息待处理</strong>
+                                            <span>待确认或争议信息不会进入正式概览、趋势、提醒和循证结果。</span>
+                                        </section>
+                                    </section>
+
+                                    <section id="hpv-indicators" tabindex="-1" class="hpv-indicator-column">
+                                        <div class="hpv-section-head">
+                                            <div>
+                                                <span class="hpv-section-icon" aria-hidden="true">◇</span>
+                                                <h3>关键检查趋势总览</h3>
+                                            </div>
+                                            <span id="indicator-count" class="hpv-count">0 项</span>
+                                        </div>
+                                        <div id="indicator-groups" class="hpv-indicator-groups"></div>
+                                    </section>
+
+                                    <section id="hpv-facts" tabindex="-1" class="hpv-fact-column">
+                                        <div class="hpv-section-head">
+                                            <div>
+                                                <span class="hpv-section-icon" aria-hidden="true">▦</span>
+                                                <h3>当前健康事实</h3>
+                                            </div>
+                                            <span id="fact-count" class="hpv-count">0 条</span>
+                                        </div>
+                                        <p class="hpv-section-description">按类别展示当前画像事实；每条信息保留确认状态和来源，待确认或争议信息不等同于医学诊断。</p>
+                                        <div id="fact-groups" class="hpv-fact-groups"></div>
+                                    </section>
+
+                                    <section id="hpv-evidence" tabindex="-1" class="hpv-evidence-column">
+                                        <div class="hpv-section-head">
+                                            <div>
+                                                <span class="hpv-section-icon" aria-hidden="true">◎</span>
+                                                <h3>循证支持</h3>
+                                            </div>
+                                            <span id="evidence-status" class="hpv-evidence-status">未请求</span>
+                                        </div>
+                                        <p class="hpv-section-description">知识库检索结果仅用于提供证据线索，不替代医生诊断。</p>
+                                        <div id="evidence-list" class="hpv-evidence-list"></div>
+                                    </section>
+                                </div>
+                            </article>
+                        </div>
+                    </section>
+                    <details class="panel" id="lab-response" data-lab-section="响应 JSON">
+                        <summary class="lab-disclosure">原始响应 JSON</summary>
+                        <div id="api-result" class="result-json" aria-live="polite">尚未发送请求。</div>
+                    </details>
+                </div>
+                <details class="panel lab-log" id="lab-network-log" data-lab-section="网络记录">
+                    <summary class="lab-disclosure">原始网络记录</summary>
+                    <div class="panel-head"><button id="clear-log" class="button ghost">清空</button></div>
+                    <pre id="raw-log" class="log"></pre>
+                </details>
+            </div>
+        </main>
+        <script src="./lab-core.js"></script>
+        <script src="./api-contracts.js"></script>
+        <script src="./json-viewer.js"></script>
+        <script src="./common.js"></script>
+        <script src="./health-profile-view.js"></script>
+    </body>
+</html>

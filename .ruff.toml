@@ -1,0 +1,11 @@
+line-length = 120
+target-version = "py312"
+
+[lint]
+select = ["E", "F", "I"]
+
+[lint.isort]
+force-single-line = true
+
+[format]
+quote-style = "single"

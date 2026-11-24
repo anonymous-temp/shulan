@@ -1,0 +1,111 @@
+# 任务指令
+你正在编写《肠道屏障报告解读参考手册》的**第一章：肠道屏障检测结果综述**。
+目标：让解读人用 10 分钟左右带用户看懂三项指标、屏障评分与损伤分级，知道下一步要做什么，且不产生恐慌。
+
+# 输入数据
+【受检者与报告信息】
+${meta_json}
+
+【第一章素材】
+${part_json}
+
+素材字段说明：
+- `summary_table`：1.1 检测综合评估结论，逐条是「评价项目 → 综合结论」。
+- `indicator_table`：1.2 三项检测指标，含检测指标、检测结果、参考范围、结果评价、单项评分。
+- `indicator_meanings`：报告自带的「指标意义」原文；为 null 表示报告没写。
+- `abnormal_indicators`：超出参考范围且能定性的项；`pending_indicators`：区间型结果、无法精确分层的项；`normal_count`：未超范围的项数。
+- `ibfc`：肠道屏障功能评分。`score` 分值、`grade` 损伤等级、`damage_type` 受损类型、`bands` 五个分级档、`selected_band` 命中的档（为空表示一档都没勾选）、`cards` 里可能带「满分15分」这类补充说明。
+- `damage_paragraph`：1.4 受损类型与受损状况原文。
+- `questionnaire` / `questionnaire_highlights`：健康问卷背景，**全部是受检者自述**。
+- `method_table` / `quality_table`：检测方法与质控记录，为 null 表示本次未提供。
+- `data_gaps`：资料缺口，只能写进 `cautions` 或 `faq`。
+- `extra_blocks`：报告里的其它块（如分级区间图），有内容就在看图看表指引里用上。
+
+# 本章的讲解要求
+
+1. **开场先给整体判断**，取自 `summary_table` 的肠道屏障功能相关结论，一句话说清这次是什么状况，再逐项展开。
+2. **三项指标逐项讲**（`indicator_talk`）：每项都要报出数值 + 参考范围 + 结果评价，三者逐字照抄；`plain` 是这项指标测什么的大白话解释，有 `indicator_meanings` 就以原文为准改写，没有才自己组织语言。
+3. **屏障评分**（`ibfc_talk`）：讲清分值、等级、受损类型，并说明落在分级条的哪一档；一档都没勾选时讲清楚原因，不要硬塞等级。
+4. **受损状况**（`damage_talk`）：改写 `damage_paragraph`，只做口语化，不添加新结论。
+5. `inflammation_talk` 为兼容字段，固定输出 `{"kind":"script","text":"","must_say":""}`；不生成相关讲解、缺失提示或复查建议。
+6. **问卷背景**（`questionnaire_talk`）：挑 `questionnaire_highlights` 里和肠道、代谢、作息相关的几条讲，把它们和检测结果的关系说成「值得一起观察」，不是因果结论。全程带「自述」限定。
+7. **禁止**：不得把「未超出参考范围」讲成「完全没问题」；不得自行换算或汇总评分；不得生成 CRP、超敏C反应蛋白的结果、分层或评估；不得在本章展开第三、四章的修复方案与机制内容。
+
+# 字数与条数约束
+- `key_points`：3 到 5 条，每条不超过 40 字。
+- `script.body`：2 到 5 段，每段不超过 120 字。
+- `indicator_talk.items`：与输入的指标条数完全一致，`plain` 与 `talk` 各不超过 120 字。
+- `ibfc_talk.text`、`damage_talk.text`、`inflammation_talk.text`、`questionnaire_talk.text`：各不超过 200 字。
+- `visual_guide`：2 到 4 条。
+- `faq`：5 到 8 条，每条 `answer` 不超过 120 字。
+- `cautions` 三个列表各 1 到 3 条。
+
+# 输出格式
+请严格遵守以下 JSON Schema（`kind` 字段照抄，不要改动）：
+{
+  "part_no": 1,
+  "title": "第一章 肠道屏障检测结果综述",
+  "key_points": [
+    {"text": "本节必须讲到的一句话要点", "anchor": "1.1"}
+  ],
+  "script": {
+    "kind": "script",
+    "opening": "本章开场的一句话",
+    "body": ["第一段照读话术", "第二段照读话术"],
+    "closing": "本章小结并转到第二章的一句话"
+  },
+  "indicator_talk": {
+    "kind": "script",
+    "intro": "进入三项指标前的一句话",
+    "items": [
+      {
+        "name": "照抄输入的检测指标名称",
+        "result": "照抄检测结果",
+        "reference": "照抄参考范围",
+        "evaluation": "照抄结果评价",
+        "plain": "这项指标测什么的大白话解释",
+        "talk": "照读话术，必须报出数值与参考范围"
+      }
+    ]
+  },
+  "ibfc_talk": {
+    "kind": "script",
+    "text": "评分、等级、受损类型的照读话术",
+    "band_guide": "分级条怎么指、这次落在哪一档（或为什么一档都没落）"
+  },
+  "damage_talk": {"kind": "script", "text": "受损类型与受损状况的照读话术"},
+  "inflammation_talk": {
+    "kind": "script",
+    "text": "",
+    "must_say": ""
+  },
+  "questionnaire_talk": {
+    "kind": "script",
+    "text": "问卷背景的照读话术",
+    "must_say": "问卷这部分是您自己填的情况，不是检测结果，我们只用它来理解背景。"
+  },
+  "visual_guide": [
+    {
+      "anchor": "1.3",
+      "target": "bands",
+      "order": ["先指哪里", "再指哪里"],
+      "talk": "指着图表说的照读话术"
+    }
+  ],
+  "faq": [
+    {"question": "用户可能怎么问", "answer": "照读的应答话术", "source": "报告 1.3"}
+  ],
+  "cautions": {
+    "must_say": ["本节必须讲到的点"],
+    "easy_wrong": ["容易讲错的点"],
+    "forbidden": ["绝对不能说的话"]
+  }
+}
+
+`target` 只能取以下四个值之一：
+- `table`：表格（1.1 结论表、1.2 指标表、问卷表）
+- `cards`：IBFC 指标卡（anchor 用 "1.3"）
+- `bands`：分级条（1.3 屏障分级）
+- `text`：纯文字段落（1.4、1.5）
+
+`anchor` 只能取 "1.1"、"1.2"、"1.3"、"1.4"、"1.5"。

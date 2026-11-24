@@ -1,0 +1,17 @@
+{
+    "version": "trial-concepts-v1",
+    "status": "experimental_project_vocabulary_not_a_medical_standard",
+    "concepts": [
+        {"id": "excess_adiposity", "label": "肥胖及腹部脂肪聚集", "allowedRelations": ["risk_factor", "coexisting_finding"]},
+        {"id": "no_scheduled_exercise", "label": "缺少专门运动", "allowedRelations": ["candidate_contributor"]},
+        {"id": "prolonged_sitting", "label": "连续久坐", "allowedRelations": ["candidate_contributor", "risk_factor"]},
+        {"id": "frequent_sweets_or_sweet_drinks", "label": "甜食或甜饮摄入较频繁", "allowedRelations": ["candidate_contributor"]},
+        {"id": "first_degree_diabetes_history", "label": "一级亲属糖尿病家族史", "allowedRelations": ["risk_factor"]},
+        {"id": "frequent_late_meals", "label": "较频繁的睡前夜宵", "allowedRelations": ["candidate_contributor"]},
+        {"id": "insufficient_sleep", "label": "睡眠不足", "allowedRelations": ["candidate_contributor"]},
+        {"id": "hemorrhoid_bleeding", "label": "痔疮相关出血", "allowedRelations": ["possible_source"]},
+        {"id": "recent_alcohol", "label": "体检前近期饮酒", "allowedRelations": ["candidate_contributor"]},
+        {"id": "nonfasting_sampling", "label": "非空腹采血", "allowedRelations": ["candidate_contributor"]},
+        {"id": "thyroid_dysfunction", "label": "甲状腺功能异常", "allowedRelations": ["candidate_contributor"]}
+    ]
+}

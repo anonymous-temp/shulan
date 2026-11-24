@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Shulan 健康分析 API Lab</title>
+    <link rel="stylesheet" href="./common.css">
+    <link rel="stylesheet" href="./health-analysis.css">
+</head>
+<body>
+<main class="shell lab-shell">
+    <header class="topbar"><div>
+        <p class="eyebrow">Health analysis API laboratory</p>
+        <h1>健康分析</h1>
+        <p class="subtitle">读取已有报告、群聊和历史问卷，单次等待综合健康评价、检查建议、健管师问题和补充问卷。新问卷的答案由客户端管理，可在下次显式请求中作为历史资料传入。</p>
+    </div></header>
+    <nav class="nav-links lab-nav" aria-label="接口页面">
+        <a class="nav-link" href="./index.html"><span>全部接口</span></a>
+        <a class="nav-link" href="./health.html"><span>健康检查</span><small lang="en">Health Check</small></a>
+        <a class="nav-link" href="./interpret.html"><span>报告解读</span><small lang="en">Analysis</small></a>
+        <a class="nav-link" href="./record.html"><span>建档问答</span><small lang="en">Record</small></a>
+        <a class="nav-link" href="./chat.html"><span>智能对话</span><small lang="en">Chat</small></a>
+        <a class="nav-link" href="./record-preview.html"><span>整卷问卷</span><small lang="en">Questionnaire</small></a>
+        <a class="nav-link active" aria-current="page" href="./health-analysis.html"><span>健康分析</span><small lang="en">Health Analysis</small></a>
+        <a class="nav-link" href="./report.html"><span>最终报告</span><small lang="en">Report</small></a>
+        <a class="nav-link" href="./health-profile.html"><span>健康画像</span><small lang="en">Profile</small></a>
+        <a class="nav-link" href="./health-profile-view.html"><span>画像展示</span><small lang="en">Profile View</small></a>
+    </nav>
+    <section id="lab-context" data-lab-section="连接与身份" class="connection lab-context" aria-label="公共测试设置"></section>
+    <section class="panel" id="analysis-presets" data-lab-section="示例">
+        <div class="panel-head"><h2>合成资料示例</h2></div>
+        <div class="panel-body">
+            <p class="hint">这些按钮只载入参数，不发送请求。离线演示可启动 <code>python -m tests.api.scripts.health_analysis_demo</code>，将后端填为 <code>http://127.0.0.1:9081</code>。该演示仅使用合成确认存储和资料；真实后端须接线持久画像确认提供方。</p>
+            <div class="actions" id="analysis-examples">
+                <button type="button" class="button ghost" data-scenario="empty">无资料、无历史</button>
+                <button type="button" class="button ghost" data-scenario="history">已有未答问卷</button>
+                <button type="button" class="button ghost" data-scenario="answer">仅问卷答案</button>
+                <button type="button" class="button ghost" data-scenario="report">合成报告</button>
+                <button type="button" class="button ghost" data-scenario="chat">合成群聊</button>
+            </div>
+        </div>
+    </section>
+    <div class="lab-workspace">
+        <div class="lab-main">
+            <section id="api-editor" data-lab-section="请求编辑" class="panel"></section>
+            <section class="panel" id="analysis-result-title-section" data-lab-section="分析结果" aria-labelledby="analysis-result-title">
+                <div class="panel-head"><h2 id="analysis-result-title">健康分析结果</h2><span id="analysis-state" class="status" role="status">尚未生成</span></div>
+                <div id="analysis-preview" class="panel-body analysis-grid" aria-live="polite"><p class="hint">发送请求后，四项结果将在这里展示。</p></div>
+            </section>
+            <details class="panel" id="lab-response" data-lab-section="响应 JSON">
+                <summary class="lab-disclosure">原始响应 JSON</summary>
+                <div id="api-result" class="result-json" aria-live="polite">尚未发送请求。</div>
+            </details>
+        </div>
+        <details class="panel lab-log" id="lab-network-log" data-lab-section="网络记录">
+            <summary class="lab-disclosure">原始网络记录</summary><div class="panel-head"><button id="clear-log" class="button ghost">清空</button></div><pre id="raw-log" class="log"></pre></details>
+    </div>
+</main>
+<script src="./lab-core.js"></script>
+<script src="./api-contracts.js"></script>
+<script src="./json-viewer.js"></script>
+<script src="./common.js"></script>
+<script src="./health-analysis.js"></script>
+</body>
+</html>

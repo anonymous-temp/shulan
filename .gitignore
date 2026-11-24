@@ -1,0 +1,78 @@
+# Environment files (only example templates belong in Git)
+.env*
+!.env.example
+!.env.example.*
+# database files
+*.db
+*.sql
+
+# macOS
+.DS_Store
+
+# editor or IDE
+.idea/
+.run/
+.vscode/
+
+# AI agent
+.claude/
+.codex/
+
+# GIT
+.gitee/
+.github/
+
+# python venv
+.venv/
+.uv-cache/
+uv.lock
+
+# Python cache
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.pytest-tmp/
+.ruff_cache/
+
+# Python build
+/build/
+/dist/
+*.egg-info/
+/src/*.egg-info/
+
+# Coverage reports
+.coverage
+.coverage.*
+/htmlcov/
+/coverage.xml
+
+# Local temporary files and manual acceptance data
+/tmp/
+/temp/
+/api_test/
+
+# test scripts
+!/tests
+/test*.py
+
+# logs
+/logs/
+/outputs/
+*.log
+
+# loadtest
+/loadtest/results/
+/tests/loadtest/results/
+
+# other files
+/*.html
+/*.pdf
+/*.patch
+/*.txt
+!/requirements.txt
+
+/test_files/
+/note*
+/meeting/
+/temp*.py
+/*.png

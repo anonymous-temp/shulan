@@ -1,0 +1,14 @@
+.analysis-grid { display: grid; gap: 1.25rem; }
+.analysis-block { border: 1px solid var(--line, #d9e1e8); border-radius: 12px; padding: 1.1rem; min-width: 0; }
+.analysis-block h3 { margin: 0 0 .65rem; }
+.analysis-prose { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; line-height: 1.75; }
+.analysis-question { border: 0; border-top: 1px solid var(--line, #d9e1e8); padding: .45rem 0 .65rem; margin: 0; min-width: 0; }
+.analysis-question legend { font-weight: 650; padding-top: .55rem; max-width: 100%; overflow-wrap: anywhere; }
+.analysis-question > .hint { margin: 0; }
+.analysis-options { display: flex; flex-wrap: wrap; gap: .3rem 1.15rem; margin-top: .4rem; }
+.analysis-option { display: flex; align-items: flex-start; gap: .4rem; max-width: 100%; padding: .2rem 0; line-height: 1.5; }
+.analysis-option input { width: auto; padding: 0; margin: .15em 0 0; flex-shrink: 0; }
+.analysis-option span { min-width: 0; overflow-wrap: anywhere; }
+.analysis-survey { grid-column: 1 / -1; }
+.analysis-feedback { min-height: 1.5em; }
+@media (min-width: 900px) { .analysis-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

@@ -1,0 +1,54 @@
+[build-system]
+requires = [
+    "setuptools>=61.0",
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "shulan"
+version = "0.9.1"
+description = "Shulan API."
+readme = "README.md"
+authors = [
+    { name = "MSR", email = "msr20666@foxmail.com" },
+]
+requires-python = ">=3.12"
+keywords = [
+    "shulan",
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Private :: Do Not Upload",
+]
+dependencies = [
+    "dotenv",
+    "tornado==6.5.2",
+    "langgraph==1.2.9",
+    "langgraph-checkpoint-mongodb==0.4.0",
+    "pymongo==4.16.0",
+    "pydantic>=2.10,<3",
+    "httpx>=0.27,<1",
+    "openai>=2.38.0,<3",
+    "PyMuPDF>=1.24,<2",
+    "database[all] @ git+https://gitee.com/loongspears/database@ca190212d2651dc6b9e0ce0d9e2e070da0701259",
+    "aion[docmind] @ git+https://gitee.com/loongspears/aion@v0.6.0",
+    "loongspears.utils @ git+https://gitee.com/loongspears/utils",
+]
+[project.optional-dependencies]
+dev = [
+    "requests",
+    "sseclient-py",
+    "pytest>=8,<9",
+    "pytest-asyncio>=0.24,<2",
+]
+loadtest = [
+    "locust==2.46.6",
+]
+
+[tool.setuptools]
+py-modules = []
+
+[tool.pytest.ini_options]
+testpaths = ["tests/unit"]
+python_files = ["test_*.py"]
+addopts = ["-p", "no:cacheprovider"]
