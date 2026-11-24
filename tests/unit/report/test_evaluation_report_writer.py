@@ -68,7 +68,7 @@ def _blueprint(targets):
     )
 
 
-def _evidence(target_id):
+def _evidence(*target_ids):
     return SimpleNamespace(
         plan=[],
         references=[SimpleNamespace(number=1, study_types=['Practice Guideline'], source='J')],
@@ -82,7 +82,7 @@ def _evidence(target_id):
                 'topicLinks': [
                     {
                         'topicId': 't',
-                        'targetIds': [target_id],
+                        'targetIds': list(target_ids),
                         'score': 4,
                         'objectName': '粪便隐血',
                         'objectTerms': ['stool-based test', 'colonoscopy'],
@@ -221,9 +221,12 @@ def test_reviewer_corrections_replace_the_draft_and_serious_findings_trigger_one
     model = FakeModel([first, second])
     audit = {}
     blueprint = _blueprint(targets)
+    # Both cells cite the same guideline passage, so it is linked to both:
+    # a passage admitted for another cell only is rejected before review.
+    evidence = _evidence('report:t1', 'report:t2')
     blocks = asyncio.run(
         author_report_chapters(
-            model, blueprint=blueprint, evidence=_evidence('report:t1'), subject=None, deadline=None, audit=audit
+            model, blueprint=blueprint, evidence=evidence, subject=None, deadline=None, audit=audit
         )
     )
     texts = {block['targetId']: block['sentences'][0]['text'] for block in blocks['medicalAssessment']}
@@ -599,9 +602,15 @@ def test_summary_merge_keeps_original_passages_when_combined_terms_change_select
     assert alpha.entries[0]['passages'][0]['text'] == alpha_text
     assert beta.entries[0]['passages'][0]['text'] == beta_text
     assert [entry['ref'] for entry in combined.entries] == ['E1']
-    assert beta_text not in [part['text'] for part in combined.entries[0]['passages']]
-    # Keeping the publication alone is insufficient when its beta passage was displaced.
-    assert _batches(targets, evidence=evidence, chapter_code='microbiomeAssessment') == [targets[:1], targets[1:]]
+    # Together the two passages exceed one selection window. Passages are
+    # chosen per link, so merging cannot displace either cell's own passage,
+    # and each stays citable only by the cell it was chosen for.
+    passages = {part['text']: part['pid'] for part in combined.entries[0]['passages']}
+    assert set(passages) == {alpha_text, beta_text}
+    assert combined.allowed_targets[passages[alpha_text]] == {'alpha'}
+    assert combined.allowed_targets[passages[beta_text]] == {'beta'}
+    # Nothing was displaced, so the related summaries share one batch.
+    assert _batches(targets, evidence=evidence, chapter_code='microbiomeAssessment') == [targets]
 
 
 def test_summary_merge_keeps_all_original_cell_records_without_raising_the_shared_quota():
@@ -900,7 +909,9 @@ def test_substantive_prior_corrections_reach_writer_and_reviewer_without_local_c
             'C01': [
                 {'type': 'fact_error', 'detail': 'F001是筛查阳性，不能直接诊断或判断F2分期。'},
                 {'type': 'citation_mismatch', 'detail': 'E1.2的适用前提没有满足。'},
-                {'type': 'off_task', 'detail': '一处轻微文风问题。'},
+                # off_task is a substantive duty failure; a type outside the
+                # reviewer vocabulary is a style-only note and stays local.
+                {'type': 'style', 'detail': '一处轻微文风问题。'},
             ]
         },
     }
