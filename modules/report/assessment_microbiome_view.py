@@ -788,7 +788,7 @@ def _reported_assessment_rows(parsed, data):
             '_sourceAssessmentFile': parsed.source_name,
             '_sourceSemantics': {
                 **semantics,
-                'reportedObject': semantics['assessmentDefinition']['label'] + '（原报告菌群关联评估）',
+                'reportedObject': semantics['assessmentDefinition']['label'] + '（菌群关联评估）',
                 'originalValue': item.test_result_value,
                 'originalStatus': item.result_status_name,
                 'displayStatus': item.result_status_name,
@@ -830,7 +830,7 @@ def _reported_assessment_rows(parsed, data):
                 '_sourceAssessmentFile': parsed.source_name,
                 '_sourceSemantics': {
                     **semantics,
-                    'reportedObject': item.name + '（原报告菌群模型评估）',
+                    'reportedObject': item.name + '（菌群模型评估）',
                     'originalValue': item.source_score,
                     'originalStatus': item.source_level,
                     'displayStatus': item.source_level,
@@ -1198,7 +1198,7 @@ def _structure_groups(rows, parsed, microbiome):
                 )
                 if bound and _number_key(row['value']) == Decimal(bound[1]):
                     measurements[index] = {**row, 'templateStatus': (
-                        f'{row["name"]}原判{row["status"]}；{row["value"]}在分界值，未满足原件严格界值{row["referenceRange"]}'
+                        f'{row["name"]}报告判为{row["status"]}；{row["value"]}处于分界值，未达到严格界值{row["referenceRange"]}'
                     )}
         if semantics := _group_source_semantics(measurements):
             group['_sourceSemantics'] = semantics

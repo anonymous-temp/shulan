@@ -380,6 +380,102 @@ def test_every_fixed_system_is_listed_with_its_level():
     assert by_code['microbiome']['anchors'][0]['name'] == '肠道微生态总评分'
 
 
+def _priority_findings():
+    return [
+        {
+            'code': 'urgent',
+            'name': '优先排查',
+            'priority': 'P0',
+            'text': '粪便隐血阳性需优先复查。',
+            'evidenceRefs': [],
+            'items': [
+                {
+                    'code': 'fobt',
+                    'name': '粪便隐血阳性复查',
+                    'priority': 'P0',
+                    'timeframe': {'text': '2 周内', 'days': 14},
+                    'department': '消化内科',
+                    'checks': ['粪便隐血复查', '肠镜评估'],
+                    'basisRows': [_row('粪便隐血试验', '阳性', reference='阴性', status='阳性')],
+                    'text': '粪便隐血阳性复查：建议2 周内至消化内科就诊，完成粪便隐血复查、肠镜评估。',
+                    'clusterId': 'C1',
+                    'ruleId': 'fobt-positive',
+                }
+            ],
+        },
+        {
+            'code': 'routine',
+            'name': '常规专科随访',
+            'priority': None,
+            'text': '胆囊息肉按间隔复查。',
+            'evidenceRefs': [],
+            'items': [
+                {
+                    'code': 'polyp',
+                    'name': '胆囊息肉',
+                    'priority': None,
+                    'timeframe': {'text': '每 6 个月', 'days': 182},
+                    'department': '肝胆外科',
+                    'checks': ['胆囊B超'],
+                    'basisRows': [],
+                    'text': '胆囊息肉：肝胆外科随访，复查胆囊B超，每 6 个月复查。',
+                },
+                {
+                    'code': 'eye',
+                    'name': '屈光不正',
+                    'priority': None,
+                    'timeframe': None,
+                    'department': None,
+                    'checks': [],
+                    'basisRows': [],
+                    'text': '屈光不正：建议眼科门诊验光。',
+                },
+            ],
+        },
+        {
+            'code': 'gaps',
+            'name': '检测盲区',
+            'priority': None,
+            'text': None,
+            'evidenceRefs': [],
+            'items': [
+                {
+                    'code': 'hcy',
+                    'name': '同型半胱氨酸',
+                    'reason': '评估一碳代谢',
+                    'text': '同型半胱氨酸：评估一碳代谢。',
+                }
+            ],
+        },
+    ]
+
+
+def _layers():
+    return [
+        {
+            'code': 'clinical',
+            'name': '第一层级：临床专科排查与随访（首月）',
+            'text': '先完成隐血复查。',
+            'evidenceRefs': [],
+            'clusterIds': ['C1'],
+        },
+        {
+            'code': 'core',
+            'name': '第二层级：核心代谢与肠道微生态干预（90 天）',
+            'text': '控制体重与血脂。',
+            'evidenceRefs': [],
+            'clusterIds': ['C2'],
+        },
+        {
+            'code': 'maintenance',
+            'name': '第三层级：营养储备与长期健康维护（持续）',
+            'text': '本次未形成需协同调理的失衡集群。',
+            'evidenceRefs': [],
+            'clusterIds': [],
+        },
+    ]
+
+
 def test_ordered_callback_passes_new_fields_through():
     view = _view()
     view['overview']['systems'] = [
@@ -392,12 +488,17 @@ def test_ordered_callback_passes_new_fields_through():
             'rows': [],
         }
     ]
-    view['overview']['priorityItems'] = [{'code': 'p1', 'title': '复查隐血', 'priority': 'P0'}]
+    view['overview']['priorityFindings'] = _priority_findings()
+    view['conclusion']['layers'] = _layers()
+    view['clinical']['baselineSummary'] = '肝肾功能与血常规在参考区间内。'
     data = _body(view)['data']
-    overview = data['chapters'][0]['content']
+    chapters = {chapter['code']: chapter['content'] for chapter in data['chapters']}
+    overview = chapters['overview']
     assert overview['systems'][0]['anchors'][0]['value'] == '3.34' and overview['systems'][0]['moreCount'] == 1
-    assert overview['priorityItems'][0]['title'] == '复查隐血'
-    assert assessment_view_for_rendering(data)['overview']['priorityItems'] == view['overview']['priorityItems']
+    assert overview['priorityFindings'][0]['items'][0]['timeframe'] == {'text': '2 周内', 'days': 14}
+    assert chapters['conclusion']['layers'][1]['clusterIds'] == ['C2']
+    assert chapters['clinical']['baselineSummary'] == '肝肾功能与血常规在参考区间内。'
+    assert assessment_view_for_rendering(data)['overview']['priorityFindings'] == view['overview']['priorityFindings']
 
 
 def test_sample_draws_the_spec_components():
@@ -478,33 +579,43 @@ def test_empty_sections_show_their_missing_statements():
         assert word not in page, word
 
 
-def test_planning_contract_rows_become_action_cards_schedule_and_gaps():
+def test_priority_items_become_action_cards_schedule_and_roadmap():
     view = _view()
-    view['overview']['priorityItems'] = [
-        {
-            'code': 'fobt',
-            'title': '粪便隐血阳性复查',
-            'priority': 'P0',
-            'timeframe': {'text': '2 周内', 'days': 14},
-            'department': '消化内科',
-            'checks': ['粪便隐血复查', '肠镜评估'],
-            'factIds': ['f1'],
-        },
-    ]
-    view['overview']['routineFollowups'] = [
-        {
-            'code': 'polyp',
-            'title': '胆囊息肉复查',
-            'interval': {'text': '每 6 个月', 'days': 182},
-            'department': '肝胆外科',
-        },
-    ]
-    view['overview']['testGaps'] = [{'code': 'hcy', 'test': '同型半胱氨酸', 'reason': '评估一碳代谢'}]
+    view['overview']['priorityFindings'] = _priority_findings()
+    view['conclusion']['layers'] = _layers()
+    view['clinical']['baselineSummary'] = '肝肾功能与血常规在参考区间内。'
     page = _page(view)
     card = re.search(r'<article class="as-act p0">.*?</article>', page).group(0)
     assert all(part in card for part in ('粪便隐血阳性复查', '2 周内', '消化内科', '粪便隐血复查；肠镜评估'))
+    assert 'href="#as-cluster-C1"' in card and '>阳性<' in card
+    assert '建议2 周内至消化内科就诊' not in card  # the composed line repeats the drawn fields
     schedule = re.search(r'<table class="sched">.*?</table>', page).group(0)
-    assert '胆囊息肉复查' in schedule and schedule.count('class="mk"') == 1 and schedule.count('mk re') == 1
+    assert '胆囊息肉' in schedule and schedule.count('class="mk"') == 1 and schedule.count('mk re') == 1
+    assert '屈光不正' not in schedule and '建议眼科门诊验光。' in page  # no interval: listed, not scheduled
     assert '同型半胱氨酸' in page and '评估一碳代谢' in page
-    first_stage = re.search(r'<section class="as-stage s1">.*?</section>', page).group(0)
-    assert '粪便隐血阳性复查' in first_stage and '胆囊息肉复查' in first_stage and '补查 同型半胱氨酸' in first_stage
+    stages = dict(re.findall(r'<section class="as-stage (s\d)">(.*?)</section>', page))
+    assert '粪便隐血阳性复查' in stages['s1'] and '胆囊息肉' in stages['s1'] and '补查 同型半胱氨酸' in stages['s1']
+    assert 'C1 粪便隐血阳性的复查' not in stages['s1']  # the P0 cluster is already its action card
+    assert 'C2 血脂异常与体重管理' in stages['s2']
+    assert '本次未形成需协同调理的失衡集群。' in stages['s3']
+    assert '肝肾功能与血常规在参考区间内。' in page
+
+
+def test_recorded_advice_is_read_from_its_kind_field():
+    view = _view()
+    advice = {**_row('检查建议 · 体检结论：粪便隐血', '建议复查大便隐血。'), 'kind': 'advice', 'status': None}
+    view['clusters'][0]['clinicalSignals'].append(advice)
+    page = _page(view)
+    card = re.search(r'<article class="as-cluster" id="as-cluster-C1">.*?</article>', page).group(0)
+    assert '<h5>检查建议</h5><p>建议复查大便隐血。</p>' in card
+    assert '建议复查大便隐血' not in card.split('<h5>检查建议</h5>')[0]  # not drawn as a clinical anchor
+
+
+def test_relabelled_questionnaire_answers_are_split_into_lines():
+    view = _view()
+    view['clinical']['symptoms'][0]['history'] = '最近通常每日睡眠时长：6至7小时；平时每周安排运动天数：没有运动'
+    page = _page(view)
+    assert (
+        '<span class="qa">最近通常每日睡眠时长：6至7小时</span><span class="qa">平时每周安排运动天数：没有运动</span>'
+        in page
+    )

@@ -313,6 +313,8 @@ main.assessment{
   .assessment section.chapter{break-before:page;padding-top:0}
   .assessment section#as-preface{break-before:auto;padding-top:18pt}
   .assessment h2,.assessment h3,.assessment h4,.assessment h5,.assessment .as-panel-head{break-after:avoid-page}
+  .assessment .as-cluster,.assessment .as-note,.assessment .as-roadmap,.assessment .as-direction>h4{
+    break-inside:avoid}
   .assessment .as-sys,.assessment .as-act,.assessment .as-mrow,.assessment .as-stage,.assessment .as-legend,
   .assessment figure.as-graph,.assessment table.as-matrix tr,.assessment .as-trend,.assessment .as-gaps li,
   .assessment table.sched,.assessment .as-cluster>header,.assessment .as-evidence,.assessment .as-timing{
@@ -336,13 +338,13 @@ _STATED_NORMAL_IMAGING = {'未见明显异常', '未见异常', '正常'}
 _HEPATOBILIARY_ORGANS = re.compile(r'肝|胆囊|胆管|胆道|胆总管|胰腺|胰管|门静脉')
 _OTHER_ABDOMINAL_ORGANS = re.compile(r'肾|脾|输尿管|集合系统|膀胱|前列腺|子宫|附件')
 _LIFESTYLE_PROMPTS = (
-    (r'^您平时一周(?:大约)?有几天安排运动[?？]$', '平时运动频率'),
-    (r'^您平时连续坐着、不起身的时间(?:通常)?有多久[?？]$', '平时连续久坐时长'),
-    (r'^您平时的正餐(?:通常)?吃到哪些食物[?？](?:可多选。)?$', '平时正餐食物'),
-    (r'^您平时吃甜食或喝含糖饮料的频率更接近哪一种[?？]$', '平时甜食或含糖饮料频率'),
-    (r'^您平时临睡前吃夜宵的频率更接近哪一种[?？]$', '平时临睡前夜宵频率'),
-    (r'^您平时的饮酒频率更接近哪一种[?？]$', '平时饮酒频率'),
-    (r'^您最近通常每天睡多长时间[?？]$', '最近每日睡眠时长'),
+    (r'^您?平时一周(?:大约)?有几天安排运动[?？]$', '平时运动频率'),
+    (r'^您?平时连续坐着、不起身的时间(?:通常)?有多久[?？]$', '平时连续久坐时长'),
+    (r'^您?平时的正餐(?:通常)?吃到哪些食物[?？](?:可多选。)?$', '平时正餐食物'),
+    (r'^您?平时吃甜食或喝含糖饮料的频率更接近哪一种[?？]$', '平时甜食或含糖饮料频率'),
+    (r'^您?平时临睡前吃夜宵的频率更接近哪一种[?？]$', '平时临睡前夜宵频率'),
+    (r'^您?平时的饮酒频率更接近哪一种[?？]$', '平时饮酒频率'),
+    (r'^您?最近通常每天睡多长时间[?？]$', '最近每日睡眠时长'),
 )
 _DOI = re.compile(r'10\.\d{4,9}/[^\s<>?#]+', re.IGNORECASE)
 _TRACKING_KEYS = frozenset(
@@ -468,10 +470,15 @@ def _digestive_measurements(group):
     return scoped
 
 
+def _is_advice(row):
+    """Recorded examination advice: the ``kind`` field, or the legacy status marker of older callbacks."""
+    return row.get('kind') == 'advice' or row.get('status') in {'原报告医嘱', '检查建议'}
+
+
 def _recorded_advice(item):
     quotes = {}
     for row in item.get('clinicalSignals') or ():
-        if row.get('status') != '原报告医嘱' or not (quote := _text(row.get('value'))):
+        if not _is_advice(row) or not (quote := _text(row.get('value'))):
             continue
         if not any(ref.get('sourceCode') == 'A' and ref.get('recordId') for ref in row.get('sources') or ()):
             continue
@@ -593,8 +600,9 @@ _LIFESTYLE_DIMENSIONS = (
 _BACKGROUND_KINDS = {'background', 'history', 'trigger'}
 _SCHEDULE = (('首月', 31), ('3 个月', 92), ('6 个月', 183), ('12 个月', 366))
 _QA = re.compile(
-    r'(?:^|[；;\n])\s*(?:(?P<date>\d{4}[-/]\d{1,2}[-/]\d{1,2}(?:[ T]\d{2}:\d{2}(?::\d{2})?)?)\s+)?'
-    r'(?P<label>体检生活方式记录原文|[^；;：:\n]{2,80}?[?？](?:可多选。)?|请[^；;：:\n]{2,80})\s*[：:]'
+    r'^\s*(?:\d{4}[-/]\d{1,2}[-/]\d{1,2}(?:[ T]\d{2}:\d{2}(?::\d{2})?)?\s+)?'
+    r'(?P<label>[^；;：:\n]{1,80}?)\s*(?:：|(?<!\d):(?!\d))\s*(?P<answer>.*)$',
+    re.S,
 )
 _LABEL_NOISE = (
     (re.compile(r'（原报告菌群关联评估）|\(原报告菌群关联评估\)'), '（菌群关联评估）'),
@@ -623,20 +631,24 @@ def _prompt(question):
 
 
 def _qa_pairs(value):
-    """(label, answer) pairs of a questionnaire string; a plain string is one unlabelled answer."""
+    """(label, answer) pairs of "题目：答案；题目：答案"; a piece without a label continues the previous answer."""
     text = _text(value).strip()
     if not text:
         return []
-    marks = list(_QA.finditer(text))
-    if not marks or text[: marks[0].start()].strip(' ；;'):
-        return [('', text)]
     pairs = []
-    for index, mark in enumerate(marks):
-        end = marks[index + 1].start() if index + 1 < len(marks) else len(text)
-        answer = text[mark.end() : end].strip(' ；;\n')
-        label = mark['label']
-        pairs.append(('' if label == '体检生活方式记录原文' else _prompt(label), answer))
-    return pairs
+    for piece in re.split(r'[；;\n]', text):
+        piece = piece.strip()
+        if not piece:
+            continue
+        match = _QA.match(piece)
+        if match and match['answer'].strip():
+            label = match['label'].strip()
+            pairs.append(['' if label == '体检生活方式记录原文' else _prompt(label), match['answer'].strip()])
+        elif pairs:
+            pairs[-1][1] += '；' + piece
+        else:
+            pairs.append(['', piece])
+    return [tuple(pair) for pair in pairs]
 
 
 def _qa_html(value):
@@ -722,6 +734,10 @@ def _days_between(first, second):
 def _shared_date(rows):
     dates = {_text(row.get('observedAt'))[:10] for row in rows}
     return next(iter(dates)) if len(dates) == 1 and '' not in dates else ''
+
+
+def _text_width(text, size):
+    return sum(size if ord(char) > 0x2E80 else size * 0.58 for char in _text(text))
 
 
 def _wrap(text, size, width, lines=2):
@@ -989,39 +1005,52 @@ def _trend_svg(points, label):
 
 
 def _graph_svg(hub, hub_lines, nodes):
-    """Centre (key indicators) to cluster nodes; text is set at 12–15 px for print."""
-    width, node_h, gap, node_x = 680.0, 50.0, 10.0, 300.0
-    height = max(len(nodes) * (node_h + gap) - gap + 16, 44 + 20 * len(hub_lines) + 24)
+    """Centre (key indicators) to cluster nodes; names wrap to two lines, text is 11.5–15 px."""
+    width, gap, node_x = 680.0, 10.0, 300.0
+    text_width = width - node_x - 6 - 56
+    laid = []
+    for identifier, name, priority, anchors in nodes:
+        lines = _wrap(name, 13, text_width, lines=2)
+        sub = f'{priority} {_PRIORITIES[priority][0]}' if priority in _PRIORITIES else ''
+        for anchor in anchors:  # an anchor that does not fit is left out, never cut
+            candidate = f'{sub} · {anchor}' if sub else anchor
+            if _text_width(candidate, 11.5) <= text_width:
+                sub = candidate
+        laid.append((identifier, lines, priority, [sub] if sub else [], 22 + 18 * len(lines) + 16))
+    total = sum(item[4] for item in laid) + gap * (len(laid) - 1)
     hub_h = 40 + 20 * len(hub_lines)
+    height = max(total + 16, hub_h + 24)
     hub_y = (height - hub_h) / 2
     parts = [f'<svg viewBox="0 0 {width:.0f} {height:.0f}" role="img" aria-label="{_e(hub)}与失衡集群关系">']
-    top = (height - (len(nodes) * (node_h + gap) - gap)) / 2
-    for index, (identifier, name, priority) in enumerate(nodes):
-        y = top + index * (node_h + gap)
-        cy = y + node_h / 2
+    y = (height - total) / 2
+    boxes = []
+    for item in laid:
+        boxes.append((y, item))
+        cy = y + item[4] / 2
         parts.append(
             f'<path class="edge" d="M230 {height / 2:.1f} C265 {height / 2:.1f} {node_x - 35:.1f} {cy:.1f} '
             f'{node_x:.1f} {cy:.1f}"/>'
         )
+        y += item[4] + gap
     parts.append(f'<rect class="hub" x="8" y="{hub_y:.1f}" width="222" height="{hub_h:.1f}" rx="8"/>')
-    for line_index, line in enumerate(_wrap(hub, 15, 196, lines=1)):
-        parts.append(f'<text class="hub-t" x="22" y="{hub_y + 26 + line_index * 18:.1f}">{_e(line)}</text>')
-    for line_index, line in enumerate(hub_lines):
+    parts.append(f'<text class="hub-t" x="22" y="{hub_y + 26:.1f}">{_e(_wrap(hub, 15, 196, lines=1)[0])}</text>')
+    for index, line in enumerate(hub_lines):
         text = _wrap(line, 12, 196, lines=1)[0]
-        parts.append(f'<text class="hub-s" x="22" y="{hub_y + 48 + line_index * 20:.1f}">{_e(text)}</text>')
-    for index, (identifier, name, priority) in enumerate(nodes):
-        y = top + index * (node_h + gap)
+        parts.append(f'<text class="hub-s" x="22" y="{hub_y + 48 + index * 20:.1f}">{_e(text)}</text>')
+    for top, (identifier, lines, priority, sub, box_h) in boxes:
         css = _PRIORITIES.get(priority, ('', 'p3'))[1]
         parts.append(
-            f'<rect class="node pri-{css}" x="{node_x:.1f}" y="{y:.1f}" width="{width - node_x - 6:.0f}" '
-            f'height="{node_h:.0f}" rx="7"/>'
+            f'<rect class="node pri-{css}" x="{node_x:.1f}" y="{top:.1f}" width="{width - node_x - 6:.0f}" '
+            f'height="{box_h:.0f}" rx="7"/>'
         )
-        parts.append(f'<text class="nid" x="{node_x + 12:.1f}" y="{y + 21:.1f}">{_e(identifier)}</text>')
-        lines = _wrap(name, 13, width - node_x - 70, lines=1)
-        parts.append(f'<text class="nt" x="{node_x + 44:.1f}" y="{y + 21:.1f}">{_e(lines[0] if lines else "")}</text>')
-        if priority in _PRIORITIES:
-            text = f'{priority} {_PRIORITIES[priority][0]}'
-            parts.append(f'<text class="np" x="{node_x + 44:.1f}" y="{y + 39:.1f}">{_e(text)}</text>')
+        parts.append(f'<rect class="badge pri-{css}" x="{node_x + 10:.1f}" y="{top + 9:.1f}" width="32" height="19"/>')
+        parts.append(f'<text class="bid" x="{node_x + 26:.1f}" y="{top + 23:.1f}" text-anchor="middle">'
+                     f'{_e(identifier)}</text>')
+        for index, line in enumerate(lines):
+            parts.append(f'<text class="nt" x="{node_x + 50:.1f}" y="{top + 23 + index * 18:.1f}">{_e(line)}</text>')
+        if sub:
+            parts.append(f'<text class="ns" x="{node_x + 50:.1f}" y="{top + 23 + len(lines) * 18 + 2:.1f}">'
+                         f'{_e(sub[0])}</text>')
     parts.append('</svg>')
     return ''.join(parts)
 
@@ -1130,13 +1159,6 @@ class _AssessmentRenderer:
         return ''.join(
             f'<p{klass}>{_e(part)}{tail if index == len(parts) - 1 else ""}</p>' for index, part in enumerate(parts)
         )
-
-    def contract(self, key):
-        """A planning-contract list (``priorityItems``…) wherever the projection placed it; ``None`` if absent."""
-        for scope in (self.overview_data, self.conclusion_data, self.data):
-            if isinstance(scope.get(key), list):
-                return scope[key]
-        return None
 
     def cluster_link(self, cluster_id, label):
         anchor = _cluster_anchor(cluster_id)
@@ -1326,7 +1348,8 @@ class _AssessmentRenderer:
             anchors = ''.join(_anchor_tag(anchor, level) for anchor in fields.get('anchors') or ())
             more = fields.get('moreCount') or 0
             if more:
-                anchors += f'<span class="as-more">另有 {more} 项</span>'
+                where = '第四章' if code == 'microbiome' else '第三章'
+                anchors += f'<span class="as-more">另有 {more} 项，见{where}</span>'
             if level == charts.NOT_TESTED:
                 body = '<p>本次资料未包含该系统的检查项目。</p>'
             else:
@@ -1344,56 +1367,103 @@ class _AssessmentRenderer:
         return summary + f'<div class="as-systems">{"".join(cards)}</div>'
 
     def priority_cards(self):
-        items = self.contract('priorityItems')
-        followups = self.contract('routineFollowups')
-        gaps = self.contract('testGaps')
-        parts = []
-        if items is not None:
-            urgent = [item for item in items if item.get('priority') in {None, 'P0'}]
-            for item in urgent:
-                parts.append(self.action_card(
-                    item.get('title'), item.get('priority') or 'P0',
-                    timeframe=(item.get('timeframe') or {}).get('text'), department=item.get('department'),
-                    checks=item.get('checks'), basis=item.get('basisRows'), text=item.get('text'),
-                ))
+        findings = list(self.overview_data.get('priorityFindings') or ())
+        if any('items' in row for row in findings):
+            return self.structured_priorities(findings)
+        return self.legacy_priorities(findings)
+
+    def structured_priorities(self, findings):
+        """1.3 in three parts (``priorityFindings[code=urgent|routine|gaps].items[]``)."""
+        sections = {row.get('code'): row for row in findings}
+        urgent = sections.get('urgent') or {}
+        items = urgent.get('items') or []
+        html = '<h4 class="as-sub">优先排查</h4>'
+        if items:
+            cards = ''.join(self.item_card(item) for item in items)
+            html += self.paragraph(urgent.get('text'), urgent) + f'<div class="as-actions">{cards}</div>'
         else:
-            for cluster in self.core_clusters:
-                if cluster.get('priority') != 'P0':
-                    continue
-                clinical = [row for row in cluster.get('clinicalSignals') or ()
-                            if row.get('status') != '原报告医嘱'
-                            and not any(source.get('sourceCode') == 'B' for source in row.get('sources') or ())]
-                parts.append(self.action_card(
-                    f'{cluster.get("id")} {cluster.get("name")}', 'P0', basis=clinical,
-                    advice=_advice_quotes(cluster), text=cluster.get('action'), node=cluster,
-                ))
-            for finding in self.overview_data.get('priorityFindings') or ():
-                priority = _FINDING_PRIORITIES.get(finding.get('code'))
-                if priority == 'P0' and parts:
-                    continue
-                if finding.get('code') == 'gaps':
-                    continue
-                parts.append(self.action_card(
-                    _text(finding.get('name')), priority, text=finding.get('action') or finding.get('text'),
-                    node=finding, routine=priority is None,
-                ))
-        urgent_present = any('class="as-act p0"' in part for part in parts)
-        html = f'<div class="as-actions">{"".join(parts)}</div>' if parts else ''
-        if not urgent_present:
-            html = _note('本次未发现需优先就医排查的结果。') + html
-        if followups:
-            html += '<h4 class="as-sub">常规专科随访</h4>' + self.schedule(followups)
-        if gaps is not None:
-            if gaps:
-                html += '<h4 class="as-sub">检测盲区</h4><ul class="as-gaps">' + ''.join(
-                    f'<li><strong>{_e(gap.get("test"))}</strong><span>{_e(gap.get("reason"))}</span></li>'
-                    for gap in gaps
-                ) + '</ul>'
+            html += _note(_text(urgent.get('text')) or '本次未发现需优先就医排查的结果。')
+        routine = sections.get('routine') or {}
+        items = routine.get('items') or []
+        html += '<h4 class="as-sub">常规专科随访</h4>'
+        if items:
+            scheduled = [item for item in items if isinstance((item.get('timeframe') or {}).get('days'), (int, float))]
+            listed = [item for item in items if item not in scheduled]
+            html += self.paragraph(routine.get('text'), routine)
+            html += self.schedule(scheduled) if scheduled else ''
+            html += self.item_list(listed)
         else:
-            for finding in self.overview_data.get('priorityFindings') or ():
-                if finding.get('code') == 'gaps' and (text := finding.get('action') or finding.get('text')):
-                    html += '<h4 class="as-sub">检测盲区</h4>' + self.paragraph(text, finding)
+            html += _note(_text(routine.get('text')) or '本次未发现需定期专科复查的发现。')
+        gaps = (sections.get('gaps') or {}).get('items') or []
+        if gaps:
+            html += '<h4 class="as-sub">检测盲区</h4>' + self.paragraph((sections.get('gaps') or {}).get('text'))
+            html += self.item_list(gaps, reason=True)
         return html
+
+    def item_card(self, item):
+        timeframe = (item.get('timeframe') or {}).get('text')
+        title = _text(item.get('name') or item.get('title'))
+        # The card line is composed from the drawn fields; it is shown only when they are absent.
+        text = None if (timeframe or item.get('department') or item.get('checks')) else item.get('text')
+        card = self.action_card(
+            title, item.get('priority') or 'P0', timeframe=timeframe, department=item.get('department'),
+            checks=item.get('checks'), basis=item.get('basisRows'), text=text,
+        )
+        if cluster := item.get('clusterId'):
+            card = card.replace('</h4></header>', f'</h4>{self.cluster_ref(cluster)}</header>', 1)
+        return card
+
+    def cluster_ref(self, cluster_id):
+        anchor = _cluster_anchor(cluster_id)
+        if anchor and cluster_id in self.cluster_ids:
+            return f'<a class="as-more" href="#{anchor}">见集群 {_e(cluster_id)}</a>'
+        return ''
+
+    def item_list(self, items, *, reason=False):
+        rows = []
+        for item in items:
+            title = _text(item.get('name') or item.get('title') or item.get('test'))
+            detail = _text(item.get('reason')) if reason and item.get('reason') else _text(item.get('text'))
+            if detail.startswith(title):
+                detail = detail[len(title):].lstrip('：: ')
+            meta = ' '.join(
+                f'<span class="as-when">{_e(value)}</span>' for value in (
+                    (item.get('timeframe') or {}).get('text'), item.get('department'),
+                ) if value
+            )
+            rows.append(f'<li><strong>{_e(_label(title))}</strong><span>{meta}{" " if meta else ""}{_e(detail)}'
+                        f'{self.cluster_ref(item.get("clusterId")) if item.get("clusterId") else ""}</span></li>')
+        return f'<ul class="as-gaps">{"".join(rows)}</ul>' if rows else ''
+
+    def legacy_priorities(self, findings):
+        """Older callbacks: P0 clusters as cards, then the authored priority paragraphs."""
+        parts = []
+        for cluster in self.core_clusters:
+            if cluster.get('priority') != 'P0':
+                continue
+            clinical = [row for row in cluster.get('clinicalSignals') or ()
+                        if not _is_advice(row)
+                        and not any(source.get('sourceCode') == 'B' for source in row.get('sources') or ())]
+            parts.append(self.action_card(
+                f'{cluster.get("id")} {cluster.get("name")}', 'P0', basis=clinical,
+                advice=_advice_quotes(cluster), text=cluster.get('action'), node=cluster,
+            ))
+        gaps = ''
+        for finding in findings:
+            text = finding.get('action') or finding.get('text')
+            if finding.get('code') == 'gaps':
+                gaps += self.paragraph(text, finding)
+                continue
+            priority = _FINDING_PRIORITIES.get(finding.get('code'))
+            if priority == 'P0' and parts:
+                continue
+            parts.append(self.action_card(
+                _text(finding.get('name')), priority, text=text, node=finding, routine=priority is None,
+            ))
+        html = f'<div class="as-actions">{"".join(parts)}</div>' if parts else ''
+        if not any('class="as-act p0"' in part for part in parts):
+            html = _note('本次未发现需优先就医排查的结果。') + html
+        return html + (f'<h4 class="as-sub">检测盲区</h4>{gaps}' if gaps else '')
 
     def action_card(self, title, priority, *, timeframe=None, department=None, checks=None, basis=None,
                     advice=None, text=None, node=None, routine=False):
@@ -1407,7 +1477,7 @@ class _AssessmentRenderer:
         if basis:
             rows.append(f'<dt>依据</dt><dd>{self.tags(basis)}</dd>')
         if advice:
-            rows.append(f'<dt>体检建议</dt><dd>{"<br>".join(_e(quote) for quote in advice)}</dd>')
+            rows.append(f'<dt>检查建议</dt><dd>{"<br>".join(_e(quote) for quote in advice)}</dd>')
         details = f'<dl>{"".join(rows)}</dl>' if rows else ''
         reading = self.paragraph(text, node)
         css = 'p0' if priority == 'P0' else 'routine' if routine else ''
@@ -1421,14 +1491,14 @@ class _AssessmentRenderer:
         head = ''.join(f'<th class="c">{_e(label)}</th>' for label, _ in _SCHEDULE)
         rows = []
         for item in followups:
-            interval = item.get('interval') or {}
+            interval = item.get('interval') or item.get('timeframe') or {}
             marks = _schedule_marks(interval.get('days'))
             symbols = {'first': '<span class="mk"></span>', 're': '<span class="mk re"></span>'}
             cells = ''.join(
                 f'<td class="c">{symbols.get(marks.get(index), "")}</td>' for index in range(len(_SCHEDULE))
             )
             rows.append(
-                f'<tr><td><b>{_e(item.get("title"))}</b><br><small class="as-muted">'
+                f'<tr><td><b>{_e(item.get("name") or item.get("title"))}</b><br><small class="as-muted">'
                 f'{_e(" · ".join(_text(value) for value in (interval.get("text"), item.get("department")) if value))}'
                 f'</small></td>{cells}</tr>'
             )
@@ -1457,12 +1527,34 @@ class _AssessmentRenderer:
                 lines.append(f'菌群总分 {_text(score.get("value"))}{grade_text}')
         return lines[:3]
 
+    def node_anchors(self, cluster):
+        """Up to two abnormal measured signals of a cluster, as short text for its graph node."""
+        texts = []
+        for row, microbiome in [*((row, False) for row in cluster.get('clinicalSignals') or ()),
+                                *((row, True) for row in cluster.get('microbiomeSignals') or ())]:
+            if _is_advice(row) or any(source.get('sourceCode') == 'B' for source in row.get('sources') or ()):
+                continue
+            fields = charts.microbiome_chart_fields(row) if microbiome else charts.clinical_chart_fields(row)
+            if fields.get('level') not in {charts.FOCUS, charts.BORDERLINE}:
+                continue
+            name = charts.display_name(clinical_observation_display_name(row) or row.get('name'))
+            value = _text(row.get('value')).strip()
+            text = f'{name} {value}' if value and len(value) <= 10 and value not in name else name
+            if text not in texts:
+                texts.append(text)
+            if len(texts) == 2:
+                break
+        return texts
+
     def problem_graph(self):
         ids = self.overview_data.get('graphClusterIds')
         clusters = [item for item in self.core_clusters if ids is None or item.get('id') in ids] or self.core_clusters
         if not clusters:
             return _note('本次各系统未形成需集中干预的失衡方向。')
-        nodes = [(_text(item.get('id')), _label(item.get('name')), item.get('priority')) for item in clusters]
+        nodes = [
+            (_text(item.get('id')), _label(item.get('name')), item.get('priority'), self.node_anchors(item))
+            for item in clusters
+        ]
         hub = _text(self.overview_data.get('graphHub')) or '核心失衡态势'
         summary = self.paragraph(
             self.overview_data.get('graphSummary'), {'evidenceRefs': self.overview_data.get('graphSummaryEvidenceRefs')}
@@ -1605,7 +1697,10 @@ class _AssessmentRenderer:
         trend += self.paragraph(
             clinical.get('trendSummary'), {'evidenceRefs': clinical.get('trendSummaryEvidenceRefs')}
         )
-        baselines = ''.join(
+        baselines = self.paragraph(clinical.get('baselineSummary'), {
+            'evidenceRefs': clinical.get('baselineSummaryEvidenceRefs')
+        })
+        baselines += ''.join(
             self.normal_line(group.get('rows') or (), _label(group.get('name')))
             for group in clinical.get('normalBaselines') or ()
             if group.get('rows')
@@ -1640,7 +1735,8 @@ class _AssessmentRenderer:
         if fermentation:
             notes.append('<h5>发酵耐受</h5>' + fermentation)
         risk = self.paragraph(gut.get('riskSummary'), {'evidenceRefs': gut.get('riskSummaryEvidenceRefs')})
-        risk += '<p>菌群风险模型的分值反映样本在模型中的位置，健康管理以临床检查结果为准。</p>'
+        if '临床检查结果为准' not in _text(gut.get('riskSummary')):
+            risk += '<p>菌群风险模型的分值反映样本在模型中的位置，健康管理以临床检查结果为准。</p>'
         return (
             lead
             + f'<div class="as-note">{"".join(notes)}</div>'
@@ -1753,7 +1849,7 @@ class _AssessmentRenderer:
             shown = '<b>0</b> %<small class="as-muted">（未检出）</small>'
         else:
             shown = f'<b>{_e(value)}</b> {_e(row.get("unit"))}{_arrow(fields.get("direction"))}'
-        chip = _level_chip(level) if level in {charts.FOCUS, charts.BORDERLINE} else ''
+        chip = ''  # a column of identical labels is noise; the dot and arrow carry the deviation
         reference = _text(row.get('referenceRange'))
         chart = _abundance_svg(abundance, fields.get('referenceLow'), fields.get('referenceHigh'), level,
                                f'{name} {value}%，参考 {reference}')
@@ -1874,7 +1970,7 @@ class _AssessmentRenderer:
         personal = [
             row for row in clinical if any(source.get('sourceCode') == 'B' for source in row.get('sources') or ())
         ]
-        observations = [row for row in clinical if row not in personal and row.get('status') != '原报告医嘱']
+        observations = [row for row in clinical if row not in personal and not _is_advice(row)]
         factors = [factor for factor in self.data.get('lifestyleFactors') or ()
                    if identifier and identifier in (factor.get('clusterIds') or ())]
         life = ''.join(
@@ -1900,8 +1996,9 @@ class _AssessmentRenderer:
         )
         if action:
             notes += f'<h5>处理方向</h5>{self.paragraph(action)}'
-        if advice := _advice_quotes(item):
-            notes += '<h5>体检建议</h5>' + ''.join(f'<p>{_e(quote)}</p>' for quote in advice)
+        advice = [quote for quote in _advice_quotes(item) if quote not in _text(action)]
+        if advice:
+            notes += '<h5>检查建议</h5>' + ''.join(f'<p>{_e(quote)}</p>' for quote in advice)
         root = f' id="{anchor}"' if anchor else ''
         return (
             f'<article class="as-cluster"{root}><header><span class="as-cid">{_e(identifier)}</span>'
@@ -1987,38 +2084,42 @@ class _AssessmentRenderer:
     # ----- chapter six -----
 
     def stage_items(self):
+        """Roadmap entries per stage: 1.3 items in the first stage, clusters by ``layers[].clusterIds``."""
         stages = {code: [] for code, *_ in _STAGES}
-        texts = {code: [] for code, *_ in _STAGES}
-        items = self.contract('priorityItems')
-        if items is not None:
-            for item in items:
+        layers = {code: [] for code, *_ in _STAGES}
+        by_id = {item.get('id'): item for item in self.core_clusters}
+        placed = set()
+        for section in self.overview_data.get('priorityFindings') or ():
+            for item in section.get('items') or ():
+                name = _text(item.get('name') or item.get('title'))
+                if section.get('code') == 'gaps':
+                    name = f'补查 {name}'
                 when = (item.get('timeframe') or {}).get('text')
-                checks = '；'.join(map(_text, item.get('checks') or ()))
-                stages[_PRIORITY_STAGES.get(item.get('priority'), 's1')].append(
-                    (_text(item.get('title')), item.get('priority'), when, checks))
-        for item in self.contract('routineFollowups') or ():
-            interval = item.get('interval') or {}
-            stages['s1'].append((_text(item.get('title')), None, interval.get('text'), _text(item.get('department'))))
-        for gap in self.contract('testGaps') or ():
-            stages['s1'].append((f'补查 {_text(gap.get("test"))}', None, None, _text(gap.get('reason'))))
-        priorities = {row.get('id'): row for row in self.conclusion_data.get('priorities') or ()}
-        for cluster in self.core_clusters:
-            if items is not None and cluster.get('priority') == 'P0':
-                continue
-            action = cluster.get('action') or (priorities.get(cluster.get('id')) or {}).get('action')
-            first = _text(action).split('\n\n')[0]
-            stages[_PRIORITY_STAGES.get(cluster.get('priority'), 's3')].append(
-                (f'{_text(cluster.get("id"))} {_text(cluster.get("name"))}', cluster.get('priority'), None, first))
+                stages['s1'].append((name, item.get('priority'), when, _text(item.get('department'))))
+                if item.get('clusterId'):
+                    placed.add(item['clusterId'])
+
+        def add_cluster(stage, cluster):
+            placed.add(cluster.get('id'))
+            title = f'{_text(cluster.get("id"))} {_text(cluster.get("name"))}'
+            stages[stage].append((title, cluster.get('priority'), None, ''))
+
         for layer in self.conclusion_data.get('layers') or ():
-            if layer.get('text'):
-                texts[_LAYER_STAGES.get(layer.get('code'), 's3')].append(layer)
-        return stages, texts
+            stage = _LAYER_STAGES.get(layer.get('code'), 's3')
+            layers[stage].append(layer)
+            for identifier in layer.get('clusterIds') or ():
+                if identifier in by_id and identifier not in placed:
+                    add_cluster(stage, by_id[identifier])
+        for cluster in self.core_clusters:
+            if cluster.get('id') not in placed:
+                add_cluster(_PRIORITY_STAGES.get(cluster.get('priority'), 's3'), cluster)
+        return stages, layers
 
     def conclusion(self):
         conclusion = self.conclusion_data
         summary = self.paragraph(conclusion.get('summary'), conclusion, css='as-lead')
-        stages, texts = self.stage_items()
-        columns = []
+        stages, layers = self.stage_items()
+        columns, details = [], []
         for code, level_name, timeframe, title, empty in _STAGES:
             entries = ''.join(
                 f'<li><strong>{_e(_label(name))}</strong>'
@@ -2028,19 +2129,29 @@ class _AssessmentRenderer:
                 + '</li>'
                 for name, priority, when, detail in stages[code]
             )
-            layer_text = ''.join(self.paragraph(layer.get('text'), layer) for layer in texts[code])
-            body = (f'<ul>{entries}</ul>' if entries else '') + layer_text
+            texts = [layer for layer in layers[code] if _text(layer.get('text')).strip()]
+            if entries:
+                body = f'<ul>{entries}</ul>'
+                details.extend(
+                    f'<h4>{_e(layer.get("name") or f"{level_name}（{timeframe}）")}</h4>'
+                    + self.paragraph(layer.get('text'), layer)
+                    for layer in texts
+                )
+            else:
+                # An empty stage keeps the projection's own sentence when it has one.
+                body = ''.join(self.paragraph(layer.get('text'), layer) for layer in texts) or f'<p>{_e(empty)}</p>'
             columns.append(
                 f'<section class="as-stage {code}"><header><div class="t"><b>{_e(timeframe)}</b>'
-                f'<span>{_e(level_name)}</span></div><h4>{_e(title)}</h4></header>{body or f"<p>{_e(empty)}</p>"}'
-                '</section>'
+                f'<span>{_e(level_name)}</span></div><h4>{_e(title)}</h4></header>{body}</section>'
             )
         roadmap = f'<div class="as-roadmap" aria-label="三阶段干预路线">{"".join(columns)}</div>'
+        if details:
+            roadmap += f'<div class="as-layers">{"".join(details)}</div>'
         directions = []
-        urgent = any(item.get('priority') == 'P0' for item in [*(self.contract('priorityItems') or ()),
-                                                                 *self.core_clusters])
-        if urgent:
-            directions.append('<p class="as-note">先完成第一层级的专科排查，再开始配方与生活方式干预。</p>')
+        urgent = any(item.get('priority') == 'P0' for item in self.core_clusters) or any(
+            item.get('priority') == 'P0'
+            for section in self.overview_data.get('priorityFindings') or () for item in section.get('items') or ()
+        )
         for row in conclusion.get('managementDirections') or ():
             children = ''.join(
                 f'<li><strong>{_e(child.get("name"))}</strong>{self.paragraph(child.get("text"), child)}</li>'
@@ -2048,15 +2159,17 @@ class _AssessmentRenderer:
             )
             text = self.paragraph(row.get('text'), row)
             title = _text(row.get('name'))
-            if row.get('items'):
+            if row.get('items') is not None and not title.startswith('MTPN'):
                 title = f'MTPN 个性化功能靶向配方方向（{title}）' if title else 'MTPN 个性化功能靶向配方方向'
-            elif row.get('code') == 'lifestyle':
+            elif row.get('code') == 'lifestyle' and not title.startswith('LSMI'):
                 title = f'LSMI 去诱因生活方式干预方向（{title}）' if title else 'LSMI 去诱因生活方式干预方向'
             if children or text:
                 listed = f'<ol>{children}</ol>' if children else ''
                 directions.append(f'<div class="as-direction"><h4>{_e(title)}</h4>{text}{listed}</div>')
         management = ''.join(directions)
-        if len(directions) == int(urgent):
+        if urgent and '第一层级' not in management:
+            management = '<p class="as-note">先完成第一层级的专科排查，再开始配方与生活方式干预。</p>' + management
+        if not directions:
             management += _note('本次资料不足以形成配方与生活方式干预方向。')
         return (
             _subsection('6.1 核心健康风险分层总结', summary + roadmap)
@@ -2115,7 +2228,7 @@ def assessment_cover(body, presentation):
         ('性别 / 年龄', ' · '.join(_text(value) for value in (subject.get('gender'),
                                                               f'{age} 岁' if age not in (None, '') else '') if value)),
         ('档案编码', sample.get('sampleId')),
-        ('检测方法', sample.get('method')),
+        ('检测技术', sample.get('method')),
         ('临床体检日期', '　'.join(part for part in (clinical_date, institution) if part)),
         (gut_label, gut_date + ('（采样日期未注明）' if gut_date and not sampled else '')),
     ]

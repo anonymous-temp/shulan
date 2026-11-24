@@ -1,14 +1,16 @@
 # API 文档
 
-> **Version**: 0.26.2（develop，待发布）
+> **Version**: 0.27.0（develop，待发布）
 >
-> **Last Updated**: 2026年11月19日
+> **Last Updated**: 2026年11月24日
 >
 > *status*: Updated, pending deployment.
 >
 > **测试服**: `http://123.57.56.88:9012`
 
 本次待发布调整：新建会话正常提问扩展为 10–15 题，前 3 题依次覆盖主诉、疾病史、血亲家族史，之后从五大类24个受控生活细项充分了解相关习惯，尽量向15题靠拢；适用且有价值的新问题确实耗尽时可提前收束。提问阶段及无正式答复时通常用一至两句简洁交流，围绕用户情况表达帮助意图或自然延续前文，不每轮重述主诉；个人史主要承接主诉，家族史宽泛转入血亲背景，生活题根据真实关联和上下文展开，不介绍采集流程或泛泛解释主题重要性；有正式答复的前置简答和QA直接进入解释，由答复首句承接，不额外复述病史、用户诉求或思考流程。建档结束先简答此前已有问题，再提供最多 5 轮实际答疑；真实疑问直接给一般解释、具体生活场景和建议，不强调资料不足导致无法判断，也不继续追问。固定补充邀请精简，连续两次无实际问题或完成第 5 轮答疑后收束。历史会话保留创建时的原预算：原策略最多10题，显式短策略最多6题，已发布题目ID和选项不变，AI正文仅在返回副本中去除内部处理提示；`intakeQuestionCount`、`qaRoundCount`、`progress`、HTTP/SSE 字段和幂等恢复保持兼容。建档问答在模型输出无效、超时或暂不可用时保留可信内容和用户原始回答，尽可能返回可继续的问题或自然结束语，对外AI正文不展示内部处理提示；已受理但回复中断的答案由后台按既定策略恢复；状态、历史接口只读取已保存结果。建档答案提交接口的 `thinking` 默认值为 `false`；普通聊天接口恢复默认 `true`，需要关闭思考时显式传入 `false`。上述接口支持可选 `reasoningEffort`（`low` / `high` / `max`），默认 `low`，仅在 `thinking=true` 时生效。响应字段和 SSE 事件结构保持兼容。
+
+本次评估报告调整：`evaluate` 六章回调追加展示字段，包括系统分档与关键异常锚点、1.3 节三部分行动事项、第六章分层对应的集群、3.6 节稳健基线说明、检查建议标记，以及菌群记录的数值、参考上下限、分档区间、方向与统一分档；原有字段的名称、类型和含义不变，调用方可按需读取。
 
 本次体检解读调整允许返回最多200字的简短 `aiSummary`；原文与结构化结果已保存后即可响应，来源发布、报告关联和画像应用继续异步完成。画像资料查询新增 `standard / complete` 展示选择，完整视图可展示未发布、日期未知、缺结果和待核实资料，并明确来源、核验和事实使用状态。完整展示不放宽有效事实、趋势或概览规则。本次契约更新不表示已部署。
 
@@ -4171,6 +4173,31 @@ curl -X POST http://host:port/api/v1/chat/history \
 
 第一章的 `graphClusterIds` 引用第五章有相关菌群证据的 `content.clusters[].id`。第四章 `digestiveContext[].symptomContext` 记录相应主诉，`rows` 记录客观检查。已绑定检查事实且需给出解读的临床单元格未完成时，可返回 `partial_success` 和既有的 `REPORT_LAYOUT_INCOMPLETE`，原检查数据随回调保留。
 
+六章正文追加以下展示字段，用于前端绘制状态标签、参考范围条、分档刻度、行动卡片和分层路线图。原有字段的名称、类型和含义不变；追加字段无法确定时为 `null`，列表为空时为 `[]`。
+
+| `level` 取值 | 含义 |
+| :--- | :--- |
+| `focus` | 重点关注：超出参考区间且需要关注，或命中优先排查规则。菌群结果中只用于失衡分度为“失调”的总评价。 |
+| `borderline` | 亚临床边界：轻度越出参考区间、分档不在正常档，或影像有需随访的所见。 |
+| `normal` | 稳健达标：在参考区间内或处于正常分档。 |
+| `notTested` | 未检测：本次资料没有该系统的检查项目。 |
+
+| 正文路径 | 类型 | 内容 |
+| :--- | :--- | :--- |
+| `chapters[code=overview].content.systems[]` | array | 固定返回五个系统，`code` 依次为 `cardiometabolic`、`digestiveRenal`、`microbiome`、`endocrineMusculoskeletal`、`hematologyImmune`。没有资料的系统 `level` 为 `notTested`，`summary` 为 `null`，`rows` 为 `[]`。 |
+| `systems[].level` | string / null | 系统分档，取成员检查中最重的一档；成员都无法分档时为 `null`。 |
+| `systems[].anchors[]` | array | 最多 6 项需关注的成员，每项包含 `name`（string）、`value`（string / null，原始结果）、`unit`（string / null）、`direction`（`up` / `down` / `null`）和 `level`（`focus` / `borderline`）。 |
+| `systems[].moreCount` | integer | 未列入 `anchors` 的需关注成员数量，没有时为 `0`。 |
+| `chapters[code=overview].content.priorityFindings[]` | array | 1.3 节按顺序返回 `code` 为 `urgent`（优先排查）、`routine`（常规专科随访）、`gaps`（检测盲区）的三部分；没有检测盲区时不返回 `gaps`。每部分包含 `name`、`priority`（`urgent` 有事项时为 `P0`，其余为 `null`）、`text`（本部分的说明，无事项时为缺失说明句）、`evidenceRefs` 和 `items`。 |
+| `priorityFindings[].items[]` | array | 行动事项。包含 `code`、`name`、`priority`（`P0` / `null`）、`timeframe`（object / null，含 `text` 与 `days`）、`department`（string / null）、`checks`（string 数组）、`basisRows`（依据的检测记录，结构同检测记录）、`text`（由上述字段组成的一句说明）。检测盲区事项另含 `reason`；按规则得出的事项另含 `ruleId`；与第五章集群对应时另含 `clusterId`。 |
+| `chapters[code=clinical].content.baselineSummary` | string / null | 3.6 节稳健基线说明，汇总在参考区间内的肿瘤标志物与核心器官功能。引用见 `baselineSummaryEvidenceRefs`。 |
+| `chapters[code=conclusion].content.layers[]` | array | 固定三层，`code` 依次为 `clinical`（首月）、`core`（90 天）、`maintenance`（持续），每层包含 `name`、`text`、`evidenceRefs` 和 `clusterIds`（本层对应的第五章集群 `id` 数组）。 |
+| `clusters[].clinicalSignals[].kind` | string | 检查记录中的原检查建议为 `advice`；其他记录不返回该字段。 |
+| 第四章各菌群记录的 `level`、`direction` | string / null | 菌群记录统一分档与方向（`up` / `down` / `null`）。适用于 `structureGroups[].rows[]`、`organismGroups[].rows[]`、`functionalGroups[].rows[]` 及其 `normalBaseline.rows[]`。 |
+| 菌群评分记录的 `score`、`bands` | number / null、array / null | 0–100 评分及分档区间。`bands[]` 包含 `label`、`low`、`high`，取自检测报告的分档说明，开放端为 `null`。 |
+| 菌群丰度记录的 `abundance`、`referenceLow`、`referenceHigh` | number / null | 相对丰度百分比数值及参考区间上下限。 |
+| 菌群宏观指数的 `valueNumber`、`referenceLow`、`referenceHigh`、`referenceKind`、`bands` | number / null、string / null、array / null | 指数数值、参考上下限、参考类型（`range` / `upper` / `lower` / `qualitative`）及分档区间。肠道年龄另含 `actualAge`（integer）与 `ageDifference`（number，肠龄减实足年龄）。 |
+
 `evaluate.v2.0` 回调顶层新增 `reportDate`（string，格式 `YYYY-MM-DD`），表示本次评估报告生成日期，使用北京时间（Asia/Shanghai），例如 `"reportDate": "2026-11-16"`。成功、部分成功和失败回调均包含此字段；重投已生成的回调时保留原日期。`generatedAt` 保持原时间戳格式，`sample.reportDate` 仍表示原检测报告日期。
 
 #### 请求参数
@@ -4463,8 +4490,71 @@ curl -X POST http://host:port/api/v1/report \
                     "evidenceRefs": [
                         1
                     ],
-                    "systems": [],
-                    "priorityFindings": []
+                    "systems": [
+                        {
+                            "code": "cardiometabolic",
+                            "name": "糖脂代谢与心脑血管系统",
+                            "status": "分项异常：示例指标",
+                            "summary": "示例指标高于参考区间。",
+                            "evidenceRefs": [],
+                            "rows": [],
+                            "level": "focus",
+                            "anchors": [
+                                {
+                                    "name": "示例指标",
+                                    "value": "3.34",
+                                    "unit": "mmol/L",
+                                    "direction": "up",
+                                    "level": "focus"
+                                }
+                            ],
+                            "moreCount": 0
+                        }
+                    ],
+                    "priorityFindings": [
+                        {
+                            "code": "urgent",
+                            "name": "优先排查",
+                            "priority": "P0",
+                            "text": "示例检查结果需优先复查。",
+                            "evidenceRefs": [],
+                            "items": [
+                                {
+                                    "code": "demo-urgent",
+                                    "name": "示例检查复查",
+                                    "priority": "P0",
+                                    "timeframe": {
+                                        "text": "2 周内",
+                                        "days": 14
+                                    },
+                                    "department": "消化内科",
+                                    "checks": [
+                                        "示例复查项目"
+                                    ],
+                                    "basisRows": [],
+                                    "text": "示例检查复查：建议2 周内至消化内科就诊，完成示例复查项目。",
+                                    "ruleId": "demo-rule"
+                                }
+                            ],
+                            "action": "示例检查结果需优先复查。",
+                            "timeframe": {
+                                "text": "2 周内",
+                                "days": 14
+                            },
+                            "department": "消化内科"
+                        },
+                        {
+                            "code": "routine",
+                            "name": "常规专科随访",
+                            "priority": null,
+                            "text": "本次未发现需定期专科复查的发现。",
+                            "evidenceRefs": [],
+                            "items": [],
+                            "action": "本次未发现需定期专科复查的发现。",
+                            "timeframe": null,
+                            "department": null
+                        }
+                    ]
                 }
             },
             {
@@ -4483,7 +4573,9 @@ curl -X POST http://host:port/api/v1/report \
                     "clinicalGroups": [],
                     "specialtyFindings": [],
                     "trends": [],
-                    "normalBaselines": []
+                    "normalBaselines": [],
+                    "baselineSummary": null,
+                    "baselineSummaryEvidenceRefs": []
                 }
             },
             {
@@ -4498,7 +4590,47 @@ curl -X POST http://host:port/api/v1/report \
                     "digestiveContext": [],
                     "structureGroups": [],
                     "organismGroups": [],
-                    "functionalGroups": []
+                    "functionalGroups": [
+                        {
+                            "code": "scfa",
+                            "name": "短链脂肪酸 (SCFA) 合成",
+                            "summary": null,
+                            "evidenceRefs": [],
+                            "rows": [
+                                {
+                                    "code": "demo-score",
+                                    "name": "示例通路",
+                                    "value": "76",
+                                    "unit": "分",
+                                    "referenceRange": "偏低:(0-25)；正常:(25-75)；偏高:(75-100)",
+                                    "status": "↑",
+                                    "observedAt": "2026-11-10",
+                                    "sources": [],
+                                    "evidenceRefs": [],
+                                    "score": 76,
+                                    "bands": [
+                                        {
+                                            "label": "偏低",
+                                            "low": 0,
+                                            "high": 25
+                                        },
+                                        {
+                                            "label": "正常",
+                                            "low": 25,
+                                            "high": 75
+                                        },
+                                        {
+                                            "label": "偏高",
+                                            "low": 75,
+                                            "high": 100
+                                        }
+                                    ],
+                                    "direction": "up",
+                                    "level": "borderline"
+                                }
+                            ]
+                        }
+                    ]
                 }
             },
             {
@@ -4520,7 +4652,29 @@ curl -X POST http://host:port/api/v1/report \
                 "code": "conclusion",
                 "title": "第六章　综合健康评估结论与精准干预方向建议",
                 "content": {
-                    "layers": [],
+                    "layers": [
+                        {
+                            "code": "clinical",
+                            "name": "第一层级：临床专科排查与随访（首月）",
+                            "text": "示例检查复查：建议2 周内至消化内科就诊，完成示例复查项目。",
+                            "evidenceRefs": [],
+                            "clusterIds": []
+                        },
+                        {
+                            "code": "core",
+                            "name": "第二层级：核心代谢与肠道微生态干预（90 天）",
+                            "text": "本次未形成需在 90 天内集中干预的核心代谢或肠道微生态失衡集群。",
+                            "evidenceRefs": [],
+                            "clusterIds": []
+                        },
+                        {
+                            "code": "maintenance",
+                            "name": "第三层级：营养储备与长期健康维护（持续）",
+                            "text": "本次未形成需协同调理的失衡集群。",
+                            "evidenceRefs": [],
+                            "clusterIds": []
+                        }
+                    ],
                     "managementDirections": []
                 }
             }
