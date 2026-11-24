@@ -416,4 +416,230 @@ def reader_quality(data) -> dict:
     }
 
 
-__all__ = ['AI_TELLS', 'ITEM_TITLE', 'ai_tells', 'present_for_reader', 'reader_quality', 'reader_text']
+# Six-chapter assessment (assessment.v2). Its prose has passed an independent
+# medical review, so the deterministic pass below is limited to wording: other
+# parties and workflow labels, the second person, source lead-ins, stock
+# connectives, unit symbols and typography. It never drops a clause, never
+# rewrites a recommendation and never touches values, units or source codes.
+_ASSESSMENT_WORDING = (
+    (re.compile(r'按原件记录[，,；;]?\s*'), ''),
+    (re.compile(r'(?:按|依据?)原件(?:记录|所列|判定|标注)?(?=[在为判属未])'), ''),
+    (re.compile(r'原件'), '报告'),
+    (re.compile(r'原报告医嘱'), '检查建议'),
+    (re.compile(r'[（(]\s*(?:原|原始)报告\s*[)）]'), ''),
+    (re.compile(r'([（(])\s*(?:原|原始)报告(?=[^\s)）])'), r'\1'),
+    (re.compile(r'(?:原|原始)报告'), '报告'),
+    (re.compile(r'主检(?:医生|医师)'), '体检医生'),
+    (re.compile(r'(?:原)?主检(?:建议|意见)'), '体检建议'),
+    (re.compile(r'(?:原)?主检(?:小结|结论|总结)(?:文字)?|(?:原)?主检(?:文字|记述)'), '体检结论'),
+    (re.compile(r'主检'), '体检结论'),
+    (re.compile(r'模板比较目标|模板目标'), '目标区间'),
+    (re.compile(r'模板'), '目标'),
+    (re.compile(r'原文正常所见'), '正常所见'),
+    (re.compile(r'(^|[；;（(\s])原文[：:]\s*'), r'\1'),
+    (re.compile(r'原文'), '检查记录'),
+    (re.compile(r'设备原建议'), '设备建议'),
+    (re.compile(r'按原(?:建议|医嘱)'), '按检查建议'),
+    (re.compile(r'原(?:建议|医嘱)'), '检查建议'),
+    (re.compile(r'按原样'), '分别'),
+    (re.compile(r'按原(?=参考|分档|判定|档|记录|口径|标准|范围|条件|单位|分级)'), '按'),
+    (re.compile(r'原判为?(?=正常|异常)|原判为'), '报告判为'),
+    (re.compile(r'本人(?:报告|自报)(?:的)?'), '自述'),
+    (re.compile(r'未形成解读'), '暂未解读'),
+    (re.compile(r'中间结果\s*[：:]?\s*'), ''),
+    (re.compile(r'检测方(?![法案式面向])(?:的)?'), ''),
+    (re.compile(r'(?:体检|检测|检验)(?:机构|中心|公司)'), lambda match: match[0][:2]),
+    (re.compile(r'来源报告(?:提供的|给出的|中的?)?'), '报告'),
+)
+# Provenance words inside reference and comparison labels; the numbers stay.
+_REFERENCE_WORDING = (
+    (re.compile(r'原件|(?:原|原始)报告'), '报告'),
+    (re.compile(r'模板比较目标|模板目标'), '目标区间'),
+)
+# Questionnaire prompts used as row labels become short nominal labels.
+_QUESTION_LABELS = (
+    (re.compile(r'^(.*?)(?:的)?频率更接近哪一种[？?]$'), r'\1频率'),
+    (re.compile(r'^(.*?)一周大约有几天(.+?)[？?]$'), r'\1每周\2天数'),
+    (re.compile(r'^(.*?)(?:的时间)?通常有多久[？?]$'), r'\1时长'),
+    (re.compile(r'^(.*?)通常吃到哪些食物[？?](?:可多选。?)?$'), r'\1常吃食物'),
+    (re.compile(r'^(.*?)每天睡多长时间[？?]$'), r'\1每日睡眠时长'),
+    (re.compile(r'[？?]\s*可多选。?$'), '？'),
+)
+_QUESTION_SEGMENT = re.compile(
+    r'(?P<lead>^|[；;\n]\s*(?:\d{4}[-/]\d{1,2}[-/]\d{1,2}(?:[ T]\d{2}:\d{2}(?::\d{2})?)?\s+)?)'
+    r'(?P<label>[^：:；;\n]*?[您你][^：:；;\n]*?[？?](?:可多选。?)?)(?=[：:])'
+)
+# Keys whose strings are identifiers, measured values, dates or bibliography.
+_ASSESSMENT_SKIP_KEYS = frozenset(
+    {
+        'code',
+        'id',
+        'ids',
+        'recordId',
+        'sourceCode',
+        'observedAt',
+        'reportDate',
+        'receivedDate',
+        'sampleDate',
+        'clinicalDate',
+        'unit',
+        'names',
+        'url',
+        'doi',
+        'year',
+        'kind',
+        'priority',
+        'version',
+        'state',
+        'specimen',
+        'sampleType',
+        'detectionStatus',
+        'clinicalDataType',
+        'sourceKind',
+        'ruleId',
+        'clusterIds',
+        'graphClusterIds',
+        'preface',
+        'readingGuide',
+        'title',
+    }
+)
+_ASSESSMENT_REFERENCE_KEYS = frozenset({'referenceRange', 'comparisonReference'})
+# Machine markers still read by the sample renderer; the display label is the
+# renderer's (see the hand-off notes). They are kept until it reads a field.
+_ASSESSMENT_STATUS_MARKERS = frozenset({'原报告医嘱'})
+_ASSESSMENT_COMPOSITE_KEYS = frozenset({'value', 'history'})
+_ASSESSMENT_PROSE_KEYS = frozenset({'summary', 'interpretation', 'text', 'action', 'reason'})
+
+
+def _question_label(label: str) -> str:
+    value = label.strip()
+    for pattern, replacement in _SECOND_PERSON:
+        value = pattern.sub(replacement, value)
+    for pattern, replacement in _QUESTION_LABELS:
+        value = pattern.sub(replacement, value)
+    return value.strip() or label
+
+
+def assessment_reader_text(text, *, prose: bool = False):
+    """Reader wording of one six-chapter string without changing its claims."""
+    if not isinstance(text, str) or not text:
+        return text
+    value = re.sub(r'(^|[；;\n])\s*主检(?:结论|建议|小结)[：:]\s*', r'\1', text)
+    for pattern, replacement in _ASSESSMENT_WORDING:
+        value = pattern.sub(replacement, value)
+    if prose:
+        value = re.sub(r'[您你](?:本人)?(?:自述|自诉|自报|提到|填写|反映)(?:的)?', '', value)
+        for pattern, replacement in _SOURCE_LEAD:
+            value = pattern.sub(replacement, value)
+        for pattern, replacement in _SECOND_PERSON:
+            value = pattern.sub(replacement, value)
+        value = re.sub(r'肠道菌群方面，(?:肠道)?菌群(?=的|中)', '肠道菌群', value)
+        for words, symbol in _UNIT_WORDS:
+            value = re.sub(r'(\d)\s*' + words, r'\1 ' + symbol, value)
+        for pattern, replacement in _FILLER:
+            value = pattern.sub(replacement, value)
+        value = value.replace('——', '，').replace('--', '，')
+        value = re.sub(r'(?<=[一-鿿])[  ]+(?=[0-9A-Za-z<>≤≥±~～-])', '', value)
+        value = re.sub(r'(?<=[0-9A-Za-z%²)）])[  ]+(?=[一-鿿])', '', value)
+    elif re.search(r'[您你]', value) and re.search(r'[？?]', value):
+        value = _question_label(value)
+    else:
+        for pattern, replacement in _SECOND_PERSON:
+            value = pattern.sub(replacement, value)
+    value = re.sub(r'([，,；;：:])\s*\1+', r'\1', value)
+    value = re.sub(r'[，,]\s*([。；;！？])', r'\1', value)
+    value = re.sub(r'([（(])\s*[，,；;]\s*', r'\1', value)
+    value = re.sub(r'[（(]\s*[)）]', '', value)
+    value = re.sub(r'^[，,；;：:\s]+', '', value)
+    value = re.sub(r' +([，,。；;：:）)])', r'\1', re.sub(r' {2,}', ' ', value))
+    return value.strip()
+
+
+def _assessment_composite(text):
+    """Label questionnaire prompts inside "prompt：answer" strings; answers stay verbatim."""
+    if not isinstance(text, str) or not re.search(r'[您你]', text):
+        return text
+    return _QUESTION_SEGMENT.sub(lambda match: match['lead'] + _question_label(match['label']), text)
+
+
+def _assessment_reference(text):
+    if not isinstance(text, str):
+        return text
+    value = text
+    for pattern, replacement in _REFERENCE_WORDING:
+        value = pattern.sub(replacement, value)
+    return value
+
+
+def present_assessment_for_reader(presentation) -> int:
+    """Apply six-chapter reader wording in place; returns the number of changed strings.
+
+    ``presentation`` is an ``AssessmentPresentation`` or its dict form. Measured
+    values, units, dates, codes and source references are left exactly as
+    recorded; questionnaire prompts used as labels lose the second person.
+    """
+    changed = 0
+
+    def clean(key, value):
+        if key == 'status' and value in _ASSESSMENT_STATUS_MARKERS:
+            return value
+        if key in _ASSESSMENT_REFERENCE_KEYS:
+            return _assessment_reference(value)
+        if key in _ASSESSMENT_COMPOSITE_KEYS:
+            return _assessment_composite(value)
+        prose = key in _ASSESSMENT_PROSE_KEYS or (key or '').endswith('Summary') or key == 'symptomsLead'
+        return assessment_reader_text(value, prose=prose)
+
+    def visit(node, key=None):
+        nonlocal changed
+        if isinstance(node, dict):
+            for name in list(node):
+                if name in _ASSESSMENT_SKIP_KEYS or name == 'sources' or name.endswith('EvidenceRefs'):
+                    continue
+                item = node[name]
+                if isinstance(item, str):
+                    cleaned = clean(name, item)
+                    if cleaned != item:
+                        node[name] = cleaned
+                        changed += 1
+                elif isinstance(item, (dict, list)):
+                    visit(item, name)
+        elif isinstance(node, list):
+            for index, item in enumerate(node):
+                if isinstance(item, str):
+                    cleaned = clean(key, item)
+                    if cleaned != item:
+                        node[index] = cleaned
+                        changed += 1
+                elif isinstance(item, (dict, list)):
+                    visit(item, key)
+
+    if isinstance(presentation, dict):
+        visit(presentation)
+        return changed
+    for name in ('overview', 'clinical', 'microbiome', 'clusters', 'lifestyle_factors',
+                 'lifestyle_recognition', 'conclusion'):
+        value = getattr(presentation, name, None)
+        if isinstance(value, (dict, list)):
+            visit(value)
+    for name in ('cluster_summary', 'lifestyle_summary'):
+        value = getattr(presentation, name, None)
+        if isinstance(value, str):
+            cleaned = assessment_reader_text(value, prose=True)
+            if cleaned != value:
+                setattr(presentation, name, cleaned)
+                changed += 1
+    return changed
+
+
+__all__ = [
+    'AI_TELLS',
+    'ITEM_TITLE',
+    'ai_tells',
+    'assessment_reader_text',
+    'present_assessment_for_reader',
+    'present_for_reader',
+    'reader_quality',
+    'reader_text',
+]
