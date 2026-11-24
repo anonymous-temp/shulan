@@ -275,3 +275,48 @@
 - 第 1.3 节、第五章、第六章第一层级按 `priorityItems`、`routineFollowups`、`testGaps` 出卡片；格子文字只做成句，没有文字时卡片照常显示。
 - `evaluation_report.py` 目前只在 `status != "reviewed"` 时加 `REPORT_LAYOUT_INCOMPLETE`。规划降级时 `status` 仍为 `reviewed`，如需在回调里体现，可在 `completeness == "degraded"` 时追加部分成功原因（字段名由集成方定）。
 - 第五章“全部正常”的写法看 `clusterState == "no_imbalance"`，不要用“集群数为 0”推断（有失衡来源却没有任何可用集群时为 `unavailable`）。
+
+## 7. 生成流程、时间预算与兜底
+
+### 7.1 流程
+
+入口 `modules/report/evaluation_report.py::generate_evaluation_report()`。
+
+1. 来源解析、临床问题整理、版面分组与风险背景关联。
+2. 内容规划（集群、主诉、生活因素；单项定向修复，仍不过只丢该项，各节独立降级）与维度评分并行。
+3. 程序判定：危险信号与常规随访（`assessment_red_flags.py`）、检测盲区（`assessment_test_gaps.py`）、目标区间（`assessment_targets.json` + `assessment_clinical_rules.py`）、检测行四档与结构化字段。
+4. 证据召回：文献库、PubMed、DeepSeek 联网检索（`adapters/report/deepseek_tools.py`）查同一批主题。
+5. 按格成稿：首稿 → 医学审核 + 来源核对 → 提前修复（首轮未过的明细格立即修复）→ 协调修复轮 → 句级保留或原值兜底。
+6. 读者措辞整理（`evaluation_presentation.py`，确定性，不调模型）→ 六章投影（`assessment_presentation.py`）→ 回调（`evaluation_callback.py`）。
+
+### 7.2 模型与并发
+
+- 全程只用 `deepseek-flash`（2026-11 实测 `deepseek-v4-pro` 效果不如前者）。整章写作与审核开思考，强度 `high`；用低强度重放来源核对，漏检明显增多，不采用。
+- 每份报告模型并发 12，应用共享上限 24（`fallback_policy.py`）。
+
+### 7.3 时间预算
+
+- 硬上限 30 分钟（`REPORT_GENERATION_TIMEOUT_SECONDS`）。
+- 修复轮、最终修复和兼容字段只在目标时间（1140 秒）内排程；超出时由句级保留接手，不再等待。
+- 兼容字段只写后续报告实际读取的旧字段（综合结论、重点方向、下一步、风险、医学发现、菌群）。
+
+### 7.4 来源核对与兜底
+
+- 回执由程序规整后再校验：同一格内 K 编号唯一、未使用的 F/E 删除、解释段里的行动句拆为行动段。数值、日期、编号范围、引文为原文子串等硬校验不放松（`assessment_source_receipts.py`）。
+- 最后仍不过的格：只删审核实际驳回的分句，余下部分重新通过全部校验后采用；否则列出原值、参考范围和状态作为兜底文字。审计键 `sentenceRetention`、`sourceOnlyFallbackTargets`；只有原值兜底会使报告标为部分完成。
+- 内容规划降级时回调 `partialReasons` 带 `REPORT_LAYOUT_INCOMPLETE`。
+
+### 7.5 实测（2026-11-24，本机，`deepseek-flash`）
+
+| 运行 | 总耗时 | 模型调用 | 被扣下的空格子 | 汉字 |
+|---|---|---|---|---|
+| 基线（9b0c8f5 加内容规格提交） | 1661 秒 | 198 | 16 | 24776 |
+| 提速后，48 岁男性实例 | 1166 秒 | 164 | 0 | 27821 |
+| 提速后，62 岁女性合成例 | 1145 秒（基线 1735 秒） | 182 | 0 | 24967 |
+
+### 7.6 本地工具
+
+- `scripts/generate_evaluation_report.py --checkpoint`：本地实跑，另存六章投影输入 `presentation_inputs.pkl`。
+- `scripts/replay_assessment_presentation.py RUN_DIR`：不调模型，按当前代码重放投影、回调与样版 HTML。
+- `scripts/check_assessment_report.py RUN_DIR --request REQUEST`：空节、禁用词、异常项覆盖、数值回溯、P0 与危险信号一致性、篇幅与耗时。
+- `scripts/build_assessment_targets.py`：重建目标区间表（检索、模型提议、程序核对出处数值）。
