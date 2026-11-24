@@ -19,8 +19,12 @@ from .assessment_measurement_claims import claim_authority_issue
 from .assessment_measurement_claims import exact_advice_support
 from .assessment_measurement_claims import paragraph_claim_candidates
 from .assessment_measurement_claims import paragraph_literal_issues
+from .assessment_source_receipts import ACTION_PASSAGES
+from .assessment_source_receipts import claim_issue_code
+from .assessment_source_receipts import normalize_receipt
+from .assessment_source_receipts import renumber_cell_claims
 
-SOURCE_REVIEW_VERSION = 'source-grounding-v19'
+SOURCE_REVIEW_VERSION = 'source-grounding-v20'
 _VIOLATION_KINDS = {
     'source_fact',
     'clinical_assessment',
@@ -455,6 +459,7 @@ def build_source_frame(cells, paragraphs, *, registry, records, evidence, subjec
                 microbiome_dates=cell.get('microbiomeDates'),
             )
             previous_part = {'text': part['text'], 'records': bound}
+        renumber_cell_claims(immutable)
         actions = [
             *clinical_actions,
             *cell.get('sourceClinicalActions', ()),
@@ -562,8 +567,10 @@ def _strings(value):
     return isinstance(value, list) and all(isinstance(item, str) and item for item in value)
 
 
-def _issue(collection, cell_id, location, detail):
-    collection.setdefault(cell_id, []).append({'type': 'source_proof', 'location': location, 'detail': detail})
+def _issue(collection, cell_id, location, detail, **extra):
+    collection.setdefault(cell_id, []).append(
+        {'type': 'source_proof', 'location': location, 'detail': detail, **extra},
+    )
 
 
 def _advice_entries_for_paragraph(source, cell):
@@ -646,9 +653,35 @@ def _check_claim_decisions(part, source, cell, *, formats, semantic, cell_id, lo
                 )
                 continue
             advice_ids = decision.get('adviceIds')
-            if not _strings(advice_ids) or not advice_ids:
-                _issue(formats, cell_id, location, f'{kid}须定位本命题对应且本P实际F准入的原医嘱A。')
-                continue
+            if not _strings(advice_ids):
+                advice_ids = []
+            elif not set(advice_ids).issubset(allowed) and set(advice_ids).intersection(allowed):
+                # Receipt bookkeeping: drop A ids this P's records do not admit.
+                advice_ids = [aid for aid in advice_ids if aid in allowed]
+                advice_corrections.setdefault(kid, {
+                    'previousAdviceIds': list(decision.get('adviceIds')), 'adviceIds': list(advice_ids),
+                    'recordIds': sorted({rid for aid in advice_ids for rid in allowed[aid].get('recordIds', ())}),
+                })
+            if not advice_ids or not set(advice_ids).intersection(allowed):
+                exact = _exact_advice_correction(candidate, allowed, source['recordIds'])
+                if exact:
+                    advice_ids = [exact]
+                    advice_corrections[kid] = {
+                        'previousAdviceIds': list(decision.get('adviceIds') or ()),
+                        'adviceIds': [exact],
+                        'recordIds': list(allowed[exact]['recordIds']),
+                    }
+                else:
+                    # The reviewer found this retelling in none of the P's original
+                    # orders: a content finding for the author, not a receipt gap.
+                    _issue(
+                        semantic,
+                        cell_id,
+                        f'{location}.{kid}',
+                        f'{source["id"]}/{kid}（{candidate["term"]}）：转述的原医嘱在本段所引原记录的医嘱中找不到对应条目。',
+                        paragraph=source['id'],
+                    )
+                    continue
             permitted = set(advice_ids).issubset(allowed)
             problem = (
                 advice_authority_issue(
@@ -690,6 +723,10 @@ def _check_claim_decisions(part, source, cell, *, formats, semantic, cell_id, lo
                 cell_id,
                 f'{location}.{kid}',
                 f'{source["id"]}/{kid}（{candidate.get("term") or candidate["kind"]}）：{problem}',
+                paragraph=source['id'],
+                code=claim_issue_code(problem),
+                term=candidate.get('term'),
+                start=candidate.get('start'),
             )
             continue
         if use in {'patient_management', 'reported_advice'}:
@@ -703,6 +740,9 @@ def _check_claim_decisions(part, source, cell, *, formats, semantic, cell_id, lo
             cell_id,
             location,
             '该行动段有E未能支持其中任何实际新增行动。原医嘱仅依本项A/F，解释和背景引文应另放。',
+            paragraph=source['id'],
+            code=ACTION_PASSAGES,
+            passageIds=sorted(set(source['passageIds']) - attached),
         )
     return actual_action
 
@@ -715,6 +755,7 @@ def validate_source_proofs(frame, private, response):
     source errors return to the author and can never approve a changed text.
     """
     formats, semantic, proofs, paragraph_audit = {}, {}, {}, {}
+    receipts, receipt_corrections = {}, {}
     rows = response.get('cells') if isinstance(response, dict) else None
     seen = set()
     for row in rows if isinstance(rows, list) else ():
@@ -726,6 +767,10 @@ def validate_source_proofs(frame, private, response):
             continue
         seen.add(cell_id)
         cell = private['cells'][cell_id]
+        row, receipt_notes = normalize_receipt(row, cell)
+        receipts[cell_id] = row
+        if receipt_notes:
+            receipt_corrections[cell_id] = receipt_notes
         outcomes = paragraph_audit.setdefault(cell_id, {pid: 'missing' for pid in cell['paragraphs']})
         advice_corrections = {}
         parts = row.get('paragraphs')
@@ -835,4 +880,6 @@ def validate_source_proofs(frame, private, response):
         'semanticIssues': semantic,
         'proofs': proofs,
         'paragraphAudit': paragraph_audit,
+        'receipts': receipts,
+        'receiptCorrections': receipt_corrections,
     }

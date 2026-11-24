@@ -34,6 +34,12 @@ from pydantic import BaseModel
 from utils.log import getLogger
 
 from .assessment_reviewed_synthesis import reviewed_cell_sources
+from .assessment_source_receipts import add_recall_timing_note
+from .assessment_source_receipts import has_number
+from .assessment_source_receipts import recall_timing_targets
+from .assessment_source_receipts import repair_receipt_findings
+from .assessment_source_receipts import repaired_receipt
+from .assessment_source_receipts import retained_paragraphs
 from .assessment_source_review import GROUNDING_GUIDE
 from .assessment_source_review import build_observation_registry
 from .assessment_source_review import build_source_frame
@@ -2172,7 +2178,7 @@ def _paragraphs(raw, *, clean_prose=True):
         text = re.sub(r'[ \t]*\n+[ \t]*', '', row['text'].strip())
         # Internal record/passage handles (F012, E3.1) are never content; a leaked
         # handle is removed rather than costing the whole cell.
-        handle = r'(?<![A-Za-z0-9])[FE]\d{2,4}(?:\.\d+)?(?![0-9A-Za-z])'
+        handle = r'(?<![A-Za-z0-9])(?:F\d{2,4}|E\d{1,4}\.\d+|E\d{2,4})(?![0-9A-Za-z])'
         text = re.sub(r'[（(\[【]?\s*' + handle + r'(?:\s*[,，、]\s*' + handle + r')*\s*[）)\]】]?', '', text)
         text = _LEAKED_LABEL.sub('', text)
         if clean_prose:
@@ -3118,6 +3124,7 @@ async def author_report_chapters(
                     return '删除口腔检查未明示的具体阴性所见。保留记录中的牙齿或牙周发现及其实际意义。'
             return _check(specs[handle], paragraphs, strict=strict)
         accepted, form_errors, verdicts, pre_review_issues, last_candidates = {}, {}, {}, {}, {}
+        last_receipts, last_reviewed_sources = {}, {}
         contract_audits = {}
         grounded_versions = {}
         paragraph_reviews = {}
@@ -3238,13 +3245,30 @@ async def author_report_chapters(
             ], limit=len(dossier.facts))
             records = [record for key in ('clinicalRecords', 'selfReported', 'cellRecords')
                        for record in ground_patient.get(key, ())]
-            frame, private = build_source_frame(
-                cells, needed, registry=dossier.source_observation_registry,
-                records=records, evidence=base['evidence'], subject=dossier.person,
-                clinical_actions=_source_handles(
-                    getattr(blueprint, 'assessment_sources', {}).get('clinicalActions', ()), dossier,
-                ),
+            clinical_actions = _source_handles(
+                getattr(blueprint, 'assessment_sources', {}).get('clinicalActions', ()), dossier,
             )
+
+            def frame_for(paragraph_map):
+                return build_source_frame(
+                    cells, paragraph_map, registry=dossier.source_observation_registry,
+                    records=records, evidence=base['evidence'], subject=dossier.person,
+                    clinical_actions=clinical_actions,
+                )
+
+            frame, private = frame_for(needed)
+            server_repairs = {}
+            # A recalled specimen event without the explicit unconfirmed timing
+            # relation fails grounding deterministically. Add the fixed sentence
+            # before the independent review sees the text.
+            for handle, requirements in private['cells'].items():
+                if pids := recall_timing_targets(requirements):
+                    updated, changed = add_recall_timing_note(needed[handle], pids)
+                    if changed:
+                        needed[handle] = updated
+                        server_repairs[handle] = [{'repair': 'recall_timing', 'paragraphs': changed}]
+            if server_repairs:
+                frame, private = frame_for(needed)
             pending = dict(needed)
             semantic_rewrite, feedback, previous_proofs = {}, {}, {}
             for handle, requirements in private['cells'].items():
@@ -3299,17 +3323,56 @@ async def author_report_chapters(
                     feedback = {handle: [{'type': 'source_proof', 'location': 'call',
                                          'detail': type(error).__name__}] for handle in pending}
                 checked = validate_source_proofs(scoped_frame, scoped_private, response)
+                for handle, issues in list(checked['semanticIssues'].items()):
+                    # Receipt-only findings (an action written inside an
+                    # interpretation, an uncited action keeping background E,
+                    # an unstated recall timing) are repaired by the server and
+                    # the repaired text is validated again against the same
+                    # reviewer decisions. Any content finding still goes back.
+                    if handle in checked['formatIssues'] or handle not in checked['receipts']:
+                        continue
+                    repaired = repair_receipt_findings(needed[handle], issues, private['cells'][handle])
+                    if repaired is None or check_draft(handle, repaired[0]) is not None:
+                        continue
+                    new_paragraphs, notes, origins = repaired
+                    repaired_frame, repaired_private = frame_for({handle: new_paragraphs})
+                    receipt = repaired_receipt(
+                        checked['receipts'][handle], private['cells'][handle],
+                        repaired_private['cells'][handle], origins,
+                    )
+                    if receipt is None:
+                        continue
+                    receipt['id'] = handle
+                    again = validate_source_proofs(repaired_frame, repaired_private, {'cells': [receipt]})
+                    if handle not in again['accepted']:
+                        continue
+                    needed[handle] = new_paragraphs
+                    private['cells'][handle] = repaired_private['cells'][handle]
+                    checked['semanticIssues'].pop(handle)
+                    checked['accepted'].append(handle)
+                    checked['proofs'][handle] = {
+                        **again['proofs'][handle], 'serverRepairs': notes,
+                        'reviewerReceipt': deepcopy(checked['receipts'][handle]),
+                    }
+                    checked['paragraphAudit'][handle] = again['paragraphAudit'].get(handle, {})
+                    server_repairs.setdefault(handle, []).extend(notes)
                 returned = response.get('cells') if isinstance(response, dict) else []
                 for proof in returned if isinstance(returned, list) else ():
                     if isinstance(proof, dict) and proof.get('id') in pending:
                         previous_proofs[proof['id']] = deepcopy(proof)
                 for handle in pending:
                     last_candidates[handle] = deepcopy(needed[handle])
+                    if handle in checked['receipts']:
+                        last_receipts[handle] = deepcopy(checked['receipts'][handle])
+                        last_reviewed_sources[handle] = private['cells'][handle]
                     if outcomes := checked.get('paragraphAudit', {}).get(handle):
                         paragraph_reviews[handle] = outcomes
                     entry = contract_audits.setdefault(handle, {'stage': 'immutable_source_grounding', 'attempts': []})
                     entry['attempts'].append({
                         'attempt': attempt, 'versionHash': private['cells'][handle]['versionHash'],
+                        **({'receiptCorrections': deepcopy(checked['receiptCorrections'][handle])}
+                           if handle in checked['receiptCorrections'] else {}),
+                        **({'serverRepairs': deepcopy(server_repairs[handle])} if handle in server_repairs else {}),
                         'formatIssues': deepcopy(checked['formatIssues'].get(handle, [])),
                         'semanticIssues': deepcopy(checked['semanticIssues'].get(handle, [])),
                         'paragraphResults': deepcopy(paragraph_reviews.get(handle, {})),
@@ -3758,6 +3821,62 @@ async def author_report_chapters(
                 },
             )
             form_errors.update({handle: type(error).__name__ for handle in cells if handle not in accepted})
+
+        def salvage(handle):
+            """Reviewed sentences of an unresolved cell that still pass every deterministic check.
+
+            Used only if no later sweep publishes the cell. The kept text is a
+            subset of the medically reviewed and source-checked candidate; it
+            is validated again with the reviewer's own decisions.
+            """
+            candidate, receipt = last_candidates.get(handle), last_receipts.get(handle)
+            reviewed = last_reviewed_sources.get(handle)
+            if (not planned or specs[handle]['form'] != 'paragraph' or not candidate or receipt is None
+                    or reviewed is None or paragraph_version(candidate) != reviewed['versionHash']):
+                return None
+            kept, removed, origins = retained_paragraphs(
+                candidate, paragraph_reviews.get(handle) or {}, verdicts.get(handle, {}).get('issues') or [],
+            )
+            if not kept or kept == candidate or check_draft(handle, kept) is not None:
+                return None
+            owner = by_handle[handle].get('owner') or {}
+            if any(re.search(r'\d', str(dossier.facts.get(fid, {}).get('value') or ''))
+                   for fid in owner.get('primaryFactIds', ())) and not has_number(kept):
+                return None
+            view = dossier.view([[dossier.reverse[rid] for part in kept for rid in part.get('factIds', ())
+                                  if rid in dossier.reverse]], limit=len(dossier.facts))
+            retained_frame, retained_private = build_source_frame(
+                cells, {handle: kept}, registry=dossier.source_observation_registry,
+                records=[record for key in ('clinicalRecords', 'selfReported', 'cellRecords')
+                         for record in view.get(key, ())],
+                evidence=base['evidence'], subject=dossier.person,
+                clinical_actions=_source_handles(
+                    getattr(blueprint, 'assessment_sources', {}).get('clinicalActions', ()), dossier,
+                ),
+            )
+            synthesized = repaired_receipt(receipt, reviewed, retained_private['cells'][handle], origins)
+            if synthesized is None:
+                return None
+            synthesized['id'] = handle
+            if handle not in validate_source_proofs(retained_frame, retained_private, {'cells': [synthesized]})[
+                'accepted'
+            ]:
+                return None
+            return {
+                'block': _block(by_handle[handle], kept, dossier, library, specs[handle]),
+                'removed': removed,
+                'phase': scope.get('phase'),
+            }
+
+        salvaged = {}
+        for handle in cells:
+            if handle in accepted:
+                continue
+            try:
+                if (kept := salvage(handle)) is not None:
+                    salvaged[handle] = kept
+            except Exception as error:  # retention is optional; the cell stays unresolved
+                logger.warning('report sentence retention skipped: error_type=%s', type(error).__name__)
         unresolved = [
             {
                 'chapterCode': chapter['code'],
@@ -3786,6 +3905,7 @@ async def author_report_chapters(
                                       'allowedPassageIds', 'passageRoles', 'allowedRoles')
                         if field in cells[handles[target['id']]]
                     }} if planned and handles[target['id']] in last_candidates else {}),
+                **({'salvage': salvaged[handles[target['id']]]} if handles[target['id']] in salvaged else {}),
             }
             for target in batch
             if handles[target['id']] not in accepted
