@@ -700,10 +700,37 @@ def _rule_numbers() -> set:
     return _numbers('\n'.join(texts))
 
 
-def check_numbers(request: dict, chapters: dict[str, dict]) -> dict:
+def parsed_source_numbers(run_dir: Path) -> set:
+    """Numbers of the parsed source documents (e.g. the full microbiome report) from a checkpoint.
+
+    A ``--checkpoint`` run keeps ``presentation_inputs.pkl``; a replay directory sits inside
+    the run directory. Normal taxa are only counted in chapter four, so their values are
+    traceable only through the parsed report.
+    """
+    import os
+    import pickle
+
+    from scripts.generate_evaluation_report import _INERT_DEFAULTS
+
+    # Unpickling imports the report modules, which validate settings; nothing remote is called.
+    for key, value in {**_INERT_DEFAULTS, 'SHULAN_LLM_API_KEY': 'unused-local'}.items():
+        os.environ.setdefault(key, value)
+    for candidate in (run_dir / 'presentation_inputs.pkl', run_dir.parent / 'presentation_inputs.pkl'):
+        if not candidate.is_file():
+            continue
+        try:
+            parsed = pickle.loads(candidate.read_bytes()).get('parsed')
+        except Exception:  # an unreadable checkpoint only narrows the trace pool
+            return set()
+        dumped = parsed.model_dump(mode='json') if hasattr(parsed, 'model_dump') else parsed
+        return _numbers(json.dumps(dumped, ensure_ascii=False, default=str))
+    return set()
+
+
+def check_numbers(request: dict, chapters: dict[str, dict], *, parsed_numbers: set | None = None) -> dict:
     pools = {
         'request': _numbers('\n'.join(_all_texts(request))),
-        'microbiome': _microbiome_numbers(chapters),
+        'microbiome': _microbiome_numbers(chapters) | set(parsed_numbers or ()),
         'derived': _derived_numbers(chapters),
         'target': _target_numbers(chapters),
         'rule': _rule_numbers(),
@@ -977,7 +1004,11 @@ def check_run(
         'sections': check_sections(chapters),
         'words': check_words(chapters),
         'abnormalCoverage': check_abnormal_coverage(request, chapters) if request is not None else None,
-        'numberTrace': check_numbers(request, chapters) if request is not None else None,
+        'numberTrace': (
+            check_numbers(request, chapters, parsed_numbers=parsed_source_numbers(run_dir))
+            if request is not None
+            else None
+        ),
         'p0': check_p0(request, chapters, red_flag_function),
         'length': check_length(chapters),
     }
