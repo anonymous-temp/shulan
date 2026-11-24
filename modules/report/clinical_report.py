@@ -2161,10 +2161,16 @@ async def organize_problems(client: Any, document: ClinicalReportDocument, *, ev
                     and (item.title in source.quote or source.fact_id in measurement_witness_ids
                         or lookup[source.fact_id].abnormal
                         and item.title == lookup[source.fact_id].name + '检查异常待复核')]
+                # A projected patient claim can be narrower than its sentence
+                # ("某器官结节，" of "某器官结节，性质待查"); the qualifier still applies.
+                supporting = [part.group() for s in primary_clinical
+                    for part in re.finditer(r"[^。；;\n]+[。；;]?", lookup[s.fact_id].value)
+                    if s.quote.strip() and s.quote.strip() in part.group()]
                 if not primary_clinical and any(lookup[s.fact_id].kind == "self_reported" for s in item.sources):
                     item.certainty = "self_reported"
                     item.title += "（用户自述）"
-                elif re.search(r"可能|疑似|考虑|待排|待查|不除外", '；'.join(s.quote for s in primary_clinical) or relevant_text):
+                elif re.search(r"可能|疑似|考虑|待排|待查|不除外",
+                        '；'.join([*(s.quote for s in primary_clinical), *supporting]) or relevant_text):
                     item.certainty = "suspected"
                     if not re.search(r"可能|疑似|待排|待查", item.title):
                         item.title += "（待核实）"
