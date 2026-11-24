@@ -15,24 +15,28 @@ from pydantic import Field
 
 ASSESSMENT_TITLE = '个体化全息健康与肠道微生态深度评估报告'
 ASSESSMENT_PREFACE = (
-    '本报告结合已提供的临床检查、本人报告及肠道菌群检测，梳理需要优先关注的发现、已有的健康基线和可追溯的随访建议。'
-    '不同资料的日期、测量方法和适用范围会影响解读。'
+    '本报告综合临床体检与检验、影像资料、健康问卷及肠道菌群宏基因组检测结果，对受检者当前的健康状态作分系统评估，'
+    '梳理需优先排查的事项、需协同管理的系统失衡方向和可作为今后对照的健康基线，并给出随访与干预方向。'
     '\n\n'
-    '菌群报告可提供样本的群落组成和预测功能线索。相关结果结合检测对象、原报告分档及临床资料解读，疾病诊断由医生结合临床情况判断。'
+    '临床资料与菌群资料的采集日期、测量方法和适用范围不同，文中分别标明。'
+    '菌群检测反映粪便样本的群落组成与预测功能，与临床检查结果对照解读。'
 )
 ASSESSMENT_READING_GUIDE = (
     (
         '报告定位',
-        '在本次资料覆盖范围内，说明哪些发现需要关注、哪些结果可留作对照，以及仍待明确的问题。',
+        '在本次资料覆盖范围内，说明需优先排查的发现、需协同管理的失衡方向，以及可作为今后对照的稳健基线。',
     ),
     (
-        '阅读实测值与参考依据',
-        '实测结果与原报告参考范围或分档并列。采用有依据且适用的临床关注界值时，另行标明其用途及适用条件。',
+        '双轨评价',
+        '每项检测对照两类区间：临床参考区间取自检验单，用于判断是否超出正常范围；'
+        '目标区间取自有文献出处的目标表，用于识别参考区间内的亚临床偏离，'
+        '仅在适用于受检者的性别、年龄与健康状况时给出，并标注文献编号。',
     ),
     (
         '结构导览',
-        '第一章概览与优先事项，第二章主诉及其检查线索。第三章与第四章分别按系统展示临床与菌群发现。'
-        '第五章与第六章归纳相关健康主题、生活背景及后续管理方向。',
+        '第一章为全息健康图景概览与优先排查事项；第二章解析主诉症状与客观指标的关联；'
+        '第三章与第四章分别为分系统临床检验评估和肠道微生态评估；'
+        '第五章归纳系统失衡集群与生活诱因；第六章给出健康风险分层结论与干预方向。',
     ),
 )
 
@@ -131,14 +135,42 @@ _FERMENTATION_TRIGGER = re.compile(
     r'洋葱|粗粮|全谷物|蔬菜|水果)[^。；，]{0,16}(?:后|时)[^。；，]{0,16}(?:胀气|腹胀|排气增多|腹泻|腹痛)'
 )
 _CONCLUSION_LAYERS = (
-    ('clinical', '临床专科排查与器质随访防线'),
-    ('core', '核心代谢轴与肠道微生态重塑重心'),
-    ('maintenance', '亚临床营养储备补齐与远期抗衰底座巩固'),
+    ('clinical', '第一层级：临床专科排查与随访（首月）'),
+    ('core', '第二层级：核心代谢与肠道微生态干预（90 天）'),
+    ('maintenance', '第三层级：营养储备与长期健康维护（持续）'),
 )
+_LAYER_PRIORITIES = {'core': ('P1',), 'maintenance': ('P2', 'P3')}
+_LAYER_EMPTY = {
+    'clinical': '本次未发现需在首月内完成的专科排查、随访或补查事项。',
+    'core': '本次未形成需在 90 天内集中干预的核心代谢或肠道微生态失衡集群。',
+    'maintenance': '本次未形成需协同调理的失衡集群。',
+}
 _MICROBIOME_ITEMS = (
-    ('probiotic', '功效菌选择与观察依据'),
-    ('fiber', '个性化益生元与膳食纤维'),
-    ('nutrient', '个体营养评估与膳食支持'),
+    ('probiotic', '功效菌选择依据'),
+    ('fiber', '益生元与膳食纤维'),
+    ('nutrient', '营养素配方方向'),
+)
+_MTPN_NAME = 'MTPN 个性化功能靶向配方'
+_LSMI_NAME = 'LSMI 去诱因个性化生活方式干预'
+_MTPN_AFTER_P0 = '存在优先排查事项，先完成第一层级排查，再开始配方干预。'
+_MTPN_NO_MICROBIOME = '本次资料未包含可用于确定配方方向的肠道菌群检测结果。'
+_LSMI_NO_FACTORS = '本次未记录可供针对性干预的生活诱因。'
+_PRIORITY_SECTIONS = (
+    ('urgent', '优先排查'),
+    ('routine', '常规专科随访'),
+    ('gaps', '检测盲区'),
+)
+_NO_URGENT = '本次未发现需优先就医排查的结果。'
+_NO_ROUTINE = '本次未发现需定期专科复查的发现。'
+_NO_CLUSTERS = '本次未形成需集中干预的失衡集群。'
+_NO_GRAPH = '本次各系统未形成需集中干预的失衡方向。'
+_ADVICE_STATUS = '原报告医嘱'
+_SELF_REPORTED_STATUS = '本人自述'
+_BASIS_FIELDS = ('name', 'value', 'unit', 'referenceRange', 'status', 'observedAt')
+_NOT_PERFORMED = re.compile(r'未做|未查|未检测|未进行|拒检|弃检')
+_NORMAL_STATE = re.compile(r'^(?:正常|阴性|未见|参考范围内|在参考|稳健达标|未检出|无异常)')
+_BODY_ELEMENTS = re.compile(
+    r'体重指数|BMI|腰围|腰臀|体脂|脂肪量|内脏脂肪|骨骼肌|肌肉量|基础代谢|细胞外水|血压|心率', re.I,
 )
 _TRIGGER_SECTIONS = {
     'diet': 'diet', 'sleep': 'sleep', 'exercise': 'exercise', 'hydration': 'drinks',
@@ -237,8 +269,8 @@ def _reported_model_summary(parsed):
             )
     if by_grade:
         groups = '；'.join(f'{grade}：{"、".join(_unique(items))}' for grade, items in by_grade.items())
-        return ('菌群原报告的疾病关联模型分档及指数：' + groups
-                + '。这些指数反映样本在该模型中的位置，不能作为个人患病概率。')
+        return ('菌群疾病关联模型的分档及指数：' + groups
+                + '。指数表示样本在相应模型中的相对位置，不是个人患病概率；健康管理以临床检查结果为准。')
     return None
 
 
@@ -417,6 +449,102 @@ def _source_clinical_actions(data, facts, *, projections=None):
     return actions
 
 
+def _plan_list(plan, key):
+    """A planner list read tolerantly: a missing or malformed field is empty."""
+    value = (plan or {}).get(key)
+    return [row for row in value if isinstance(row, dict)] if isinstance(value, list) else []
+
+
+def _period(value):
+    """``{text, days}``, a plain phrase or a day count; anything else is unknown."""
+    if isinstance(value, dict):
+        text, days = value.get('text'), value.get('days')
+    elif isinstance(value, str):
+        text, days = value, None
+    elif isinstance(value, int) and not isinstance(value, bool):
+        text, days = None, value
+    else:
+        return None
+    text = str(text).strip() if isinstance(text, (str, int)) and not isinstance(text, bool) else ''
+    days = days if isinstance(days, int) and not isinstance(days, bool) and days > 0 else None
+    if not text and days:
+        text = f'{days} 天内'
+    return {'text': text, 'days': days} if text else None
+
+
+def _plain_strings(value):
+    if isinstance(value, (str, dict)):
+        value = [value]
+    result = []
+    for item in value if isinstance(value, (list, tuple)) else ():
+        if isinstance(item, dict):
+            item = item.get('name') or item.get('test') or item.get('title') or item.get('text')
+        if isinstance(item, str) and item.strip():
+            result.append(item.strip())
+    return _unique(result)
+
+
+def _plan_fact_ids(row, *fields):
+    return _unique(fid for field in fields for fid in (row.get(field) or ()) if isinstance(fid, str))
+
+
+def _urgent_plan_items(plan):
+    return [row for row in _plan_list(plan, 'priorityItems')
+            if row.get('priority') in (None, '', 'P0') and str(row.get('title') or row.get('name') or '').strip()]
+
+
+def _item_title(row, *fields):
+    return next((str(row[field]).strip() for field in fields if str(row.get(field) or '').strip()), '')
+
+
+def _priority_brief(rows, kind):
+    """Program-decided items handed to the writer; the cell only phrases them."""
+    lines = []
+    for row in rows:
+        if kind == 'gaps':
+            title = _item_title(row, 'test', 'title', 'name')
+            details = [f'理由：{row["reason"]}' if str(row.get('reason') or '').strip() else '']
+        else:
+            title = _item_title(row, 'title', 'name')
+            period = _period(row.get('timeframe') if kind == 'urgent' else row.get('interval'))
+            checks = _plain_strings(row.get('checks'))
+            details = [
+                f'{"时限" if kind == "urgent" else "间隔"}：{period["text"]}' if period else '',
+                f'科室：{row["department"]}' if str(row.get('department') or '').strip() else '',
+                f'需完成：{"、".join(checks)}' if checks else '',
+            ]
+        details = [part for part in details if part]
+        if title:
+            lines.append(title + (f'（{"；".join(details)}）' if details else ''))
+    if not lines:
+        return None
+    lead = {
+        'urgent': '程序判定的优先排查事项（P0），逐项成句，时限、科室和需完成的检查照用，不增删事项：',
+        'routine': '程序判定的常规专科随访事项，逐项写发现、复查项目、间隔和科室，间隔照用：',
+        'gaps': '程序判定的检测盲区，逐项写建议补查的项目与理由，不新增项目：',
+    }[kind]
+    return lead + '；'.join(lines) + '。'
+
+
+def body_type_elements(clinical):
+    """Body-type elements with their own recorded judgement, for a one-sentence verdict."""
+    rows = [*clinical.get('bodyMetrics', ()),
+            *(row for group in clinical.get('bodyGroups', ()) for row in group.get('rows', ()))]
+    parts = []
+    for row in rows:
+        name = str(row.get('name') or '').strip()
+        if not name or not _BODY_ELEMENTS.search(name) or row.get('value') in (None, ''):
+            continue
+        value = f'{row["value"]}{(" " + row["unit"]) if row.get("unit") else ""}'
+        status = str(row.get('templateStatus') or row.get('status') or '').strip()
+        parts.append(f'{name} {value}' + (f'（{status}）' if status else ''))
+    parts = _unique(parts)
+    if not parts:
+        return None
+    return ('体型判定要素（照用各项实测与原判定，不补阈值）：' + '；'.join(parts[:14]) + '。'
+            '先用一句名词性判断概括体型类别、脂肪分布与肌肉量，再说明支撑该判断的关键实测。')
+
+
 def _planned_source_bindings(clinical, microbiome, facts, plan, *, data=None):
     """Bind aggregate responsibilities to real source domains and reviewed links."""
     if plan.get('status') == 'unavailable':
@@ -430,6 +558,9 @@ def _planned_source_bindings(clinical, microbiome, facts, plan, *, data=None):
                               for row in _panel_rows(group)], facts)
 
     clusters = plan.get('clusters', ())
+    priority_items = _urgent_plan_items(plan)
+    routine_items = _plan_list(plan, 'routineFollowups')
+    gap_items = _plan_list(plan, 'testGaps')
     clustered_problems = {code for row in clusters for code in row.get('problemCodes', ())}
     urgent_problems = {code for row in clusters if row.get('priority') == 'P0'
                        for code in row.get('problemCodes', ())}
@@ -491,6 +622,19 @@ def _planned_source_bindings(clinical, microbiome, facts, plan, *, data=None):
                 routine_ids.extend(identifiers)
         clinical_plan_ids.extend(fid for row in advice_by_code.values() for fid in row['sourceFactIds'])
     clinical_plan_ids = valid(clinical_plan_ids)
+    urgent_ids = valid([*(fid for row in priority_items for fid in _plan_fact_ids(row, 'factIds')), *urgent_ids])
+    if 'routineFollowups' in plan:
+        # The planner owns the follow-up list once it states one.
+        routine_ids = valid(fid for row in routine_items for fid in _plan_fact_ids(row, 'factIds'))
+    gap_ids = valid(fid for row in gap_items for fid in _plan_fact_ids(row, 'triggeredBy', 'factIds'))
+    core_ids = valid(fid for row in clusters if row.get('priority') == 'P1' for fid in row.get('factIds', ()))
+    supportive_ids = valid(fid for row in clusters if row.get('priority') in {'P2', 'P3'}
+                           for fid in row.get('factIds', ()))
+    urgent_brief = _priority_brief(priority_items, 'urgent') or _priority_brief(
+        [{'title': row.get('name')} for row in clusters if row.get('priority') == 'P0'], 'urgent',
+    )
+    routine_brief = _priority_brief(routine_items, 'routine')
+    gap_brief = _priority_brief(gap_items, 'gaps')
     functional_ids = rows_ids(microbiome['functionalGroups'])
     nutrient_ids = rows_ids(microbiome['functionalGroups'], {'aminoAcid', 'vitamin', 'nucleotidePlant'})
     beneficial_ids = rows_ids(microbiome['organismGroups'], {'beneficial'})
@@ -517,9 +661,15 @@ def _planned_source_bindings(clinical, microbiome, facts, plan, *, data=None):
             *(row for group in microbiome.get('structureGroups', ()) for row in _panel_rows(group)),
         ], facts)),
         'clinicalLead': binding(clinical_ids),
+        'bodySummary': binding(_row_fact_ids([
+            *clinical['bodyMetrics'], *(row for group in clinical.get('bodyGroups', ()) for row in group['rows']),
+        ], facts)),
         'priority.urgent': binding(urgent_ids),
-        'priority.planned': binding(managed_ids, [*lifestyle_ids, *clinical_plan_ids]),
         'priority.routine': binding(routine_ids),
+        'priority.gaps': binding(gap_ids),
+        'baselineSummary': binding(_row_fact_ids([
+            row for group in clinical.get('normalBaselines', ()) for row in group.get('rows', ())
+        ], facts)),
         'graphSummary': binding(cluster_ids),
         'clusterSummary': binding(cluster_ids),
         'symptomSummary': binding(symptom_ids),
@@ -529,9 +679,10 @@ def _planned_source_bindings(clinical, microbiome, facts, plan, *, data=None):
         'fermentationSummary': binding(_reported_diet_context(facts)),
         'riskSummary': binding(_model_fact_ids(microbiome, facts)),
         'lifestyleSummary': binding(background_ids),
-        'layer.clinical': binding(clinical_plan_ids),
-        'layer.core': binding([*cluster_ids, *lifestyle_ids], symptom_ids),
-        'layer.maintenance': binding(functional_ids or lifestyle_ids, [*lifestyle_ids, *symptom_ids]),
+        'layer.clinical': binding([*urgent_ids, *routine_ids, *gap_ids]),
+        'layer.core': binding(core_ids, [*lifestyle_ids, *symptom_ids]),
+        'layer.maintenance': binding([*supportive_ids, *(functional_ids or lifestyle_ids)],
+                                     [*lifestyle_ids, *symptom_ids]),
         'management.lifestyle': binding(lifestyle_ids, [*clinical_plan_ids, *symptom_ids]),
         'management.fiber': binding(fiber_ids),
         'management.probiotic': binding(beneficial_ids),
@@ -539,115 +690,153 @@ def _planned_source_bindings(clinical, microbiome, facts, plan, *, data=None):
     }
     for group in clinical['digestiveContext']:
         bindings['digestive.' + group['code']] = binding(_row_fact_ids(group['rows'], facts))
+    # Program-decided content travels with the binding as the cell's context
+    # purpose; the writer phrases it and the projection keeps the fields.
+    purposes = {
+        'bodySummary': body_type_elements(clinical),
+        'priority.urgent': urgent_brief,
+        'priority.routine': routine_brief,
+        'priority.gaps': gap_brief,
+        'layer.clinical': '；'.join(filter(None, (urgent_brief, routine_brief, gap_brief))) or None,
+    }
+    for key, purpose in purposes.items():
+        if purpose and key in bindings:
+            bindings[key]['contextPurpose'] = purpose
     return bindings
 
 
 def assessment_template_duty(key):
-    """Positive duties of the six-chapter reader slots, separate from plan drafts."""
+    """Positive duties of the six-chapter reader slots (wiki/report-assessment-v2.md, section 2)."""
     duties = {
-        'overviewSummary': '先点出最影响当前安排的实测发现，说明为什么要先查明以及接下来可共同管理的问题。'
-                           '只选能改变安排的主要异常或稳定结果。日期不明的回顾留在主诉表。',
-        'conclusionSummary': '将已复核发现收束成一个管理结论：先解决需查明的问题，再说长期工作要改变什么，'
-                             '最后用本人可复测的指标或观察结果说明怎样判断进展。具体措施由后面的分层和方向展开。',
-        'structureSummary': '说明整体状态与仍然保存的多样性或组成基础怎样并存，再指出最有意义的结构偏移。'
-                            '不靠正常的单项抵消整体异常，也不拼成宿主临床状态。',
-        'bodySummary': '概括不同体格测量共同提示的主要体成分特点，指出用哪种同条件测量建立复评基线。'
-                       '区分实测围度、由身高体重计算的指标、仪器估算的脂肪和能量；只有实际测过的对象才归于该方法。',
-        'clinicalLead': '从主要临床发现中区分眼下需核实、需要随访和有实测支持的稳定基础。'
-                        '写出改变先后的发现及其意义，不按系统重抄指标。',
-        'priority.urgent': '交代当前最优先的异常、为何要查明、实际原建议及明确时机。'
-                           '保留并列安排，不擅自增加先决条件。',
-        'priority.planned': '简洁呈现重点主题近期可共用的实际管理行动、复评对象与原医嘱安排。',
-        'priority.routine': '简洁呈现核心主题之外已有实际依据的常规随访对象、行动和时机。',
-        'priority.gaps': '依据已明确成立的临床需要，说明尚待完成的检查任务、目的与适用条件。',
-        'sampleSummary': '只交代会影响本次对照的已知采样背景、方法或质控。注明的采样、收样和报告时间各自对应。',
-        'fermentationSummary': '用本人实际食物和表现说明可观察的耐受线索。不能确认食物后反应时，'
-                               '给出与现有饮食或排便记录直接相关的观察项，不宣告已经有不耐受。',
-        'symptomSummary': '只归纳主诉表已经刊列的实际困扰。分别说明哪些检查可供理解、哪些属于背景，'
-                          '以及目前最需要进一步查明或观察什么。其他问卷目标留在生活方式部分。',
-        'specialtySummary': '概括各专项检查共同说明的健康判断和仍值得关注的线索，避免复述分项。',
-        'digestive.oralGastric': '分别解释口腔所见、胃部检查与实际消化相关的意义。'
-                               '同名菌种的不同标本和检测方式不可互相定性，不从呼气结果推胃酸状态。',
-        'digestive.hepatobiliaryPancreatic': '用实际影像和相关临床指标说明主要器官发现、正常对照及各自随访事项。'
-                                            '检查只在原测量范围内解释，不从单项指标推断实际消化或吸收量。',
-        'digestive.lowerDigestive': '先解释实测便检中会改变判断的结果。未注明日期的回顾只有在本身带来额外线索时'
-                                    '才另段陈述，照录其发生条件。保留已核实的原医嘱。',
-        'trendSummary': '有两次可比实测才写上升下降；本人回忆以前查过的结果单独按自述说明。'
-                        '旧测值或日期不详仍可保留既往线索，说明今后复评的基线。',
-        'microbiomeLead': '先说目前最值得关注的消化发现和整体群落特点，再概括仍保存的基础。'
-                          '消化系统临床结果和粪便菌群结果'
-                          '分别承担判断与提供背景线索的职责。',
-        'riskSummary': '原模型的名称、指数及原分档另列。这里回答哪些模型和哪条临床发现值得同读，'
-                       '每个对照分别交代模型原分档、具体检查所见及随访如何决定。区分模型的较高档、临床实测'
-                       '异常和有日期限制的自述，指数未校准为个人患病概率。不泛谈通路、饮食或情绪原因。',
-        'graphSummary': '概括图中已确认主题的先后和共用管理目标。写图所帮助理解的关系，不复述每个图节点。',
-        'clusterSummary': '收束多源集群，先说最值得优先查明的线索和为何优先，'
-                          '再说明其他主题可共用哪些管理目标与临床复评信息。',
-        'lifestyleSummary': '归纳与本次主题有关的真实本人既往事件、家族背景和用药情况，保留原角色与时间。',
-        'layer.clinical': '按先后写眼下需查明的异常和各专科的随访任务。'
-                          '说明对应的对象、目的和原有条件或时机，已单列的原建议不必在正文重抄。',
-        'layer.core': '结合可共同管理的实际问题、本人行为基线与已确认的临床约束，'
-                      '明确阶段目标及能复查的体征、化验或观察结果。',
-        'layer.maintenance': '结合真实饮食与恢复背景、功能预测偏离和已保留的正常项，'
-                             '提出长期维护目标与可持续观察项。不同档位分别保留，不从功能分数开出人体补充方案。',
-        'management.lifestyle': '用本人已经记录的饮食、活动或作息场景组织起步动作、如何递进和观察结果。'
-                                '与目标无关的习惯无需写入，保留实际临床约束及按原医嘱的安排。',
-        'management.fiber': '结合实际食物、排便时间情境与微生态线索，说明膳食纤维选择、渐进适应和耐受观察。',
-        'management.probiotic': '结合实际菌群偏移、正常成员和排便记录，说明是否具备选择特定功效菌的依据及观察目标。',
-        'management.nutrient': '结合实际功能谱、膳食与临床营养线索，说明成立的营养支持及按临床需要核实的方向。',
-        'microbiomeRow': '解释本行检测对象、实际偏移及生理意义，并连接有适用依据的个人健康关注点。',
-        'structure.overallBalance': '给出原综合分档和对本次群落状态的意义。分数接近档位界线时不外推临床进程。',
-        'structure.diversity': '解释多样性和物种数分别说明的群落特点，说明保存的基础如何与整体失衡并存。',
-        'structure.gmwi2': '按原指标说明当前菌群模式的关联方向，负向模型指数的意义限定于原比较对象。',
-        'structure.gutAge': '解释估算肠龄与可比较的实足年龄之间的差距。只注明来源确实用于年龄校准的日期，'
-                            '明确的报告日期只用于指明哪份结果。',
-        'structure.colonizationResistance': '按本项分子和分母说明相对构成比例及其原参考比较，'
-                                           '个体感染防护能力须由另有依据的临床结果判断。',
-        'structure.composition': '原菌门比例、菌门比值和肠型分开比较，点出实际值得关注的组成差异。',
-        'structure.barrier': '把面板原结论、成员结果和相关指数分别解释，说明样本所显示的生态线索。',
-        'organisms.otherOrganisms': '对照靶标面板与构成图谱各自的实际成员和例外，并保留能确定的正常对照。'
-                                    '属、种及面板级判断分别归属。',
-        'organisms.genes': '区分已检出及未检出的靶标序列、候选注释和耐药相关丰度，'
-                           '解释实际检测所见及能支持的临床关注范围。',
+        # Chapter 1
+        'overviewSummary': '健康状况总览：先点出最影响后续安排的实测发现及其数值，说明为何需要优先查明，'
+                           '再写可协同管理的问题和可作为对照的稳健结果。只选能改变安排的结果。',
+        'conclusionSummary': '综合评估结论：先写需优先完成的排查，再写长期管理要改变的方向，'
+                             '最后写用哪些可复测的指标判断进展。具体措施由三个层级和干预方向展开。',
+        'bodySummary': '1.1 体型判断：先用一句名词性判断概括体型类别、脂肪分布和肌肉量，只使用contextPurpose'
+                       '列出的判定要素及各项原判定；再用一两句写出支撑判断的关键实测（身高、体重、体重指数、腰围、'
+                       '体脂率、内脏脂肪、骨骼肌量、血压、心率中实际测过的项目）及今后复评的基线。'
+                       '实测围度、计算指标与仪器估算分别归属，不同方法的测量不合并成变化。',
+        'graphSummary': '1.4 失衡态势总述：用一句话概括各失衡集群的先后与共同管理环节，'
+                        '需优先排查的集群写在前面。不罗列指标，不复述每个集群名。',
+        'priority.urgent': '1.3 优先排查：按contextPurpose列出的事项逐项成句，每项写明触发的发现及数值、'
+                           '需完成的检查、时限和就诊科室。时限、科室和检查照用，不增删事项，不增加先决条件；'
+                           '原检查建议保留其条件与力度。',
+        'priority.routine': '1.3 常规专科随访：按contextPurpose列出的事项逐项成句，写明需定期复查的发现'
+                            '（保留分类、大小等记录要素）、复查项目、间隔和科室。间隔只用原检查建议或列出的内容。',
+        'priority.gaps': '1.3 检测盲区：按contextPurpose列出的项目逐项写建议补查的检查及理由：'
+                         '由哪项发现触发、补查能回答什么问题。只写列出的项目，不新增检查。',
+        # Chapter 2
+        'symptomSummary': '2.2 综合印证：把主诉、主要异常和生活因素串成一条有依据的关联链，'
+                          '写明哪项发现支持哪条主诉、哪种生活因素与之相关；证据层级或时间关系不同处分别交代。'
+                          '不写疗效预期和推销句。',
+        # Chapter 3
+        'clinicalLead': '第三章概览：区分需优先查明、需定期随访和有实测支持的稳健结果，'
+                        '写出改变后续安排的发现及其意义，不按系统重抄指标。',
+        'specialtySummary': '3.5 专项检测小结：概括各专项检测共同说明的健康判断和仍需关注的线索，'
+                            '保留筛查性质与分项偏离的区别，不复述分项。',
+        'trendSummary': '3.6 历年趋势：同一指标有两次及以上可比实测时，写日期、数值和变化方向；'
+                        '本人回忆的既往结果按自述单列。旧测值日期不详时只作既往线索，并说明今后复评的基线。',
+        'baselineSummary': '3.6 稳健基线：汇总本次在参考区间内的肿瘤标志物与核心器官功能（肝、肾、心、血常规），'
+                           '说明可作为今后对照的基线。只写本次实际检测的项目，单次正常不推广为无病。',
+        # Chapter 4
+        'microbiomeLead': '第四章概览：先写最值得关注的消化道发现和群落整体特点，再概括保留的稳健基础。'
+                          '消化系统临床检查与粪便菌群结果分别承担判断与提供线索的职责。',
+        'sampleSummary': '第四章章首采样情况：写明采样前抗生素、泻药、益生菌的使用情况（取自问卷），'
+                         '未记录时写“采样前用药情况未记录”；采样、收样和报告日期各自对应，不互相替代。'
+                         '只写会影响本次对照的采样背景或质控。',
+        'fermentationSummary': '第四章章首发酵耐受：结合产甲烷菌等产气相关结果、产气症状和排便性状给出发酵耐受判断。'
+                               '只有记录了进食后的具体反应才写耐受情境；没有时给出观察要点，不宣告已有不耐受。',
+        'structureSummary': '4.2 微生态稳态小结：说明总分分级与保留的多样性或组成基础如何并存，'
+                            '再指出最有意义的结构偏移。'
+                            '正常单项不抵消整体异常，也不改写为宿主临床状态。',
+        'riskSummary': '第四章风险小结：列出菌群疾病风险模型的名称、分值与阈值分档，'
+                       '说明哪些模型与哪项临床发现值得对照，'
+                       '区分模型分档、临床实测异常和自述。分值不是个人患病概率。'
+                       '明确写出“健康管理以临床检查结果为准”。',
+        'digestive.oralGastric': '4.1 口腔与上消化道：分别解释口腔查体、胃部相关检查与消化症状的意义。'
+                                 '不同标本和检测方式的同名菌结果不互相定性，呼气试验结果不推断胃酸状态。',
+        'digestive.hepatobiliaryPancreatic': '4.1 肝胆胰：用影像和相关临床指标说明主要器官发现、'
+                                             '正常对照及各自随访事项。'
+                                             '检查只在其测量范围内解释，不从单项指标推断消化或吸收量。',
+        'digestive.lowerDigestive': '4.1 下消化道黏膜：先解释实测粪便检查中会改变判断的结果，再写排便症状；'
+                                    '日期不明的回顾只在带来额外线索时另段陈述，并照录其发生条件。保留原检查建议。',
+        'microbiomeRow': '解释本行检测对象、实际偏移及生理意义，并连接有适用依据的健康关注点。',
+        'structure.overallBalance': '4.2 总分与分级：写出总分、所在分级区间及其对群落状态的意义。'
+                                    '分数接近分级界线时不外推临床进程。',
+        'structure.diversity': '4.2 多样性：解释多样性指数和检出种数分别说明的群落特点，'
+                               '以及保留的基础如何与整体失衡并存。',
+        'structure.gmwi2': '4.2 健康指数：按报告给出的区间说明当前菌群模式的关联方向，负向指数的意义限定于其比较对象。',
+        'structure.gutAge': '4.2 肠道生物学年龄：写出估算肠龄与实际年龄之差及其意义。'
+                            '只采用确实用于年龄校准的日期，报告日期只用于指明是哪份结果。',
+        'structure.colonizationResistance': '4.2 定植抗力：按本项分子和分母说明相对构成比例及其参考比较，'
+                                            '个体感染防护能力须由临床结果判断。',
+        'structure.composition': '4.2 菌门比例与肠型：分别比较菌门比例、F/B 比值和肠型，指出实际值得关注的组成差异。',
+        'structure.barrier': '4.2 屏障与免疫相关评分：分别解释面板结论、成员结果和相关指数，说明样本显示的生态线索。',
+        'organisms.otherOrganisms': '4.3 真菌、病毒与寄生虫：对照靶标面板与构成图谱各自的实际成员和例外，'
+                                    '保留能确定的正常对照；属、种及面板级判断分别归属。',
+        'organisms.genes': '4.3 毒力与耐药基因：区分已检出与未检出的靶标序列、候选注释和耐药相关丰度，'
+                           '说明检测所见及能支持的临床关注范围。序列检出不等于活性毒素表达。',
+        # Chapter 5
+        'clusterSummary': '5.1 集群概览：先写需优先排查的集群及其理由，再说明其余集群可共用的管理目标与复评指标。',
+        'lifestyleSummary': '5.2 先天背景与触发事件：用一段归纳家族史、既往病、用药、手术和烟酒史等背景与触发事件，'
+                            '保留主体（本人或亲属）和时间；未记录的方面写“未记录”。背景不等于已证实的诱因。',
+        # Chapter 6
+        'layer.clinical': '6.1 第一层级（首月）：汇总优先排查事项、常规专科随访和检测盲区，每项写检查、时限和科室，'
+                          '相同目的只写一次。按contextPurpose列出的事项写，不新增。',
+        'layer.core': '6.1 第二层级（90 天）：针对核心干预集群写干预目标、起步方向和 90 天后复评的指标，'
+                      '结合已记录的行为基线和临床约束。',
+        'layer.maintenance': '6.1 第三层级（持续）：针对协同调理集群和营养储备写长期维护目标与可持续观察的指标。'
+                             '功能预测偏低不作人体缺乏的判断，不开补充方案。',
+        'management.probiotic': '6.2 MTPN 功效菌选择依据：依据缺失或偏低的菌说明功效菌选择方向与观察目标。'
+                                '只写方向，不写产品名、菌株剂量或疗效。有优先排查事项时写明先完成第一层级排查。',
+        'management.fiber': '6.2 MTPN 益生元与膳食纤维：按发酵耐受和排便性状说明益生元与膳食纤维的种类方向、'
+                            '渐进方式和耐受观察。只写方向，不写产品名和剂量。',
+        'management.nutrient': '6.2 MTPN 营养素配方方向：按营养合成偏低的通路与相关临床指标说明营养素配方方向。'
+                               '预测合成偏低不等于人体缺乏；只写方向，不写产品名和剂量。',
+        'management.lifestyle': '6.2 LSMI 去诱因生活方式干预：按第五章的诱因维度（饮食与进餐、饮酒与饮品、睡眠、'
+                                '运动与久坐、精神压力与口腔护理）写起步动作、递进方式和观察指标。'
+                                '只写已记录的诱因，保留临床约束和原检查建议的安排。',
     }
     if key in duties:
         return duties[key]
     prefix = key.partition('.')[0]
     if prefix == 'symptomEvidence' and key.endswith('.microbiome'):
-        return ('用一两句交代当前菌群结果对理解该主诉有多少直接帮助，以及最有用的观察意义。'
-                '只引用适用的本人检测，保留预测与人体实测的区别，避免重复表中已有分数、阈值和通用限制。')
+        return ('用一两句交代本次菌群结果对理解该主诉的直接帮助和观察意义。'
+                '只引用适用的检测，保留预测与人体实测的区别，不重复表中已有的分数和阈值。')
     return {
-        'body': '以测项原判定说明本组最重要的体格特点。不同方法或姿势的测量不能改写为变化、'
-                '合并成一个范围或据此确诊。保留能解释结果的关键测量条件。',
-        'clinical': '按本系统主要异常、可以独立成立的稳定结果和需复核矛盾组织判断。'
-                    '仅将会改变随访或临床优先级的结果带入小结。',
-        'clinicalRow': '先说明这行实际结果的状态及检查能回答的问题。'
-                       '用同组有意义的正常项或不同方向的结果限定判断范围，说明为什么值得关注或可作参考基线。'
-                       '发生条件、解读前提和分项各自保留，避免复述相邻列。',
-        'specialtyRow': '单独解释本项检查所测对象、实际判定及其临床意义。原结论限定于本项的测量或筛查用途。'
-                        '只采用本项自身的分级与参考，不复述相邻检查项目。',
-        'digestive': '解释本消化环节的实际检查与自述，各按原时点和来源性质说明其健康与管理意义。',
-        'structure': '说明本指标测量的对象，并用本项自己的原状态或参照定位本次结果。'
-                     '与其他指标同时存在的不同结论需要分开表达，健康联系只写到这一指标能支持的范围。',
-        'organisms': '以实际面板的总体状态、异常成员和一个有意义的正常对照说明本组特点。'
-                     '跨面板发现各自归位，生理及个人联系写到所用证据能支持的程度。',
-        'function': '综合本组功能潜能谱及适用个人记录，解释主要特点、可能健康联系与本组独有的关注方向。',
-        'system': '点明本系统内真正改变安排的发现及对照；与临床分项中已适用的临床筛查界值保持一致，'
-                  '分别写本室参考和筛查分级的对象。单次正常只指本次已测项目，不能推广为系统无病。',
-        'symptom': '用本人自述的时点界定困扰，再用同一时点的结果支持判断。'
-                   '在主诉前完成的检查只能按当时的日期和范围作基线，不能据此排除现有病因。'
-                   '回忆有一次明确的诱因时要保留所述场景和未能确定的事项。',
-        'symptomEvidence': '解释本列真实检测与主诉的有据关联，同时引用主诉及适用检测并保留各自时间和测量层级。',
-        'synthesis': '说明哪些临床与微生态锚点合在同一管理主题，主判断来自什么，'
-                     '辅助线索及证据限度是什么。写清为何共同管理，不把它们拼成没有证实的连续病因。',
-        'synthesisAction': '将这个主题转成优先查明、可同步开展或常规复评的具体行动，'
-                           '按适用情况写清对应目标、临床约束及原建议的条件。',
-        'lifestyle': '保留本人原场景、频次、角色及限制，并指出与相应客观发现最直接、可调整的一点。'
-                     '健康意义要有实际桥接，不将已观察行为写成确定病因。',
-        'recognition': '个人目标与相应实测基线要写出今后追踪的对象和方法。'
-                       '两份原始记录冲突时分别报告数值、参考和原结论，保留由原机构或专科核实的下一步；'
-                       '不能代替本人决定采信一方，也不能因实验室范围内忽略已列明的另一套适用筛查标准。',
-    }.get(prefix, '按本格在正式六章中的职责，解释实际发现及有依据的个人健康意义。')
+        'body': '1.1 体格分组：用本组各项原判定说明最重要的体格特点。不同方法或姿势的测量不改写为变化、'
+                '不合并成一个范围，保留能解释结果的测量条件。',
+        'system': '1.2 系统定论：用一句定论概括本系统的状态，点名最重的一到两项异常锚点及其数值；'
+                  '已检项目均在参考区间内时写明这一点。定论限于本次已检项目，不推广为系统无病。',
+        'clinical': '3.1–3.5 分系统小结：按本系统主要异常、独立成立的稳健结果和需核对的矛盾组织判断，'
+                    '只把会改变随访或优先级的结果写入小结。',
+        'clinicalRow': '第三章表格行解读：写明实测值与临床参考区间，有目标区间时写出目标区间及文献编号，再说明本行'
+                       '的临床意义及与相关结果的联系。原始资料文字与数值互相矛盾时，另起一句“数据校准说明”，'
+                       '写明以哪项为准及理由。不复述相邻列。',
+        'specialtyRow': '3.5 专项检测行：解释本项检测的对象、实际判定及临床意义，只采用本项自身的分级与参考，'
+                        '判断限于本项的测量或筛查用途。',
+        'digestive': '4.1 消化环节：解释本环节的实际检查与自述，各按时点和来源性质说明其健康与管理意义。',
+        'structure': '4.2 结构指标：说明本指标所测对象，以本项分级区间或参照定位本次结果，'
+                     '健康联系只写到本指标能支持的范围。',
+        'organisms': '4.3 菌群结构：写出异常项的方向、丰度与参考范围及功能意义，正常项给出计数和代表示例；'
+                     '生理及健康联系写到所用证据能支持的程度。',
+        'function': '4.4 营养合成与代谢潜能：写出偏离项的分值及所在分档区间，说明主要特点；与临床指标交叉印证'
+                    '只在有直接依据时写。预测潜能不等于人体浓度或缺乏。',
+        'symptom': '2.2 主诉解析：首句用名词性判断概括该主诉的主要线索，再解析相关临床指标、菌群和生活因素'
+                   '如何共同解释这一表现，带关键数值和文献编号。主诉发生前的检查只作当时的基线；'
+                   '时间关系未确认时分别陈述。',
+        'symptomEvidence': '2.1 主诉证据：解释本列检测与该主诉的有据关联，'
+                           '同时引用主诉及适用检测，保留各自时间和测量层级。',
+        'synthesis': '5.1 健康影响解读：说明临床与影像锚点、微生态与代谢锚点及相关生活因素为何归入同一集群，'
+                     '主要判断来自什么、辅助线索和证据限度是什么，以及对健康的影响。不把共现写成已证实的病因。',
+        'synthesisAction': '5.1 处理方向：按集群优先级写处理方向。优先排查集群写需完成的检查、时限和科室；'
+                           '核心干预和协同调理集群写干预方向与复评指标。原检查建议保留其条件与力度。',
+        'lifestyle': '5.2 诱因表行：写行为特征（频次、场景，照问卷原意）、相关的客观异常和关联集群，'
+                     '说明这一行为与异常之间有依据的联系，指出可调整的一点。行为不写成确定病因。',
+        'recognition': '5.2 认知校准：只在问卷或自述中有可对照的个人认识时写：原有认识、本次结果显示的情况、'
+                       '校准后的理解和今后追踪的指标。两份记录相互矛盾时分别写数值和判定，并写明由专科核实。',
+    }.get(prefix, '按本格在六章报告中的职责，解释实际发现及有依据的健康意义。')
 
 
 def assessment_publication_rows(clinical, microbiome):
@@ -700,9 +889,7 @@ def _planned_editorial_jobs(clinical, microbiome, facts, plan, *, sample_rows=()
             yield chapter, key, name, assessment_template_duty(key), identifiers, compact
 
     yield from job('healthOverview', 'bodySummary', '基础体格与人体成分判断',
-        '综合不同测量情境下的体格与人体成分，说明会改变管理的重点。测值属于各自来源，'
-        '不能把同日不同设备记录写成体重变化；不重复整表。',
-        _row_fact_ids(clinical['bodyMetrics'], facts), compact=True)
+        assessment_template_duty('bodySummary'), _row_fact_ids(clinical['bodyMetrics'], facts), compact=True)
     clinical_rows = [*clinical['bodyMetrics'],
                      *(row for group in clinical['clinicalGroups'] for row in group['rows']),
                      *clinical['specialtyFindings']]
@@ -711,21 +898,13 @@ def _planned_editorial_jobs(clinical, microbiome, facts, plan, *, sample_rows=()
         '以及能改变整体判断的稳健基础。保留不同日期、方法和结果性质，'
         '不重复表格明细、章节说明、阅读规则或全部转诊安排。',
         _row_fact_ids(clinical_rows, facts))
-    for key, name, purpose in (
-        ('urgent', '优先查因与临床评估',
-         '用一两句直接写现在先落实的查因或临床评估、对象及目的。遵守本次已审核的临床处理先后和原医嘱，'
-         '只在实际条件支持时交代时机或紧急情形，不把稳定管理与急诊混为一谈。'),
-        ('planned', '重点管理与近期复评',
-         '用一两句写最值得同步落实的实际管理行动和复评对象，保留来源中明确的复查安排，'
-         '不列主题名称清单，不让读者另翻章节才能知道先做什么，不重复展开完整生活处方。'),
-        ('routine', '常规随访与健康维护',
-         '用一两句归纳尚未纳入核心主题但有实际原医嘱的常规随访对象、行动与时机。'
-         '按原检查性质安排，不由正常结果泛化出新检测，不复制重点主题行动。'),
-    ):
-        yield from job('healthOverview', 'priority.' + key, name, purpose, compact=key != 'routine')
+    # 1.3 has three program-decided parts. A part without items has no cell;
+    # the projection prints the specified sentence (or omits the gaps part).
+    for key, name in _PRIORITY_SECTIONS:
+        yield from job('healthOverview', 'priority.' + key, name, assessment_template_duty('priority.' + key))
     yield from job('microbiomeAssessment', 'sampleSummary', '样本与检测背景',
         '只依据已绑定的样本元数据说明本次检测背景中有实际解释价值的情况。'
-        '采样、收样、报告日期分别按原字段理解，不能相互代替；原件明确的质控只按原结论表述，'
+        '采样、收样、报告日期分别按原字段理解，不能相互代替；报告明确的质控只按其结论表述，'
         '不由缺日期、本人回顾或结果异常推断样本质量。原值已在样本信息展示，不重抄字段清单，'
         '没有额外可解释内容可留空，不写通用检测介绍或资料缺失占位。',
         _row_fact_ids(sample_rows, facts), compact=True)
@@ -743,7 +922,7 @@ def _planned_editorial_jobs(clinical, microbiome, facts, plan, *, sample_rows=()
          '有明确联系才使用计划中的背景事实，不把共现写成病因。'),
         (clinical['digestiveContext'], 'microbiomeAssessment', 'digestive.',
          '解释本消化环节的真实记录及其管理意义，分清临床检查与回顾性自述的时间，'
-         '不把牙石等查体所见改写为未记录的不良生活习惯。'),
+         '不把查体所见改写为未记录的生活习惯。'),
         (microbiome.get('structureGroups', ()), 'microbiomeAssessment', 'structure.',
          '解释本组群落结构及正常基线的实际含义。比值、肠型及群落指标各按检测对象理解，'
          '不转成宿主生理功能或病因的直接测量。'),
@@ -778,7 +957,7 @@ def _planned_editorial_jobs(clinical, microbiome, facts, plan, *, sample_rows=()
         purpose = row.get('purpose') or ''
         yield from job('medicalAssessment', 'symptom.' + code, name,
             '解释真实主诉、目标或不适的提问语境、时间及观察意义。希望改善不等于已发生症状；'
-            '父亲等家族成员病史不属于本人诊断。' + purpose, owners, compact=True)
+            '家族成员病史不属于本人诊断。' + purpose, owners, compact=True)
         for kind, title, ids in (
             ('clinical', '临床证据', row.get('clinicalFactIds', ())),
             ('microbiome', '微生态证据', row.get('microbiomeFactIds', ())),
@@ -819,28 +998,32 @@ def _planned_editorial_jobs(clinical, microbiome, facts, plan, *, sample_rows=()
                        _row_fact_ids([row], facts), compact=True)
     all_ids = _unique([*cluster_ids, *behavior_ids])
     for chapter, key, name, purpose, ids, compact in (
-        ('medicalAssessment', 'symptomSummary', '主诉相关线索小结',
-         '综合实际主诉与有据的相关线索，区分症状、个人目标和临床发现；没有额外判断可留空。',
-         [fid for row in plan.get('symptoms', ()) for fid in row.get('factIds', ())], True),
+        ('medicalAssessment', 'symptomSummary', '综合印证',
+         assessment_template_duty('symptomSummary'),
+         [fid for row in plan.get('symptoms', ()) for fid in row.get('factIds', ())], False),
         ('medicalAssessment', 'specialtySummary', '专项功能与生理评估',
          '综合实际完成的专项检查，保留筛查性质、分项偏移和总体判定的区别。',
          _row_fact_ids(clinical['specialtyFindings'], facts), False),
-        ('medicalAssessment', 'trendSummary', '历次变化解读',
+        ('medicalAssessment', 'trendSummary', '历年指标演变趋势',
          '只解释来源已确认的不同日期变化，不把同日不同场景或缺日期结果当趋势。',
          _row_fact_ids([point for series in clinical['trends'] for point in series['points']], facts), False),
+        ('medicalAssessment', 'baselineSummary', '已确认稳健安全基线',
+         assessment_template_duty('baselineSummary'),
+         _row_fact_ids([row for group in clinical.get('normalBaselines', ()) for row in group.get('rows', ())],
+                       facts), True),
         ('microbiomeAssessment', 'microbiomeLead', '肠道微生态和消化评估概览',
          '概括实际消化道情况与群落构成主线，交代值得关注的组合及保留基础，不重复章节明细。',
          _row_fact_ids([*microbiome['structure'], *(row for group in clinical['digestiveContext']
                                                           for row in group['rows'])], facts), True),
-        ('microbiomeAssessment', 'riskSummary', '菌群疾病关联模型与临床对照',
+        ('microbiomeAssessment', 'riskSummary', '本章风险小结',
          assessment_template_duty('riskSummary'), _model_fact_ids(microbiome, facts), False),
         ('healthOverview', 'graphSummary', '核心系统失衡态势速览',
          '用简短文字概括已复核集群的主次、共同管理环节和必要边界，不罗列指标或发明固定数量的主题。',
          cluster_ids, True),
-        ('medicalAssessment', 'clusterSummary', '系统失衡集群概览',
+        ('medicalAssessment', 'clusterSummary', '系统失衡集群定性概览',
          '统领下文真实主题及其关联：先交代需要优先查因的事项，再解释长期主线和微生态协同。'
          '不把共现写成个人因果，不重复全部集群名或指标。', cluster_ids, False),
-        ('medicalAssessment', 'lifestyleSummary', '先天背景与既往事件复盘',
+        ('medicalAssessment', 'lifestyleSummary', '先天背景与触发事件',
          '只归纳真实且与当前主题相关的本人既往史、家族成员及用药背景，保留原问题角色与时间。'
          '有背景不等于已证明触发原因，不补遗传分型或未记录病史。', behavior_ids, False),
         ('comprehensiveConclusion', 'layer.clinical', _CONCLUSION_LAYERS[0][1],
@@ -852,24 +1035,24 @@ def _planned_editorial_jobs(clinical, microbiome, facts, plan, *, sample_rows=()
         ('comprehensiveConclusion', 'layer.maintenance', _CONCLUSION_LAYERS[2][1],
          '根据真实功能谱、营养摄入与临床背景解释长期营养和生活维护目标。'
          '预测合成潜能低不等于人体缺乏；没有直接缺乏证据也应解释可成立的膳食支持意义。', all_ids, False),
-        ('comprehensiveConclusion', 'management.lifestyle', '个体化生活方式管理',
+        ('comprehensiveConclusion', 'management.lifestyle', _LSMI_NAME,
          '围绕真实诱因和计划中的主题写连贯、可执行且有主次的起步方案与观察指标，'
          '把饮食、渐进活动、规律恢复及有来源的约束协同起来，不补缺失习惯，不照搬模板剂量。'
          '对需要评估的运动或临床风险在此直接写明，最终投影不会代为删词补句。', all_ids, False),
-        ('comprehensiveConclusion', 'management.fiber', '个性化益生元与膳食纤维',
+        ('comprehensiveConclusion', 'management.fiber', _MICROBIOME_ITEMS[1][1],
          '结合真实饮食、排便特点及微生态线索说明食物选择、循序适应和如何观察耐受。'
          '不凭潜能或基因作治病、拦截毒素、修复屏障承诺。', all_ids, False),
-        ('comprehensiveConclusion', 'management.probiotic', '功效菌选择与观察依据',
+        ('comprehensiveConclusion', 'management.probiotic', _MICROBIOME_ITEMS[0][1],
          '解释实际群落异常对微生态支持选择的意义及需要观察的目标。只有适用菌株与用途的人体研究'
          '和个人条件同时支持时才提出相应方向；不能由种水平0值推绝对缺失并直接指定菌株、'
          '配方或抗真菌抗感染作用。仅有粪便相对丰度时，交代该结果对于选菌的实际局限和本人的观察重点。', all_ids, False),
-        ('comprehensiveConclusion', 'management.nutrient', '个体营养评估与膳食支持',
-         '结合本例实际功能谱、膳食和临床营养线索说明可成立的营养支持与必要核实方向。'
+        ('comprehensiveConclusion', 'management.nutrient', _MICROBIOME_ITEMS[2][1],
+         '结合实际功能谱、膳食和临床营养线索说明可成立的营养配方方向与必要核实方向。'
          '不把粪便潜能当宿主缺乏，不指定未经证实需要的补充剂、用量或技术配方。', all_ids, False),
     ):
         yield from job(chapter, key, name, purpose, ids, compact=compact)
     for key, scope in scopes.items():
-        if key in emitted:
+        if key in emitted or key == 'priority.planned':  # 1.3 no longer has a "planned" part.
             continue
         chapter = ('comprehensiveConclusion' if key.startswith(('layer.', 'management.')) else
                    'healthOverview' if key.startswith(('system.', 'body.', 'priority.')) else
@@ -3136,8 +3319,254 @@ def _synchronize_actions(data, items, *, reviewed=None, facts=None):
     conclusion.next_steps = steps
 
 
+def _title_terms(title):
+    """Two-character windows of a finding title, used to put its own rows first."""
+    text = re.sub(r'[^\u4e00-\u9fff]', '', str(title or ''))
+    return {text[index:index + 2] for index in range(len(text) - 1)}
+
+
+def _rank_basis(rows, title, limit):
+    terms = _title_terms(title)
+
+    def rank(row):
+        status = str(row.get('status') or '')
+        shown = f'{row.get("name") or ""}{row.get("value") or ""}'
+        return (-sum(term in shown for term in terms),
+                2 if _NORMAL_STATE.match(status) else 1 if not status else 0)
+
+    return sorted(rows, key=rank)[:limit]
+
+
+def _basis_rows(identifiers, clinical, *, title=None, limit=4):
+    """Displayed clinical rows behind an action card: its own finding, then abnormal results."""
+    wanted = set(identifiers or ())
+    if not wanted:
+        return []
+    rows = [*clinical.get('bodyMetrics', ()),
+            *(row for group in clinical.get('clinicalGroups', ()) for row in group.get('rows', ())),
+            *clinical.get('specialtyFindings', ()),
+            *(row for group in clinical.get('digestiveContext', ()) for row in group.get('rows', ()))]
+    selected, seen = [], set()
+    for row in rows:
+        if not any(source.get('recordId') in wanted for source in row.get('sources') or ()):
+            continue
+        if _NOT_PERFORMED.search(f'{row.get("name") or ""} {row.get("value") or ""}'):
+            continue  # an examination not done is no basis for an action
+        key = (row.get('name'), str(row.get('value')))
+        if key in seen:
+            continue
+        seen.add(key)
+        selected.append({**{field: row.get(field) for field in _BASIS_FIELDS},
+                         'sources': [dict(source) for source in row.get('sources') or ()]})
+
+    return _rank_basis(selected, title, limit)
+
+
+def _signal_basis(item, *, limit=4):
+    """Measured anchors of a cluster; recorded advice and self-reports are shown elsewhere."""
+    rows = [{**{field: signal.get(field) for field in _BASIS_FIELDS},
+             'sources': [dict(source) for source in signal.get('sources') or ()]}
+            for signal in item.get('clinicalSignals') or ()
+            if signal.get('status') not in {_ADVICE_STATUS, _SELF_REPORTED_STATUS}
+            and not _NOT_PERFORMED.search(f'{signal.get("name") or ""} {signal.get("value") or ""}')]
+    return _rank_basis(rows, item.get('name'), limit)
+
+
+def _recorded_advice_quotes(item):
+    return _unique(str(signal['value']).strip() for signal in item.get('clinicalSignals') or ()
+                   if signal.get('status') == _ADVICE_STATUS and str(signal.get('value') or '').strip())
+
+
+def _sentence(text):
+    text = str(text or '').strip()
+    return text if not text or text[-1] in '。！？；' else text + '。'
+
+
+def _card_text(section, title, *, period=None, department=None, checks=(), quotes=(), reason=None):
+    """One deterministic line from the program-decided fields of an action card."""
+    if section == 'gaps':
+        return f'{title}：{_sentence(reason)}' if reason else f'建议补查{title}。'
+    if quotes and not (period or department or checks):
+        return f'{title}：' + ''.join(_sentence(quote) for quote in quotes)
+    if section == 'urgent':
+        visit = ''.join(filter(None, ((period or {}).get('text'), f'至{department}就诊' if department else '')))
+        steps = '，'.join(filter(None, (('建议' + visit) if visit else '',
+                                        f'完成{"、".join(checks)}' if checks else '')))
+        return f'{title}：{_sentence(steps)}' if steps else f'{title}。'
+    interval = (period or {}).get('text') or ''
+    review = interval if not interval or interval.endswith(('复查', '随访')) else interval + '复查'
+    steps = '，'.join(filter(None, (f'{department}随访' if department else '',
+                                    f'复查{"、".join(checks)}' if checks else '', review)))
+    return f'{title}：{_sentence(steps)}' if steps else f'{title}。'
+
+
+def _action_card(section, code, title, *, priority=None, period=None, department=None, checks=(),
+                 basis=(), quotes=(), reason=None, rule=None, cluster_id=None):
+    card = {
+        'code': str(code), 'name': title, 'priority': priority,
+        'timeframe': period, 'department': department or None, 'checks': list(checks),
+        'basisRows': list(basis), 'text': _card_text(section, title, period=period, department=department,
+                                                     checks=checks, quotes=quotes, reason=reason),
+    }
+    if reason:
+        card['reason'] = reason
+    if rule:
+        card['ruleId'] = str(rule)
+    if cluster_id:
+        card['clusterId'] = cluster_id
+    return card
+
+
+def _urgent_cards(plan, clusters, clinical):
+    """P0 cards from the red-flag items; a P0 cluster without an item keeps its own card."""
+    cards, claimed = [], []
+    for index, row in enumerate(_urgent_plan_items(plan), 1):
+        ids = _plan_fact_ids(row, 'factIds')
+        basis = [dict(item) for item in row.get('basisRows') or () if isinstance(item, dict)]
+        cards.append(_action_card(
+            'urgent', row.get('code') or f'urgent{index}', _item_title(row, 'title', 'name'), priority='P0',
+            period=_period(row.get('timeframe')), department=str(row.get('department') or '').strip(),
+            checks=_plain_strings(row.get('checks')),
+            basis=basis or _basis_rows(ids, clinical, title=_item_title(row, 'title', 'name')),
+            rule=row.get('ruleId'),
+        ))
+        claimed.append((set(ids), {str(row.get('code') or ''), str(row.get('ruleId') or '')} - {''}))
+    plan_clusters = {row.get('code'): row for row in (plan or {}).get('clusters', ()) if isinstance(row, dict)}
+    for item in clusters:
+        if item.get('priority') != 'P0':
+            continue
+        source = plan_clusters.get(item.get('_planCode'), {})
+        ids = set(_plan_fact_ids(source, 'factIds'))
+        codes = set(_plain_strings(source.get('priorityItemCodes'))) | set(
+            _plain_strings(source.get('priorityWorkupCodes')))
+        owner = next((card for card, (item_ids, item_codes) in zip(cards, claimed)
+                      if ids & item_ids or codes & item_codes), None)
+        if owner is not None:
+            owner.setdefault('clusterId', item.get('id'))
+            continue
+        cards.append(_action_card(
+            'urgent', item.get('id') or item.get('_planCode') or 'urgent', item['name'], priority='P0',
+            basis=_signal_basis(item), quotes=_recorded_advice_quotes(item), cluster_id=item.get('id'),
+        ))
+    return cards
+
+
+def _routine_cards(plan, clinical, data, facts, clusters):
+    if 'routineFollowups' in (plan or {}):
+        return [_action_card(
+            'routine', row.get('code') or f'routine{index}', _item_title(row, 'title', 'name'),
+            period=_period(row.get('interval') or row.get('timeframe')),
+            department=str(row.get('department') or '').strip(), checks=_plain_strings(row.get('checks')),
+            basis=_basis_rows(_plan_fact_ids(row, 'factIds'), clinical, title=_item_title(row, 'title', 'name')),
+        ) for index, row in enumerate(_plan_list(plan, 'routineFollowups'), 1) if _item_title(row, 'title', 'name')]
+    # Without a planner list, recorded follow-up advice outside every cluster
+    # remains a routine follow-up with its exact source wording.
+    if data is None:
+        return []
+    clustered = {code for item in clusters for code in item.get('_codes', ())}
+    groups = {group.get('code'): group for group in getattr(data, '_template_layout', {}).get('groups', ())}
+    cards = []
+    for action in _source_clinical_actions(data, facts):
+        group = groups.get(action['code'], {})
+        if (action['code'] in clustered or group.get('focusLabel') == '优先查因' or not action.get('originalAdvice')):
+            continue
+        owners = [*group.get('originalFactIds', group.get('sourceFactIds', ())), *action.get('sourceFactIds', ())]
+        cards.append(_action_card(
+            'routine', f'routine{len(cards) + 1}', action['name'], quotes=action['originalAdvice'],
+            basis=_basis_rows(owners, clinical, title=action['name']),
+        ))
+    return cards
+
+
+def _gap_cards(plan, clinical):
+    return [_action_card(
+        'gaps', row.get('code') or f'gap{index}', _item_title(row, 'test', 'title', 'name'),
+        reason=str(row.get('reason') or '').strip() or None, rule=row.get('ruleId'),
+        basis=_basis_rows(_plan_fact_ids(row, 'triggeredBy', 'factIds'), clinical,
+                          title=_item_title(row, 'test', 'title', 'name')),
+    ) for index, row in enumerate(_plan_list(plan, 'testGaps'), 1) if _item_title(row, 'test', 'title', 'name')]
+
+
+def planned_priority_findings(plan, clusters, editorial, clinical, *, data=None, facts=None):
+    """1.3: urgent (P0), routine follow-up and test gaps as program cards plus authored sentences."""
+    cards = {
+        'urgent': _urgent_cards(plan, clusters, clinical),
+        'routine': _routine_cards(plan, clinical, data, facts or {}, clusters),
+        'gaps': _gap_cards(plan, clinical),
+    }
+    result = []
+    for code, name in _PRIORITY_SECTIONS:
+        items = cards[code]
+        if code == 'gaps' and not items:
+            continue
+        section = {'code': code, 'name': name, 'priority': 'P0' if code == 'urgent' and items else None,
+                   'text': None, 'evidenceRefs': [], 'items': items}
+        if items:
+            _put_editorial(editorial, 'priority.' + code, section, 'text')
+        if not section['text']:
+            section['text'] = ('\n'.join(card['text'] for card in items) if items
+                               else _NO_URGENT if code == 'urgent' else _NO_ROUTINE)
+        section['action'] = section['text']
+        first = next((card for card in items if card.get('timeframe')), {})
+        section['timeframe'] = first.get('timeframe')
+        section['department'] = first.get('department')
+        result.append(section)
+    return result
+
+
+def _cluster_line(item):
+    action = str(item.get('action') or '').split('\n\n', 1)[0].strip()
+    quotes = [] if action else _recorded_advice_quotes(item)
+    label = f'{item.get("name")}（{item["id"]}）' if item.get('id') else str(item.get('name') or '')
+    if action:
+        return f'{label}：{_sentence(action)}'
+    if quotes:
+        return f'{label}：' + ''.join(_sentence(quote) for quote in quotes)
+    return _sentence(label)
+
+
+def planned_conclusion_layers(editorial, clusters, findings):
+    """6.1: three fixed layers; an authored layer is kept, a missing one is composed from its items."""
+    cards = [card for section in findings for card in section.get('items', ())]
+    layers = []
+    for code, name in _CONCLUSION_LAYERS:
+        members = [] if code == 'clinical' else [
+            item for item in clusters if item.get('priority') in _LAYER_PRIORITIES[code]
+        ]
+        layer = {'code': code, 'name': name, 'text': None, 'evidenceRefs': [],
+                 'clusterIds': _unique(card['clusterId'] for card in cards if card.get('clusterId'))
+                 if code == 'clinical' else [item['id'] for item in members if item.get('id')]}
+        _put_editorial(editorial, 'layer.' + code, layer, 'text')
+        if not layer['text']:
+            lines = [card['text'] for card in cards] if code == 'clinical' else [
+                _cluster_line(item) for item in members
+            ]
+            layer['text'] = '\n'.join(lines) or _LAYER_EMPTY[code]
+        layers.append(layer)
+    return layers
+
+
+def planned_management_directions(editorial, *, has_microbiome, has_urgent, has_lifestyle):
+    """6.2: MTPN (three parts) and LSMI; a P0 item puts the first-layer workup first."""
+    directions = []
+    items = _named_edits(editorial, _MICROBIOME_ITEMS, 'management.') if has_microbiome else []
+    notes = [_MTPN_AFTER_P0 if has_urgent else '', '' if has_microbiome else _MTPN_NO_MICROBIOME]
+    mtpn = {'name': _MTPN_NAME, 'items': items}
+    if any(notes):
+        mtpn['text'] = ''.join(notes)
+    if items or mtpn.get('text'):
+        directions.append(mtpn)
+    lifestyle = _named_edits(editorial, (('lifestyle', _LSMI_NAME),), 'management.')
+    if not lifestyle and not has_lifestyle:
+        lifestyle = [{'code': 'lifestyle', 'name': _LSMI_NAME, 'text': _LSMI_NO_FACTORS}]
+    directions.extend(lifestyle)
+    return directions
+
+
 def assessment_projection_issues(presentation, blueprint):
     """Distinguish a lost authored cell from a gap in the original material."""
+    from .evaluation_presentation import assessment_reader_text
+
     required = {target['path'][1] for chapter in blueprint.chapters for target in chapter['targets']
                 if target.get('required') and target['path'][0] == '_assessment_editorial'}
     rows = {
@@ -3191,7 +3620,9 @@ def assessment_projection_issues(presentation, blueprint):
             value = blueprint.data
             for part in target['path']:
                 value = value[part] if isinstance(value, (dict, list)) else getattr(value, part)
-            if not value or not any(publication_rows.get(slot, {}).get('interpretation') == value for slot in slots):
+            # The projection carries the reader wording of the reviewed text.
+            shown = {value, assessment_reader_text(value, prose=True)} if isinstance(value, str) else {value}
+            if not value or not any(publication_rows.get(slot, {}).get('interpretation') in shown for slot in slots):
                 missing.append('.'.join(str(part) for part in target['path']) + '.projection')
         projected = {}
         for key, groups in (
@@ -3209,7 +3640,7 @@ def assessment_projection_issues(presentation, blueprint):
                          for row in presentation.clinical.get('specialtyFindings', ()))
         by_name = {row['name']: row for row in presentation.clusters}
         for row in plan.get('clusters', ()):
-            item = by_name.get(row['name'], {})
+            item = by_name.get(row['name']) or by_name.get(assessment_reader_text(row['name']), {})
             projected['synthesis.' + row['code']] = item.get('interpretation')
             projected['synthesisAction.' + row['code']] = item.get('action')
         for row in presentation.clinical.get('symptoms', ()):
@@ -3233,6 +3664,7 @@ def assessment_projection_issues(presentation, blueprint):
             ('symptomSummary', presentation.clinical.get('symptomSummary')),
             ('specialtySummary', presentation.clinical.get('specialtySummary')),
             ('trendSummary', presentation.clinical.get('trendSummary')),
+            ('baselineSummary', presentation.clinical.get('baselineSummary')),
             ('microbiomeLead', presentation.microbiome.get('overviewSummary')),
             ('sampleSummary', presentation.microbiome.get('sampleSummary')),
             ('riskSummary', presentation.microbiome.get('riskSummary')),
@@ -3312,7 +3744,7 @@ def build_assessment_presentation(*, request, parsed, document, data, blueprint,
     clinical.setdefault('symptomSummary', None)
     clinical.setdefault('symptomSummaryEvidenceRefs', [])
     _put_editorial(editorial, 'symptomSummary', clinical, 'symptomSummary', 'symptomSummaryEvidenceRefs')
-    for field in ('specialtySummary', 'trendSummary'):
+    for field in ('specialtySummary', 'trendSummary', 'baselineSummary'):
         clinical.setdefault(field, None)
         clinical.setdefault(field + 'EvidenceRefs', [])
         _put_editorial(editorial, field, clinical, field, field + 'EvidenceRefs')
@@ -3321,7 +3753,7 @@ def build_assessment_presentation(*, request, parsed, document, data, blueprint,
         device_plan = row.pop('_deviceFollowup', None)
         if device_plan and device_plan not in (row.get('interpretation') or ''):
             row['interpretation'] = '\n'.join(filter(None, (
-                row.get('interpretation'), f'设备原建议：{device_plan}',
+                row.get('interpretation'), f'设备建议：{device_plan}',
             )))
     for field in ('sampleSummary', 'fermentationSummary', 'riskSummary'):
         microbiome.setdefault(field, None)
@@ -3404,18 +3836,15 @@ def build_assessment_presentation(*, request, parsed, document, data, blueprint,
     if overview['graphClusterIds']:
         overview['graphHub'] = '核心健康主题' if plan is not None else '肠道微生态线索'
     if plan is not None:
-        overview['priorityFindings'] = [
-            {**row, 'action': row['text']}
-            for row in _named_edits(editorial, (
-                ('urgent', '优先查因与临床评估'), ('planned', '重点管理与近期复评'),
-                ('routine', '常规随访与健康维护'),
-            ), 'priority.')
-        ]
-        if any(scope.get('code') == 'priority.gaps' and scope.get('factIds')
-               for scope in plan.get('cellScopes', ())):
-            overview['priorityFindings'].extend({**row, 'action': row['text']} for row in _named_edits(
-                editorial, (('gaps', '关键常规检测盲区提示'),), 'priority.',
-            ))
+        # Program cards decide the items; an authored sentence that did not
+        # pass review never removes them (a withheld P0 cell used to drop the
+        # whole urgent part).
+        # An unavailable plan decided nothing; absence sentences would be false.
+        overview['priorityFindings'] = planned_priority_findings(
+            plan, items, editorial, clinical, data=data, facts=facts,
+        ) if plan.get('status') != 'unavailable' else []
+        if plan.get('status') == 'reviewed' and not items:
+            overview['graphSummary'] = overview['graphSummary'] or _NO_GRAPH
     else:
         overview['priorityFindings'].extend({
             **item, 'code': 'urgent', 'action': item['action'].split('\n\n', 1)[0],
@@ -3435,7 +3864,7 @@ def build_assessment_presentation(*, request, parsed, document, data, blueprint,
             r'^(?:未发现|没有|无|暂未发现|暂无)(?:需要|需|其他|尚|新的|独立|明确|单独|\s|。)', prompt['text'],
             ):
                 overview['priorityFindings'].append({**prompt, 'action': prompt['text']})
-    directions = _named_edits(editorial, (('lifestyle', '个体化生活方式管理'),), 'management.')
+    directions = _named_edits(editorial, (('lifestyle', _LSMI_NAME),), 'management.')
     if exercise_scope:
         text, refs = exercise_scope
         if directions:
@@ -3444,20 +3873,32 @@ def build_assessment_presentation(*, request, parsed, document, data, blueprint,
             direction['evidenceRefs'] = _unique([*refs, *direction.get('evidenceRefs', ())])
         else:
             directions.append({
-                'code': 'lifestyle', 'name': '个体化生活方式管理',
+                'code': 'lifestyle', 'name': _LSMI_NAME,
                 'text': text, 'evidenceRefs': refs,
             })
     micro_directions = []
     if _has_microbiome_findings(microbiome):
         micro_directions = _named_edits(editorial, _MICROBIOME_ITEMS, 'management.')
     if micro_directions:
-        directions.insert(0, {'name': '肠道微生态与营养支持方向', 'items': micro_directions})
+        directions.insert(0, {'name': _MTPN_NAME, 'items': micro_directions})
+    if plan is not None and plan.get('status') != 'unavailable':
+        directions = planned_management_directions(
+            editorial, has_microbiome=_has_microbiome_findings(microbiome),
+            has_urgent=any(section['code'] == 'urgent' and section['items']
+                           for section in overview['priorityFindings']),
+            has_lifestyle=bool(_plan_list(plan, 'lifestyleFactors')),
+        )
     lifestyle = {}
     _put_editorial(editorial, 'lifestyleSummary', lifestyle)
     cluster_summary = {}
     if items:
         _put_editorial(editorial, 'clusterSummary', cluster_summary)
-    layers = _named_edits(editorial, _CONCLUSION_LAYERS if plan is not None else _CONCLUSION_LAYERS[1:], 'layer.')
+    elif plan is not None and plan.get('status') == 'reviewed':
+        cluster_summary['summary'] = _NO_CLUSTERS
+    layers = ([] if plan is None or plan.get('status') == 'unavailable'
+              else planned_conclusion_layers(editorial, items, overview['priorityFindings']))
+    if plan is None:
+        layers = _named_edits(editorial, _CONCLUSION_LAYERS[1:], 'layer.')
     clinical_layers = [] if plan is not None else [{
         'code': code, 'name': name,
         'text': '\n\n'.join(_unique(item['action'] for item in action_items)),
@@ -3470,7 +3911,7 @@ def build_assessment_presentation(*, request, parsed, document, data, blueprint,
     minor = age.isdecimal() and int(age) < 18
     _strip_display_metadata(clinical)
     _strip_display_metadata(microbiome)
-    return AssessmentPresentation(
+    presentation = AssessmentPresentation(
         overview=overview,
         clinical=clinical,
         microbiome=microbiome,
@@ -3498,3 +3939,9 @@ def build_assessment_presentation(*, request, parsed, document, data, blueprint,
             'managementDirections': directions,
         },
     )
+    # Formal written wording for every displayed string (values, units, dates
+    # and source references stay as recorded). No model call is involved.
+    from .evaluation_presentation import present_assessment_for_reader
+
+    present_assessment_for_reader(presentation)
+    return presentation
