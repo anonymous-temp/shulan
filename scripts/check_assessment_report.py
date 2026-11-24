@@ -744,12 +744,23 @@ def report_p0_items(chapters: dict[str, dict]) -> list[dict]:
 
     def visit(node, path):
         if isinstance(node, dict):
-            if str(node.get('priority') or '').upper() == 'P0':
+            # A section that only groups P0 cards (1.3 "优先排查") is not an item itself.
+            is_container = isinstance(node.get('items'), list) and bool(node.get('items'))
+            if str(node.get('priority') or '').upper() == 'P0' and not is_container:
                 label = node.get('name') or node.get('text') or node.get('action') or node.get('id') or ''
                 text = ' '.join(str(node.get(key) or '') for key in ('name', 'text', 'action', 'interpretation'))
                 if _normalize(label) not in seen:
                     seen.add(_normalize(label))
-                    items.append({'path': path, 'label': label, 'text': text})
+                    items.append(
+                        {
+                            'path': path,
+                            'label': label,
+                            'text': text,
+                            'ruleId': node.get('ruleId'),
+                            'clusterId': node.get('clusterId'),
+                            'id': node.get('id'),
+                        }
+                    )
             for key, value in node.items():
                 if not _hidden(key):
                     visit(value, f'{path}.{key}')
@@ -839,6 +850,7 @@ def red_flag_hits(request: dict, function: str | None = None) -> dict:
             'available': True,
             'reason': f'{module_name}.evaluate_red_flags(请求体检行 {len(facts)} 条)',
             'hits': [_hit_label(hit) for hit in hits],
+            'ruleIds': [hit.get('ruleId') for hit in hits if isinstance(hit, dict)],
         }
     arguments = []
     try:
@@ -877,8 +889,23 @@ def check_p0(request: dict | None, chapters: dict[str, dict], function: str | No
     result = {'reportP0': [item['label'] for item in p0], 'redFlags': flags, 'consistent': None}
     if not flags['available']:
         return result
-    unreflected = [hit for hit in flags['hits'] if not any(_related(hit, item['text']) for item in p0)]
-    unsupported = [item['label'] for item in p0 if not any(_related(hit, item['text']) for hit in flags['hits'])]
+    rule_ids = set(filter(None, flags.get('ruleIds') or ()))
+    cards = [item for item in p0 if item.get('ruleId') in rule_ids]
+    linked_clusters = {item.get('clusterId') for item in cards if item.get('clusterId')}
+    reflected_rules = {item['ruleId'] for item in cards}
+
+    def supported(item):
+        if item.get('ruleId') in rule_ids or (item.get('id') and item['id'] in linked_clusters):
+            return True
+        return any(_related(hit, item['text']) for hit in flags['hits'])
+
+    labelled = list(zip(flags['hits'], flags.get('ruleIds') or [None] * len(flags['hits'])))
+    unreflected = [
+        hit
+        for hit, rule_id in labelled
+        if rule_id not in reflected_rules and not any(_related(hit, item['text']) for item in p0)
+    ]
+    unsupported = [item['label'] for item in p0 if not supported(item)]
     result.update(
         unreflectedHits=unreflected, p0WithoutRedFlag=unsupported, consistent=not unreflected and not unsupported
     )
