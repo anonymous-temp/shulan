@@ -478,3 +478,69 @@ def test_unresolved_detail_cells_are_repaired_while_the_first_pass_is_still_runn
     assert repair_start < first_end
     assert {b['targetId'] for b in state.approved_blocks['medicalAssessment']} == {'d1', 'd2', 's1'}
     assert sum(1 for row in events if row[0] == 'public_repair' and row[1] == 'start') == 1
+
+
+def test_the_coordinated_sweep_does_not_wait_for_a_slow_early_repair(monkeypatch):
+    import dataclasses
+    import time
+
+    from modules.report import evaluation_report
+    from modules.report import evaluation_report_writer
+
+    def target(identifier, code):
+        return {
+            'id': identifier,
+            'path': ['_assessment_editorial', identifier, 'text'],
+            'owner': {'contentPlanVersion': 1, 'contentScopeCode': code, 'primaryFactIds': []},
+            'sourceFactIds': [],
+            'allowedRoles': ['interpretation'],
+            'required': True,
+            'publicationScope': 'assessment',
+        }
+
+    @dataclasses.dataclass
+    class Blueprint:
+        chapters: list
+        data: object
+        facts: list = dataclasses.field(default_factory=list)
+
+    chapter = {
+        'code': 'medicalAssessment',
+        'number': 3,
+        'title': '三',
+        'targets': [target('d1', 'clinicalRow.lipid.ldl'), target('s1', 'clinicalLead')],
+    }
+    blueprint = Blueprint(chapters=[chapter], data=SimpleNamespace(_assessment_content_plan={'status': 'reviewed'}))
+    state = SimpleNamespace(
+        blueprint=blueprint, audit={}, approved_blocks={}, evidence=None, stage_timings={}, started=time.monotonic()
+    )
+    events = []
+
+    def block(identifier):
+        return {'targetId': identifier, 'completion': 'complete', 'sentences': [{'text': identifier}]}
+
+    async def fake_author(client, *, blueprint, authoring_scope, on_checkpoint, **_):
+        phase = authoring_scope['phase']
+        ids = tuple(t['id'] for c in blueprint.chapters for t in c['targets'])
+        events.append((phase, 'start', ids))
+        if phase == 'public_first_pass':
+            on_checkpoint(
+                'medicalAssessment',
+                [],
+                [
+                    {'chapterCode': 'medicalAssessment', 'targetId': 'd1', 'issues': []},
+                    {'chapterCode': 'medicalAssessment', 'targetId': 's1', 'issues': []},
+                ],
+            )
+            await asyncio.sleep(0.01)
+            events.append((phase, 'end', ids))
+            return {}
+        if ids == ('d1',):
+            await asyncio.sleep(0.2)  # a slow early repair
+        events.append((phase, 'end', ids))
+        return {'medicalAssessment': [block(i) for i in ids]}
+
+    monkeypatch.setattr(evaluation_report_writer, 'author_report_chapters', fake_author)
+    asyncio.run(evaluation_report._author_chapters(state, None, None, time.monotonic() + 60))
+    assert events.index(('public_repair', 'start', ('s1',))) < events.index(('public_repair', 'end', ('d1',)))
+    assert {b['targetId'] for b in state.approved_blocks['medicalAssessment']} == {'d1', 's1'}

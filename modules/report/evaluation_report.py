@@ -1042,8 +1042,6 @@ async def _author_chapters(state, client, subject, deadline, *, recall=None):
                                 await recalled
                                 ready.create_task(author(public_chapters, 'public_first_pass', first_deadline,
                                                          on_missing=schedule_early_repair))
-                        while early_tasks and not all(task.done() for task in early_tasks):
-                            await asyncio.gather(*early_tasks)
                     else:
                         if recall is not None:
                             await recall()
@@ -1059,7 +1057,8 @@ async def _author_chapters(state, client, subject, deadline, *, recall=None):
                         task.cancel()
                 await asyncio.gather(*tasks, *early_tasks, return_exceptions=True)
         # The first repair sweep reaches every unresolved duty before
-        # spending another review on any one troublesome batch.
+        # spending another review on any one troublesome batch. Duties still
+        # in an early repair stay reserved by it and are not claimed twice.
         accepted_ids = accepted_public_ids()
         repair_ids = unfinished_ids(public_ids)
         remaining = None if deadline is None else max(0.0, deadline - time.monotonic())
@@ -1075,6 +1074,12 @@ async def _author_chapters(state, client, subject, deadline, *, recall=None):
                 if not repair_window.expired() and (deadline is None or time.monotonic() < deadline):
                     raise
                 state.audit['publicRepairBudgetExhausted'] = True
+            accepted_ids = accepted_public_ids()
+        if pending_early := [task for task in early_tasks if not task.done()]:
+            # The coordinated sweep did not wait for early repairs still in
+            # flight; their duties were reserved and are settled here.
+            remaining = None if deadline is None else max(0.0, deadline - time.monotonic())
+            await asyncio.wait(pending_early, timeout=remaining)
             accepted_ids = accepted_public_ids()
         if source_planned and (needed := unfinished_ids(public_ids) & required_ids):
             from statistics import median
