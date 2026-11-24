@@ -3000,6 +3000,46 @@ def _annotate_view(view, context: SubjectContext):
             group.update(summarize_levels(members))
 
 
+def _reference_identity(doi, title):
+    return (str(doi or '').strip().casefold() or None, re.sub(r'\W+', '', str(title or '')).casefold() or None)
+
+
+def reference_index(library):
+    """``{identity: number}`` of the bibliography entries, by DOI and by title."""
+    numbers = {}
+    for entry in library:
+        for key in _reference_identity(entry.doi, entry.title):
+            if key:
+                numbers.setdefault(key, entry.number)
+    return numbers
+
+
+def cite_reference(library, numbers, source, *, study_type=None, section, added=None):
+    """Number of ``source`` in the final bibliography; appended with the next free number if new."""
+    from .evaluation_schema import ReferenceLiterature
+
+    doi_key, title_key = _reference_identity(source.get('doi'), source.get('title'))
+    number = numbers.get(doi_key) or numbers.get(title_key)
+    if number is not None:
+        return number
+    number = max((entry.number for entry in library), default=0) + 1
+    year = source.get('year')
+    if not year and (found := re.search(r'(?<!\d)(?:19|20)\d{2}(?!\d)', str(source.get('citation') or ''))):
+        year = found.group()
+    library.append(ReferenceLiterature(
+        number=number, title=source.get('title'), year=str(year or '') or None,
+        journal=source.get('journal') or source.get('citation'), url=source.get('url'), doi=source.get('doi'),
+        study_type=study_type, evidence_grade=_EVIDENCE_GRADES.get(study_type or '', 'C'),
+        supporting_sections=[section],
+    ))
+    if added is not None:
+        added.append(number)
+    for key in (doi_key, title_key):
+        if key:
+            numbers[key] = number
+    return number
+
+
 def attach_target_references(view, data):
     """Number the target-table literature after the report bibliography and cite it on each target.
 
@@ -3011,41 +3051,18 @@ def attach_target_references(view, data):
     library = getattr(appendices, 'reference_literature', None)
     if library is None:
         return []
-    from .evaluation_schema import ReferenceLiterature
-
-    def identity(doi, title):
-        return (str(doi or '').strip().casefold() or None, re.sub(r'\W+', '', str(title or '')).casefold() or None)
-
-    numbers = {}
-    for entry in library:
-        doi_key, title_key = identity(entry.doi, entry.title)
-        for key in (doi_key, title_key):
-            if key:
-                numbers.setdefault(key, entry.number)
+    numbers = reference_index(library)
     added = []
     for rows in _view_row_lists(view):
         for row in rows:
             target = row.get('target') if isinstance(row, dict) else None
             if not target:
                 continue
-            refs = []
-            for source in target.get('sources') or ():
-                doi_key, title_key = identity(source.get('doi'), source.get('title'))
-                number = numbers.get(doi_key) or numbers.get(title_key)
-                if number is None:
-                    number = max((entry.number for entry in library), default=0) + 1
-                    library.append(ReferenceLiterature(
-                        number=number, title=source.get('title'), year=str(source.get('year') or '') or None,
-                        journal=source.get('journal'), url=source.get('url'), doi=source.get('doi'),
-                        study_type=target.get('evidenceLevel'),
-                        evidence_grade=_EVIDENCE_GRADES.get(target.get('evidenceLevel') or '', 'C'),
-                        supporting_sections=['assessmentPresentation.clinical.target'],
-                    ))
-                    added.append(number)
-                    for key in (doi_key, title_key):
-                        if key:
-                            numbers[key] = number
-                refs.append(number)
+            refs = [
+                cite_reference(library, numbers, source, study_type=target.get('evidenceLevel'),
+                               section='assessmentPresentation.clinical.target', added=added)
+                for source in target.get('sources') or ()
+            ]
             target['evidenceRefs'] = list(dict.fromkeys(refs))
     return added
 
