@@ -275,3 +275,13 @@
 - 第 1.3 节、第五章、第六章第一层级按 `priorityItems`、`routineFollowups`、`testGaps` 出卡片；格子文字只做成句，没有文字时卡片照常显示。
 - `evaluation_report.py` 目前只在 `status != "reviewed"` 时加 `REPORT_LAYOUT_INCOMPLETE`。规划降级时 `status` 仍为 `reviewed`，如需在回调里体现，可在 `completeness == "degraded"` 时追加部分成功原因（字段名由集成方定）。
 - 第五章“全部正常”的写法看 `clusterState == "no_imbalance"`，不要用“集群数为 0”推断（有失衡来源却没有任何可用集群时为 `unavailable`）。
+
+### 6.6 规则结论作为写作与来源核对的依据（R）
+
+程序判定的事项除了以卡片和 `contextPurpose` 交给写作，还以可引用来源 `R` 交给写作和来源核对（`modules/report/assessment_rule_sources.py`），与原检查建议 `A` 同级核对。
+
+- **开放范围**：只对命中的格开放。`priority.urgent`／`priority.routine`／`priority.gaps` 各取对应事项，`layer.clinical` 取三类事项；P0 集群的 `synthesis.*`、`synthesisAction.*` 取该集群 `priorityItemCodes` 所列事项；第三章 `clinicalRow.*` 取本行适用的目标区间。只是转述原检查建议的条目（`origin = original_advice`）不进 R，仍按 A 核对；触发记录不在本格范围内的规则不开放。
+- **格式**：每格按顺序编号 `R01`、`R02`……，含 `kind`（`priority_item`／`routine_followup`／`test_gap`／`target`）、`ruleId`、`conclusion`（一句确定性结论）、时限或间隔、科室、需完成的检查、补查项目与理由或目标区间与适用条件、触发记录（`recordIds`，即本格的 F 编号）、出处（`program_default` 与原检查建议不算文献，时限取默认档位时另注 `basisNote`）。
+- **写作**：照用 R 的段落在 `cite` 中写对应 R（可与 E 并列），并绑定 R 的触发记录；时限、科室、检查、项目和数值照抄 R。R 不是受检者事实，发现、测值、日期仍以 F 为依据；R 不写成原检查建议。
+- **来源核对**：`patient_action` 命题新增用途 `rule_conclusion`（给 `ruleIds`，同句转述原医嘱时可同时给 `adviceIds`）。程序硬校验：所选 R 须在本段 `cite` 中（只引用一个 R 时自动补齐）；命题中的专科、检查项目、时限只能来自所选 R 或 A；引用 R 的段落中，时限、就诊科室须见于所引 R、本段原医嘱、记录或所引文献段落，引用目标区间的句子里的数值须见于所引 R 或本段记录；引用 R 的段落须绑定其触发记录；引用本格范围外的 R 编号直接驳回。回执规整：`ruleIds` 只保留本段所引 R，非 `rule_conclusion` 用途的 `ruleIds` 删去；服务端把行动拆段时 R 随行动段保留。
+- **文献表**：已发布句子带 `rules[{ruleId, kind, sources}]`。六章投影时（参考文献终排之后）按 DOI 或题名复用已有条目，否则顺延编号追加，编号并入该格文字的 `evidenceRefs`，与目标区间文献同一套接入方式；重复投影不重复追加。
