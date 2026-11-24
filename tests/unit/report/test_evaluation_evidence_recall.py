@@ -110,11 +110,14 @@ def test_selection_gives_every_topic_its_best_source_first():
             'x1', 'Eggerthella lenta in the gut', 'Eggerthella lenta metabolises drugs. Eggerthella lenta is common.'
         ),
     ]
+    # "Patients with MASLD" limits the guideline to that condition, so the
+    # person's own record must state it before the source is admitted.
+    facts = [{'factId': 'f1', 'kind': 'clinical', 'name': '临床诊断', 'value': '代谢相关脂肪性肝病（MASLD）'}]
     chosen, links = _select(
         pool,
         topics,
         subject=SimpleNamespace(age=48, sex='男'),
-        facts=[],
+        facts=facts,
         limits=RecallLimits(max_publications=3, clinical_per_topic=3, default_per_topic=2),
     )
     titles = {links[identity][0]['topicId'] for identity in chosen}
