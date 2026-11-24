@@ -162,8 +162,116 @@
 - 至少覆盖：粪便隐血阳性；肿瘤标志物明显升高；BI-RADS 4 类及以上、TI-RADS 4 类及以上、Lung-RADS 3 类及以上或肺结节需随访；血红蛋白明显降低；血钾、血钠、血糖、肌酐、转氨酶等危急或明显异常；心电图严重异常；尿蛋白、尿潜血阳性伴肾功能异常等。
 - 原检查建议含“尽快/及时就诊”时也授予 P0（作为补充，不是唯一依据）。
 
+- 实现说明：共 77 条规则（P0 55 条、常规随访 22 条），同组规则取最紧迫的一条。出处以《健康体检重要异常结果管理专家共识（试行版）》（中华健康管理学杂志 2019;13(2):97-101）为主，另有 Kost 危急值调查（JAMA 1990）、中国慢性肾脏病血钾管理共识与高钾血症专家建议（2020）、欧洲低钠血症指南（2014）、BSG 缺铁性贫血指南（2021）、中国结直肠癌筛查指南（2020）、KDIGO 2024、ESC 房颤 2024 与急性冠脉综合征 2023、ACC/AHA/HRS 心动过缓 2018、AHA QT 声明 2010、ACR BI-RADS/TI-RADS/Lung-RADS、C-TIRADS 2020、Fleischner 2017、ACOG PB 174、中国前列腺癌筛查指南（2022）、第六次幽门螺杆菌共识（2022）、ESGAR 胆囊息肉 2022、EASL 肝囊肿 2022、Bosniak 2019。每条规则在代码里列出处键，`rule_table()` 可导出带出处的全表。
+- 来源只要求“及时/尽早”而没有天数时，时限按程序默认三档（危急当日、明显异常 1 周、需进一步检查 1 个月）取值，条目里标 `timeframe.basis = "program_default"`。
+- 规则只按成人设计；检验值按单位换算后比较，参考上限/下限取自本人检验单；倍数规则（如转氨酶 ≥5 倍、肿瘤标志物 ≥2 倍）以检验单参考上限为基准。
+- 检测盲区规则在 `modules/report/assessment_test_gaps.py`（16 条，“发现 → 建议补查项目”，含理由、出处、性别年龄条件），只输出本人检验记录里没有的项目；记录名含“拒检/未做”的不算已做。
+
 ## 5. 验收
 
 - 多画像样例集（不少于 8 例）：48 岁男性实例；62 岁女性多病；29 岁男性基本正常；无问卷；只有菌群；体检全部正常；含危险信号；另一家医院的指标写法与育龄女性；70 岁以上多病。
 - 每例自动检查：六章各节非空或有缺失说明；异常项全部出现在报告中；禁用词为 0；数值能回溯到原始资料；P0 与危险信号一致；耗时不超过 30 分钟（目标 20 分钟）。
 - 48 岁男性实例另与甲方示例对照：示例中出现的事实，本报告覆盖的比例。
+
+## 6. 规划输出（内容规划结果契约）
+
+内容规划（`modules/report/evaluation_content_plan.py: plan_assessment_content`）的结果挂在 `data._assessment_content_plan`，同一份副本写入审计 `contentPlan.plan`。下游按本节投影第 1.3、5、6 章。所有 `factIds`、`triggeredBy` 都是本次报告的来源事实编号（与集群的 `factIds` 同一套），不是给模型看的 `F0001` 句柄。
+
+### 6.1 顶层字段
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `version` | string | `assessment-content-plan.v10-rule-priority` |
+| `status` | `reviewed` / `unavailable` | 只要有可用内容就是 `reviewed`（下游兼容）；只有没有来源事实或没有时间预算时才是 `unavailable`。是否降级看 `completeness` |
+| `completeness` | `complete` / `degraded` | 任一节状态为 `partial`、`fallback`、`failed` 时为 `degraded` |
+| `clusterState` | `clusters_present` / `no_imbalance` / `unavailable` | `no_imbalance`：没有危险信号、没有非随访类健康问题、没有菌群分项偏移，规划不造集群，下游写“未形成需集中干预的失衡集群”并列维持要点 |
+| `clusters`、`symptoms`、`lifestyleFactors`、`recognitions`、`cellScopes` | array | 原有五节，字段不变；新增字段见 6.3 |
+| `priorityItems` | array | 第 1.3 节第 1 部分与第六章第一层级的 P0 事项（6.2） |
+| `routineFollowups` | array | 第 1.3 节第 2 部分的常规专科随访（6.2） |
+| `testGaps` | array | 第 1.3 节第 3 部分的检测盲区（6.2） |
+| `sectionStatus` | object | 每节一项：`{state, reasons[], dropped[{code, errors[]}], repaired[], rows}`（6.4） |
+| `rulesVersion` | object | `{redFlags, testGaps}` 规则表版本 |
+
+### 6.2 程序判定的事项
+
+`priorityItems[]`（只由危险信号规则授予，按时限从紧到松排序）：
+
+| 字段 | 说明 |
+|---|---|
+| `code`、`ruleId` | 规则编号，如 `RF-FOBT-POSITIVE`；原检查建议补充来源为 `RF-ADVICE-URGENT:<问题code>` |
+| `title` | 事项名，如“粪便隐血阳性”“缺铁性贫血需排查消化道失血” |
+| `priority` | 固定 `P0` |
+| `timeframe` | `{text, days, basis}`；`basis` 为 `program_default` 或 `original_advice` |
+| `department` | 科室 |
+| `checks[]` | 需完成的检查 |
+| `factIds[]` | 触发规则的检验/检查记录（优先实测记录，没有时才用主检结论） |
+| `problemCodes[]` | 关联的临床问题 code |
+| `clusterCodes[]` | 承接该事项的 P0 集群 code |
+| `evidenceText[]` | 命中原文，如“粪便隐血试验：弱阳性”（只供审计与写作参考，数值以 `factIds` 为准） |
+| `sources[]` | 出处 `{key, title, publisher, citation, doi?, note?}`；程序默认时限另列 `program_default` |
+| `origin` | `red_flag_rule` 或 `original_advice` |
+
+`routineFollowups[]`：结节、息肉、囊肿、幽门螺杆菌阳性、肿瘤标志物轻度升高等规则命中的随访，加上原检查建议里有随访安排、但未进任何集群也未被 P0 覆盖的临床问题。
+
+| 字段 | 说明 |
+|---|---|
+| `code`、`ruleId` | 规则编号（如 `RT-GB-POLYP`）；原建议来源为 `advice:<问题code>` / `RT-ORIGINAL-ADVICE` |
+| `title` | 发现名 |
+| `interval` | `{text, days, basis}`；`basis`：`original_advice`（取自原检查建议，如“每6个月复查”→180）、`rule_default`（规则表默认）、`original_advice_without_interval`（原建议没写间隔，`days` 为 `null`，`text` 为“按原检查建议”） |
+| `department` | 原建议里的科室优先，没有时用规则表科室 |
+| `factIds[]`、`problemCodes[]`、`originalAdvice[]`、`evidenceText[]`、`sources[]`、`origin` | 同上 |
+
+`testGaps[]`：
+
+| 字段 | 说明 |
+|---|---|
+| `code` | 项目代码，如 `lpa`、`ogtt`、`pepsinogen` |
+| `test` | 项目名，如“脂蛋白(a)” |
+| `reason` | 补查理由（书面语，可直接成句） |
+| `ruleId`、`alsoRuleIds[]` | 首个命中的规则；其他也建议该项目的规则 |
+| `finding` | 触发发现的短名 |
+| `triggeredBy[]` | 触发发现的来源事实编号；按年龄性别筛查的条目为空数组 |
+| `applies` | 适用条件（`sex`、`min_age`、`max_age`） |
+| `sources[]` | 出处 |
+
+### 6.3 五节里的新增字段
+
+- 集群：`priority` 的 P0 只由规则授予——绑定了某个 `priorityItems` 的临床问题、或对其记录覆盖最多的集群升为 P0；没有绑定规则条目的 P0 降为 P1。原值记在 `sourcePriority`。`priorityItemCodes[]` 列出该集群承接的 P0 事项，P0 集群至少对应一个；`priorityWorkupCodes[]` 保留为承接的问题 code（兼容旧字段）。`origin`：`model`、`red_flag_rule`（P0 条目无人承接时程序补的主题）、`rule_fallback`（有异常但没有任何已审集群时程序按临床问题补的主题）。
+- 主诉、生活因素：`origin` 为 `model` 或 `rule_fallback`（问卷有不适或生活方式回答、但没有任何已审条目时由程序按原始回答补齐；生活因素按睡眠、运动与久坐、饮酒与饮品、吸烟、精神压力、口腔护理、饮食与进餐分条）。
+
+### 6.4 各节状态与原因码
+
+`sectionStatus` 的键：`clusters`、`symptoms`、`lifestyleFactors`、`recognitions`、`cellScopes`，以及 `priorityItems`、`routineFollowups`、`testGaps`（后三者 `state` 固定为 `rule`）。
+
+| `state` | 含义 |
+|---|---|
+| `reviewed` | 全部条目经审核并通过程序校验（可能含一次定向修复） |
+| `partial` | 有条目被丢弃，或在已审条目之外补了程序条目 |
+| `fallback` | 本节只有程序条目（或逐格背景只用了来源基线） |
+| `failed` | 模型失败且没有可补的程序条目，本节为空 |
+| `empty` | 本节按数据本就为空（见原因码） |
+
+| 原因码 | 含义 |
+|---|---|
+| `items_repaired` | 校验失败的条目经一次定向修复后通过（`repaired[]` 列出 code） |
+| `items_dropped` | 定向修复后仍不过的条目被丢弃（`dropped[]` 列出 code 与错误） |
+| `items_dropped_in_final_check` | 跨节终检时丢弃的条目 |
+| `repair_rejected` | 定向修复的返回未通过自检，失败条目直接丢弃 |
+| `section_issue_pending` | 本节缺项（如未保留已确认的主诉）在定向修复后仍存在，交由程序补齐 |
+| `review_checks_incomplete` / `sections_missing` | 两轮审核后自检仍不完整或结构缺失，本节清空 |
+| `model_call_failed:<异常类型>` | 模型调用失败 |
+| `timeout` | 规划总时限内未完成 |
+| `rule_fallback` | 本节有程序补齐的条目 |
+| `priority_rule_cluster_added` | P0 事项无集群承接，程序补了规则主题 |
+| `uncovered_priority_item` / `uncovered_reported_symptom` | 终检时仍有 P0 事项无集群承接、或已确认的主诉无条目（程序无法补齐时） |
+| `source_baseline_used` | 逐格背景批次失败，用来源基线（只含本格主记录） |
+| `no_imbalance` | 集群为空且无失衡来源 |
+| `no_reported_symptoms` | 问卷没有确认的不适 |
+| `no_lifestyle_answers` | 没有可用的生活方式回答 |
+| `no_recognition_items` | 没有来源冲突或目标对照项 |
+
+### 6.5 集成方需要配合的地方
+
+- 第 1.3 节、第五章、第六章第一层级按 `priorityItems`、`routineFollowups`、`testGaps` 出卡片；格子文字只做成句，没有文字时卡片照常显示。
+- `evaluation_report.py` 目前只在 `status != "reviewed"` 时加 `REPORT_LAYOUT_INCOMPLETE`。规划降级时 `status` 仍为 `reviewed`，如需在回调里体现，可在 `completeness == "degraded"` 时追加部分成功原因（字段名由集成方定）。
+- 第五章“全部正常”的写法看 `clusterState == "no_imbalance"`，不要用“集群数为 0”推断（有失衡来源却没有任何可用集群时为 `unavailable`）。

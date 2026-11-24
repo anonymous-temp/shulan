@@ -15,7 +15,13 @@ import unicodedata
 from copy import deepcopy
 from time import monotonic
 
-PLAN_VERSION = 'assessment-content-plan.v9-diagnostic-priority'
+from .assessment_red_flags import RULES_VERSION as RED_FLAG_RULES_VERSION
+from .assessment_red_flags import advice_followups
+from .assessment_red_flags import evaluate_red_flags
+from .assessment_test_gaps import RULES_VERSION as TEST_GAP_RULES_VERSION
+from .assessment_test_gaps import evaluate_test_gaps
+
+PLAN_VERSION = 'assessment-content-plan.v10-rule-priority'
 _SECTIONS = ('clusters', 'symptoms', 'lifestyleFactors', 'recognitions', 'cellScopes')
 _CHECKS = (
     'sourceBindingsValid',
@@ -45,14 +51,6 @@ _RELATION_KINDS = {
     'different_assay_context',
     'co_management',
 }
-_PRIORITY_ADVICE = re.compile(
-    r'(?:优先|尽快|即刻|立即|及时|紧急)(?:\s|前往|到|接受|安排|完成|至|进行|转诊){0,10}'
-    r'(?:就诊|检查|复查|评估|排查|查因|转诊|急诊)|转(?:入)?急诊',
-)
-_SPECIFIC_WORKUP = re.compile(r'复查|进一步检查|明确诊断|明确病因|排查|查因|referr?al for diagnostic', re.I)
-_RELATED_CLINICAL_EVALUATION = re.compile(r'就诊|专科评估|查因|诊断|consult|diagnos\w*', re.I)
-_POSITIVE_RESULT = re.compile(r'(?:弱|强|可疑)?阳性(?:\s*\+{1,3})?|positive|positive \(weak\)|reactive', re.I)
-
 _PLAN_RULES = [
     '只规划这位受检者的阅读问题、真实事实关系和栏目职责，不撰写医学成稿，不新增测量、病史或诊断。',
     '从原始检查、问卷和菌群结果共同理解实际健康主题，不按单个异常、检验数量或疾病目录一项一簇。'
@@ -90,12 +88,12 @@ _PLAN_RULES = [
     'microbiomeFactIds须选择sourceCells属于organisms或function的实际分项锚点。'
     '整体评分、GMWI和“异常/检出”等汇总或疾病关联标签可作背景，不能代替具体菌种丰度、'
     '原功能评分或明确序列结果。只选与本主题确有意义的分项，不能为凑联系借无关分项。',
-    'P0必须由真实临床查因需要、警示表现或原医嘱支持；菌群分档不能独自触发P0。'
-    '一般微小异常不能仅因有数值偏离获得比重要代谢/器官问题更高的阅读优先级。',
-    'clinicalProblems中的优先查因职责必须保留；P0表示优先完成有依据的临床查因，不等于急诊。'
-    '不能把已有明确查因安排改成“先判断是否需要查因”。常规影像随访留在临床表及随访层。',
-    '只有clinicalProblems中通过priorityWorkup核验的事项可升为P0；原建议仅结合临床就诊、'
-    '一般复核或报告表述冲突，不自动获得与明确优先查因相同的优先级。',
+    'P0只授予覆盖priorityItems的主题。priorityItems由程序按危险信号规则（检验阈值、影像分级、心电图、'
+    '原检查建议明确要求尽快就诊）判定；菌群分档、一般微小异常不能触发P0，也不能仅因数值偏离获得更高阅读优先级。',
+    'P0表示优先完成有依据的临床查因，不等于急诊；保留priorityItems的查因职责，不能改成“先判断是否需要查因”。'
+    'routineFollowups中的结节、息肉、囊肿等常规随访留在临床表及随访层，不单独成簇。',
+    '存在异常检查结果时至少规划一个主题；单一临床问题有独立管理目标时可以单独成簇。'
+    '全部检查正常、没有需要共同管理的问题时clusters返回空数组，不为凑数制造主题。',
     '临床查因集群只保留实际临床与主诉线索，不把同一人的候选菌种、序列或功能评分连成查因依据。'
     '微生态维度中的其他可能关系只供源记录待解释，直到后续独立证据审核通过。',
     '同一测量的原值、复算值和来源镜像不是多个独立问题。不同日期、方法或体格测量场景分别保留，'
@@ -142,31 +140,58 @@ _PLAN_RULES = [
 ]
 
 
+_OBSERVATION_ROLES = {'direct_measurement', 'derived_measurement', 'exam_finding', 'physical_finding'}
+_NON_BEHAVIOR_ROLES = {
+    'reported_symptom',
+    'reported_history',
+    'qualified_history_context',
+    'management_goal',
+    'reported_goal',
+}
+# Program fallback when no reviewed lifestyle row survives: one row per
+# dimension of section 5.2, each bound only to real questionnaire answers.
+_LIFESTYLE_DIMENSIONS = (
+    ('sleep', '睡眠', r'睡眠|睡多|入睡|失眠|作息|熬夜'),
+    ('exercise', '运动与久坐', r'运动|锻炼|久坐|坐着|步行|活动量|健身'),
+    ('drinks', '饮酒与饮品', r'饮酒|喝酒|酒精|饮水|喝水|咖啡|浓茶|饮品'),
+    ('smoking', '吸烟', r'吸烟|抽烟|烟草|二手烟'),
+    ('stress', '精神压力', r'压力|情绪|焦虑|紧张|心情|抑郁'),
+    ('oralCare', '口腔护理', r'刷牙|牙线|口腔清洁|漱口'),
+    ('diet', '饮食与进餐', r'正餐|饮食|甜食|含糖|零食|夜宵|咸|油腻|油炸|蔬菜|水果|主食|早餐|进餐|吃'),
+)
+_LIFESTYLE_EXCLUDED_QUESTIONS = re.compile(
+    r'不适|症状|疾病|诊断|药|保健品|体重|腰围|大便|排便|便秘|腹痛|心慌|乏力|空腹|月经|绝经|家族|血亲|隐血|血脂|血糖'
+)
+_SUMMARY_RECORD = re.compile(r'^\s*(?:主检结论|总检结论|主检|小结|结论)')
+
+
+def _clinical_literal(text):
+    return re.sub(r'\s+', '', unicodedata.normalize('NFKC', text)).rstrip('。；;，,')
+
+
+def _observation_quotes(fact):
+    return [
+        span['quote']
+        for item in fact.get('_clinicalPatientRows', ())
+        if item.get('role') in _OBSERVATION_ROLES
+        for span in item.get('sourceSpans', ())
+    ]
+
+
+def _behavior_anchor(fact):
+    """Whether a record can be the primary anchor of a lifestyle row."""
+    if (fact.get('_reportedSourceRole') or {}).get('role') in _NON_BEHAVIOR_ROLES:
+        return False
+    if fact.get('kind') == 'clinical':
+        return any(item.get('role') == 'reported_behavior' for item in fact.get('_clinicalPatientRows', ()))
+    return fact.get('kind') == 'self_reported'
+
+
 def _fact_id(row):
     return row.get('factId', row.get('fact_id'))
 
 
-def _source_workup_priority(problem, records):
-    if problem.get('focusLabel') != '优先查因':
-        return None
-    advice = [line for line in problem.get('originalAdvice', ()) if isinstance(line, str)]
-    if any(_PRIORITY_ADVICE.search(line) and not re.search(r'无需|无须|不必|不需要|不作为', line) for line in advice):
-        return 'explicit_priority_in_original_advice'
-    positive = any(
-        records[fid].get('kind') == 'clinical'
-        and (records[fid].get('sourceObservation') or {}).get('role') in {'direct_measurement', 'exam_finding'}
-        and any(_POSITIVE_RESULT.fullmatch(str(records[fid].get(field) or '').strip())
-            for field in ('value', 'status'))
-        for fid in problem.get('factIds', ()) if fid in records
-    )
-    if positive and any(_SPECIFIC_WORKUP.search(line) for line in advice) and any(
-        _RELATED_CLINICAL_EVALUATION.search(line) for line in advice
-    ):
-        return 'positive_observation_with_original_diagnostic_evaluation'
-    return None
-
-
-def _snapshot(blueprint):
+def _snapshot(blueprint, subject=None):
     from .assessment_clinical_observation import model_clinical_observation
     from .assessment_microbiome_view import source_semantic_context
     from .assessment_presentation import assessment_template_duty
@@ -347,15 +372,37 @@ def _snapshot(blueprint):
         identifiers = action.pop('sourceFactIds', action.get('recordIds', ()))
         action['recordIds'] = [handles[fid] for fid in identifiers if fid in handles]
     actions_by_code = {action['code']: action for action in source_context.get('clinicalActions', ())}
-    records_by_handle = {record['id']: record for record in records}
     for problem in problems:
         if action := actions_by_code.get(problem.get('code')):
             problem['originalAdvice'] = deepcopy(action.get('originalAdvice') or [])
-        if problem.get('focusLabel') == '优先查因':
-            problem['priorityWorkup'] = _source_workup_priority(problem, records_by_handle)
-            if problem['priorityWorkup'] is None:
-                problem['sourceFocusLabel'] = problem['focusLabel']
-                problem['focusLabel'] = '重点管理'
+    # P0 and routine follow-up come from the danger-signal rule table, never
+    # from the wording of the original report (spec section 4).
+    internal_problems = [
+        {**{key: deepcopy(problem.get(key)) for key in ('code', 'name', 'role', 'focusLabel', 'category')},
+         'originalAdvice': deepcopy(problem.get('originalAdvice') or []),
+         'factIds': [source_by_handle[handle] for handle in problem.get('factIds', ()) if handle in source_by_handle]}
+        for problem in problems
+    ]
+    flags = evaluate_red_flags(facts.values(), subject, internal_problems)
+    for problem in problems:
+        linked = [item['code'] for item in flags['priorityItems'] if problem.get('code') in item['problemCodes']]
+        problem['priorityItemCodes'] = linked
+        problem['priorityWorkup'] = 'red_flag_rule' if linked else None
+        if linked and problem.get('focusLabel') != '优先查因':
+            problem['sourceFocusLabel'] = problem.get('focusLabel')
+            problem['focusLabel'] = '优先查因'
+        elif not linked and problem.get('focusLabel') == '优先查因':
+            problem['sourceFocusLabel'] = problem['focusLabel']
+            problem['focusLabel'] = '重点管理'
+    rules = {
+        'priorityItems': flags['priorityItems'],
+        'routineFollowups': flags['routineFollowups'],
+        'routineProblemCodes': sorted({code for item in flags['routineFollowups'] for code in item['problemCodes']}),
+        'testGaps': evaluate_test_gaps(facts.values(), subject),
+        'problems': internal_problems,
+        'context': flags['context'],
+        'versions': {'redFlags': RED_FLAG_RULES_VERSION, 'testGaps': TEST_GAP_RULES_VERSION},
+    }
     return (
         facts,
         handles,
@@ -365,8 +412,22 @@ def _snapshot(blueprint):
             'cells': scopes,
             'clinicalProblems': problems,
             'clinicalTrends': deepcopy(getattr(blueprint, 'clinical_trends', [])),
+            'priorityItems': [
+                {'code': item['code'], 'title': item['title'], 'timeframe': item['timeframe']['text'],
+                 'department': item['department'], 'checks': list(item['checks']),
+                 'recordIds': [handles[fid] for fid in item['factIds'] if fid in handles],
+                 'problemCodes': list(item['problemCodes'])}
+                for item in flags['priorityItems']
+            ],
+            'routineFollowups': [
+                {'code': item['code'], 'title': item['title'], 'interval': item['interval']['text'],
+                 'recordIds': [handles[fid] for fid in item['factIds'] if fid in handles],
+                 'problemCodes': list(item['problemCodes'])}
+                for item in flags['routineFollowups']
+            ],
             **source_context,
         },
+        rules,
     )
 
 
@@ -467,7 +528,296 @@ def _unlinked_recalled_observations(ids, facts):
     ]
 
 
-def _decode(plan, facts, handles, scopes, problem_codes=(), *, symptom_slots=(), check_workup_coverage=True):
+def _decode_row(section, source, used, context):
+    """Decode one planned row; return ``(row, issues)`` or raise ``ValueError``.
+
+    A raised error or a non-empty issue list affects only this row. The caller
+    decides whether to repair, drop or reject it.
+    """
+    reverse, scopes, facts, handles = context['reverse'], context['scopes'], context['facts'], context['handles']
+    problem_codes, items = context['problemCodes'], context['priorityItems']
+    content_issues = []
+    if not isinstance(source, dict):
+        raise ValueError('content_plan_invalid_row')
+    row = deepcopy(source)
+    code = row.get('code')
+    if not isinstance(code, str) or not code.strip() or code in used:
+        raise ValueError(f'{section}: content_plan_invalid_code {code!r}')
+    if section == 'cellScopes' and code not in scopes:
+        raise ValueError(f'cellScopes.{code}: content_plan_unknown_cell')
+    for field in _ID_FIELDS:
+        ids = row.get(field, [])
+        if not isinstance(ids, list):
+            raise ValueError(f'{section}.{code}.{field}: expected source ID array')
+        unknown = [fid for fid in ids if not isinstance(fid, str) or fid not in reverse]
+        if unknown:
+            raise ValueError(f'{section}.{code}.{field}: unknown source IDs {unknown}')
+        row[field] = list(dict.fromkeys(reverse[fid] for fid in ids))
+    if section in {'clusters', 'recognitions'}:
+        row['factIds'] = list(dict.fromkeys(fid for field in _ID_FIELDS for fid in row[field]))
+    elif section == 'cellScopes':
+        original = [reverse[fid] for fid in scopes[code].get('factIds', ()) if fid in reverse]
+        row['factIds'] = list(dict.fromkeys(original))
+    elif section == 'symptoms':
+        affirmed = [fid for fid in row['factIds']
+            if (facts[fid].get('_reportedSourceRole') or {}).get('role') == 'reported_symptom']
+        if affirmed:
+            # A supporting answer does not have the primary assertion's polarity or time.
+            row['contextFactIds'] = list(dict.fromkeys([
+                *row['contextFactIds'], *(fid for fid in row['factIds'] if fid not in affirmed),
+            ]))
+            row['factIds'] = affirmed
+    if not row['factIds']:
+        raise ValueError(f'{section}.{code}: content_plan_unbound_row')
+    if section != 'cellScopes' and not isinstance(row.get('name'), str):
+        raise ValueError(f'{section}.{code}: content_plan_name_missing')
+    if not isinstance(row.get('purpose'), str) or not row['purpose'].strip():
+        raise ValueError(f'{section}.{code}: content_plan_purpose_missing')
+    recalled = _unlinked_recalled_observations(
+        list(dict.fromkeys(fid for field in _ID_FIELDS for fid in row[field])), facts,
+    )
+    row.pop('unlinkedRecalledObservations', None)
+    if recalled:
+        row['unlinkedRecalledObservations'] = recalled
+    if section == 'symptoms' and any(item['recordId'] in row['factIds'] for item in recalled):
+        # Free-text planning cannot turn a separate laboratory result into a result of the recalled event.
+        row['name'] = '、'.join(str(facts[fid]['name']) for fid in row['factIds'])
+        row['purpose'] = (
+            '说明本人回顾的不适及其问题原文限定。分别解释相关检查、对照事实及日常背景，各按原时间范围，'
+            '保留回顾事件和有日期检查之间尚未建立的联系。'
+        )
+    for field, allowed in (
+        ('clinicalFactIds', {'clinical'}),
+        ('microbiomeFactIds', {'microbe', 'function', 'context'}),
+    ):
+        mismatches = [
+            f'{handles[fid]}={facts[fid].get("kind")}'
+            for fid in row[field]
+            if facts[fid].get('kind') not in allowed
+        ]
+        if mismatches:
+            content_issues.append(f'{section}.{code}.{field}: wrong source kinds {mismatches}')
+    unsupported_clinical = [
+        handles[fid] for fid in row['clinicalFactIds'] if facts[fid].get('_clinicalPatientObservation') is False
+    ]
+    if unsupported_clinical:
+        content_issues.append(
+            f'{section}.{code}.clinicalFactIds: {unsupported_clinical} '
+            'are summary claims, advice or background; '
+            'use actual patient observations as clinical anchors and retain conflicting claims only as context'
+        )
+    if section in {'clusters', 'symptoms'}:
+        selections = row.get('clinicalSelections', [])
+        if not isinstance(selections, list):
+            raise ValueError(f'{section}.{code}.clinicalSelections: expected an array')
+        restored_selections = []
+        for selection in selections:
+            if not isinstance(selection, dict) or selection.get('recordId') not in reverse:
+                raise ValueError(f'{section}.{code}.clinicalSelections: unknown recordId')
+            fid, quote = reverse[selection['recordId']], selection.get('quote')
+            matches = [original for original in _observation_quotes(facts[fid])
+                       if isinstance(quote, str) and _clinical_literal(original) == _clinical_literal(quote)]
+            if fid not in row['clinicalFactIds'] or len(set(matches)) != 1:
+                content_issues.append(
+                    f'{section}.{code}.clinicalSelections: {selection["recordId"]} must own a complete '
+                    'patientRows.sourceSpans.quote for this theme; preserve conditions and polarity'
+                )
+            else:
+                restored_selections.append({'recordId': fid, 'quote': matches[0]})
+        row['clinicalSelections'] = restored_selections
+        for fid in row['clinicalFactIds']:
+            observations = [
+                item
+                for item in facts[fid].get('_clinicalPatientRows', ())
+                if item.get('role')
+                in {'direct_measurement', 'derived_measurement', 'exam_finding', 'physical_finding'}
+            ]
+            if len(observations) > 1 and not any(item['recordId'] == fid for item in restored_selections):
+                content_issues.append(
+                    f'{section}.{code}: select the actual clinical observation(s) from {handles[fid]} '
+                    'in clinicalSelections; sharing a report does not select its other findings'
+                )
+    if row['microbiomeFactIds'] and not any(
+        _specific_microbiome_fact(facts[fid]) for fid in row['microbiomeFactIds']
+    ):
+        content_issues.append(
+            f'{section}.{code}: microbiome column needs a relevant measured '
+            'organism/function/sequence item from sourceCells, not only group states or model labels'
+        )
+    if section == 'clusters' and row.get('priority') not in {'P0', 'P1', 'P2', 'P3'}:
+        raise ValueError(f'clusters.{code}: content_plan_priority_missing')
+    if section == 'clusters':
+        codes = row.get('problemCodes', [])
+        if not isinstance(codes, list) or any(
+            not isinstance(item, str) or item not in problem_codes for item in codes
+        ):
+            raise ValueError(f'clusters.{code}: content_plan_problem_codes_invalid')
+        # P0 is granted only by the danger-signal rules. Ownership of a rule
+        # item is resolved across all themes once every row is decoded.
+        actual = set(row['clinicalFactIds'] or row['factIds'])
+        row['_priorityCandidates'] = [
+            {'code': item['code'], 'byProblem': bool(set(codes).intersection(item.get('problemCodes', ()))),
+             'overlap': len(actual.intersection(item.get('factIds', ())))}
+            for item in items
+            if set(codes).intersection(item.get('problemCodes', ())) or actual.intersection(item.get('factIds', ()))
+        ]
+        row['priorityWorkupCodes'] = [item for item in codes if item in context['priorityProblems']]
+        row['microbiomeRelationStatus'] = (
+            'source_only_pending_interpretation' if row['microbiomeFactIds'] else 'none'
+        )
+        kinds = {facts[fid]['kind'] for fid in row['factIds']}
+        routine_only = set(codes).intersection(context['routineProblemCodes']) or (
+            not codes and len(row['clinicalFactIds']) <= 1
+        )
+        if kinds == {'clinical'} and not row['_priorityCandidates'] and len(codes) <= 1 and routine_only:
+            content_issues.append(
+                f'clusters.{code}: a single routine follow-up finding is not a management theme; '
+                'it is kept in routineFollowups and the clinical table'
+            )
+    if section == 'recognitions':
+        if row.get('kind') == 'source_conflict':
+            if len(row['conflictFactIds']) < 2:
+                content_issues.append(f'recognitions.{code}: source_conflict needs conflicting source records')
+        elif row.get('kind') == 'goal_alignment':
+            if not row['goalFactIds'] or any(
+                facts[fid]['kind'] != 'self_reported' for fid in row['goalFactIds']
+            ):
+                content_issues.append(f'recognitions.{code}: goal_alignment needs an explicit personal goal')
+        else:
+            content_issues.append(
+                f'recognitions.{code}: background inventory is not a recognition '
+                'item; use source_conflict or goal_alignment, or omit the row'
+            )
+    if section == 'lifestyleFactors':
+        for fid in row['factIds']:
+            if not _behavior_anchor(facts[fid]):
+                content_issues.append(
+                    f'lifestyleFactors.{code}: {handles[fid]} is not a behavior/scenario anchor; '
+                    'retain symptoms in symptoms, and clinical findings/history/goals as relevant context'
+                )
+        selections = row.get('sourceSelections', [])
+        if not isinstance(selections, list):
+            raise ValueError(f'lifestyleFactors.{code}.sourceSelections: expected an array')
+        selected = []
+        for selection in selections:
+            if not isinstance(selection, dict) or selection.get('recordId') not in reverse:
+                raise ValueError(f'lifestyleFactors.{code}.sourceSelections: unknown recordId')
+            fid, quote = reverse[selection['recordId']], selection.get('quote')
+            admitted = [
+                span['quote']
+                for item in facts[fid].get('_clinicalPatientRows', ())
+                if item.get('role') == 'reported_behavior'
+                for span in item.get('sourceSpans', ())
+            ]
+
+            def literal_key(text):
+                return re.sub(r'\s+', '', unicodedata.normalize('NFKC', text)).rstrip('。；;')
+
+            restored = [
+                original
+                for original in admitted
+                if isinstance(quote, str) and literal_key(original) == literal_key(quote)
+            ]
+            if fid not in row['factIds'] or len(set(restored)) != 1:
+                content_issues.append(
+                    f'lifestyleFactors.{code}.sourceSelections: {selection["recordId"]} needs an owned, '
+                    'complete reported_behavior sourceSpans.quote; preserve its conditions'
+                )
+            else:
+                selected.append({'recordId': fid, 'quote': restored[0]})
+        row['sourceSelections'] = selected
+        for fid in row['factIds']:
+            facets = [
+                item
+                for item in facts[fid].get('_clinicalPatientRows', ())
+                if item.get('role') == 'reported_behavior'
+            ]
+            if len(facets) > 1 and not any(item['recordId'] == fid for item in selected):
+                content_issues.append(
+                    f'lifestyleFactors.{code}: choose the relevant complete behavior facets from '
+                    f'{handles[fid]} in sourceSelections instead of selecting its whole compound record'
+                )
+    if section == 'cellScopes' and 'contextPurpose' in row:
+        if not isinstance(row['contextPurpose'], str) or not row['contextPurpose'].strip():
+            raise ValueError(f'cellScopes.{code}: contextPurpose is required')
+        if row.get('contextStatus') not in {'related_sources_selected', 'no_additional_context'}:
+            raise ValueError(f'cellScopes.{code}: contextStatus is required')
+        if row['contextFactIds'] and row['contextStatus'] != 'related_sources_selected':
+            raise ValueError(f'cellScopes.{code}: contextStatus does not match selected sources')
+        relations = row.get('relations', [])
+        if not isinstance(relations, list):
+            raise ValueError(f'cellScopes.{code}: relations must be an array')
+        converted = []
+        for relation in relations:
+            if (
+                not isinstance(relation, dict)
+                or relation.get('recordId') not in reverse
+                or relation.get('kind') not in _RELATION_KINDS
+                or not isinstance(relation.get('purpose'), str)
+                or not relation['purpose'].strip()
+            ):
+                raise ValueError(f'cellScopes.{code}: invalid source relation')
+            fid = reverse[relation['recordId']]
+            if fid not in row['contextFactIds']:
+                raise ValueError(f'cellScopes.{code}: relations must bind contextFactIds')
+            converted.append({**relation, 'recordId': fid})
+        if row['contextFactIds'] and not set(row['contextFactIds']) <= {
+            relation['recordId'] for relation in converted
+        }:
+            raise ValueError(f'cellScopes.{code}: explain each selected context source')
+        row['relations'] = converted
+        row['purpose'] = scopes[code]['question']
+    return row, content_issues
+
+
+def _resolve_priority(clusters, items, facts):
+    """Give each P0 rule item to the themes that own it, then fix priorities.
+
+    A theme bound to the item's clinical problem owns it; otherwise the themes
+    with the largest overlap of the item's records do. Only owners are P0, so
+    a symptom or lifestyle theme that merely cites one of the records keeps
+    its own priority.
+    """
+    owners = {}
+    for item in items:
+        candidates = [(row, entry) for row in clusters for entry in row.get('_priorityCandidates', ())
+                      if entry['code'] == item['code']]
+        by_problem = [row for row, entry in candidates if entry['byProblem']]
+        if by_problem:
+            owners[item['code']] = by_problem
+        elif candidates:
+            best = max(entry['overlap'] for _, entry in candidates)
+            owners[item['code']] = [row for row, entry in candidates if entry['overlap'] == best]
+    for row in clusters:
+        row.pop('_priorityCandidates', None)
+        owned = [item['code'] for item in items if any(owner is row for owner in owners.get(item['code'], ()))]
+        if row['priority'] == 'P0' and not owned:
+            row.setdefault('sourcePriority', 'P0')
+            row['priority'] = 'P1'
+            row['purpose'] = '按各自原始结果、资料差异及医生的具体建议说明需复核或管理的事项。'
+        elif owned and row['priority'] != 'P0':
+            row.setdefault('sourcePriority', row['priority'])
+            row['priority'] = 'P0'
+        row['priorityItemCodes'] = owned
+        if owned:
+            pending = [fid for fid in row['factIds'] if facts[fid]['kind'] in {'microbe', 'function'}
+                       or fid in row['microbiomeFactIds']]
+            row['sourceOnlyPendingMicrobiomeFactIds'] = pending
+            for field in _ID_FIELDS:
+                row[field] = [fid for fid in row[field] if fid not in pending]
+            if pending:
+                row['microbiomeRelationStatus'] = 'source_only_pending_interpretation'
+
+
+def _decode_report(plan, facts, handles, scopes, problem_codes=(), *, symptom_slots=(), check_workup_coverage=True,
+                   priority_items=(), routine_problem_codes=()):
+    """Decode every planned row independently.
+
+    Returns ``(result, row_issues, section_issues)``. ``row_issues`` maps
+    ``(section, index)`` to the messages of a row left out of ``result``;
+    ``section_issues`` lists ``(section, message)`` gaps no single row owns
+    (an affirmed symptom without a row, a P0 rule item without a theme).
+    """
     if not isinstance(plan, dict) or any(not isinstance(plan.get(key), list) for key in _SECTIONS):
         raise ValueError('content_plan_sections_missing')
     reverse = {value: key for key, value in handles.items()}
@@ -486,7 +836,8 @@ def _decode(plan, facts, handles, scopes, problem_codes=(), *, symptom_slots=(),
             # Reusing only that column here silently stripped the clinical
             # and microbial anchors from otherwise reviewed cell scopes.
             primary = (
-                list(dict.fromkeys(fid for field in _ID_FIELDS for fid in row.get(field, ())))
+                list(dict.fromkeys(fid for field in _ID_FIELDS if isinstance(row.get(field), list)
+                                   for fid in row[field]))
                 if section in {'clusters', 'recognitions'}
                 else row.get('factIds', [])
             )
@@ -497,286 +848,33 @@ def _decode(plan, facts, handles, scopes, problem_codes=(), *, symptom_slots=(),
                 endings = ('.clinical', '.microbiome') if prefix == 'symptomEvidence.' else ('',)
                 for ending in endings:
                     scopes.setdefault(prefix + row['code'] + ending, {'factIds': primary})
-    result = {'version': PLAN_VERSION, 'status': 'reviewed'}
-    content_issues = []
-    confirmed_workups = {
-        code: {reverse[fid] for fid in problem.get('factIds', ())
-            if fid in reverse and facts[reverse[fid]]['kind'] == 'clinical'}
-        for code, problem in (problem_codes.items() if isinstance(problem_codes, dict) else ())
-        if problem.get('focusLabel') == '优先查因' and problem.get('priorityWorkup')
+    items = [item for item in priority_items if isinstance(item, dict) and item.get('code')]
+    context = {
+        'reverse': reverse,
+        'scopes': scopes,
+        'facts': facts,
+        'handles': handles,
+        'problemCodes': problem_codes if isinstance(problem_codes, dict) else {},
+        'priorityItems': items,
+        'priorityProblems': {code for item in items for code in item.get('problemCodes', ())},
+        'routineProblemCodes': set(routine_problem_codes),
     }
+    result = {'version': PLAN_VERSION, 'status': 'reviewed'}
+    row_issues, section_issues = {}, []
     for section in _SECTIONS:
         rows, used = [], set()
-        for source in plan[section]:
-            if not isinstance(source, dict):
-                raise ValueError('content_plan_invalid_row')
-            row = deepcopy(source)
-            code = row.get('code')
-            if not isinstance(code, str) or not code.strip() or code in used:
-                raise ValueError('content_plan_invalid_code')
-            if section == 'cellScopes' and code not in scopes:
-                raise ValueError('content_plan_unknown_cell')
-            used.add(code)
-            for field in _ID_FIELDS:
-                ids = row.get(field, [])
-                if not isinstance(ids, list):
-                    raise ValueError(f'{section}.{code}.{field}: expected source ID array')
-                unknown = [fid for fid in ids if not isinstance(fid, str) or fid not in reverse]
-                if unknown:
-                    raise ValueError(f'{section}.{code}.{field}: unknown source IDs {unknown}')
-                row[field] = list(dict.fromkeys(reverse[fid] for fid in ids))
-            if section in {'clusters', 'recognitions'}:
-                row['factIds'] = list(dict.fromkeys(fid for field in _ID_FIELDS for fid in row[field]))
-            elif section == 'cellScopes':
-                original = [reverse[fid] for fid in scopes[code].get('factIds', ()) if fid in reverse]
-                row['factIds'] = list(dict.fromkeys(original))
-            elif section == 'symptoms':
-                affirmed = [fid for fid in row['factIds']
-                    if (facts[fid].get('_reportedSourceRole') or {}).get('role') == 'reported_symptom']
-                if affirmed:
-                    # A supporting answer does not have the primary assertion's polarity or time.
-                    row['contextFactIds'] = list(dict.fromkeys([
-                        *row['contextFactIds'], *(fid for fid in row['factIds'] if fid not in affirmed),
-                    ]))
-                    row['factIds'] = affirmed
-            if not row['factIds']:
-                raise ValueError('content_plan_unbound_row')
-            if section != 'cellScopes' and not isinstance(row.get('name'), str):
-                raise ValueError('content_plan_name_missing')
-            if not isinstance(row.get('purpose'), str) or not row['purpose'].strip():
-                raise ValueError('content_plan_purpose_missing')
-            recalled = _unlinked_recalled_observations(
-                list(dict.fromkeys(fid for field in _ID_FIELDS for fid in row[field])), facts,
-            )
-            row.pop('unlinkedRecalledObservations', None)
-            if recalled:
-                row['unlinkedRecalledObservations'] = recalled
-            if section == 'symptoms' and any(item['recordId'] in row['factIds'] for item in recalled):
-                # Free-text planning cannot turn a separate laboratory result into a result of the recalled event.
-                row['name'] = '、'.join(str(facts[fid]['name']) for fid in row['factIds'])
-                row['purpose'] = (
-                    '说明本人回顾的不适及其问题原文限定。分别解释相关检查、对照事实及日常背景，各按原时间范围，'
-                    '保留回顾事件和有日期检查之间尚未建立的联系。'
-                )
-            for field, allowed in (
-                ('clinicalFactIds', {'clinical'}),
-                ('microbiomeFactIds', {'microbe', 'function', 'context'}),
-            ):
-                mismatches = [
-                    f'{handles[fid]}={facts[fid].get("kind")}'
-                    for fid in row[field]
-                    if facts[fid].get('kind') not in allowed
-                ]
-                if mismatches:
-                    content_issues.append(f'{section}.{code}.{field}: wrong source kinds {mismatches}')
-            unsupported_clinical = [
-                handles[fid] for fid in row['clinicalFactIds'] if facts[fid].get('_clinicalPatientObservation') is False
-            ]
-            if unsupported_clinical:
-                content_issues.append(
-                    f'{section}.{code}.clinicalFactIds: {unsupported_clinical} '
-                    'are summary claims, advice or background; '
-                    'use actual patient observations as clinical anchors and retain conflicting claims only as context'
-                )
-            if section in {'clusters', 'symptoms'}:
-                selections = row.get('clinicalSelections', [])
-                if not isinstance(selections, list):
-                    raise ValueError(f'{section}.{code}.clinicalSelections: expected an array')
-                restored_selections = []
-                for selection in selections:
-                    if not isinstance(selection, dict) or selection.get('recordId') not in reverse:
-                        raise ValueError(f'{section}.{code}.clinicalSelections: unknown recordId')
-                    fid, quote = reverse[selection['recordId']], selection.get('quote')
-                    admitted = [
-                        span['quote']
-                        for item in facts[fid].get('_clinicalPatientRows', ())
-                        if item.get('role')
-                        in {'direct_measurement', 'derived_measurement', 'exam_finding', 'physical_finding'}
-                        for span in item.get('sourceSpans', ())
-                    ]
-
-                    def clinical_literal(text):
-                        return re.sub(r'\s+', '', unicodedata.normalize('NFKC', text)).rstrip('。；;，,')
-
-                    matches = [
-                        original
-                        for original in admitted
-                        if isinstance(quote, str) and clinical_literal(original) == clinical_literal(quote)
-                    ]
-                    if fid not in row['clinicalFactIds'] or len(set(matches)) != 1:
-                        content_issues.append(
-                            f'{section}.{code}.clinicalSelections: {selection["recordId"]} must own a complete '
-                            'patientRows.sourceSpans.quote for this theme; preserve conditions and polarity'
-                        )
-                    else:
-                        restored_selections.append({'recordId': fid, 'quote': matches[0]})
-                row['clinicalSelections'] = restored_selections
-                for fid in row['clinicalFactIds']:
-                    observations = [
-                        item
-                        for item in facts[fid].get('_clinicalPatientRows', ())
-                        if item.get('role')
-                        in {'direct_measurement', 'derived_measurement', 'exam_finding', 'physical_finding'}
-                    ]
-                    if len(observations) > 1 and not any(item['recordId'] == fid for item in restored_selections):
-                        content_issues.append(
-                            f'{section}.{code}: select the actual clinical observation(s) from {handles[fid]} '
-                            'in clinicalSelections; sharing a report does not select its other findings'
-                        )
-            if row['microbiomeFactIds'] and not any(
-                _specific_microbiome_fact(facts[fid]) for fid in row['microbiomeFactIds']
-            ):
-                content_issues.append(
-                    f'{section}.{code}: microbiome column needs a relevant measured '
-                    'organism/function/sequence item from sourceCells, not only group states or model labels'
-                )
-            if section == 'clusters' and row.get('priority') not in {'P0', 'P1', 'P2', 'P3'}:
-                raise ValueError('content_plan_priority_missing')
-            if section == 'clusters':
-                codes = row.get('problemCodes', [])
-                if not isinstance(codes, list) or any(
-                    not isinstance(code, str) or code not in problem_codes for code in codes
-                ):
-                    raise ValueError('content_plan_problem_codes_invalid')
-                actual = set(row['clinicalFactIds'] or row['factIds'])
-                owned_workups = [code for code in codes if actual.intersection(confirmed_workups.get(code, ()))]
-                if row['priority'] == 'P0' and not owned_workups:
-                    row['priority'] = 'P1'
-                    row['purpose'] = '按各自原始结果、资料差异及医生的具体建议说明需复核或管理的事项。'
-                row['priorityWorkupCodes'] = owned_workups
-                row['microbiomeRelationStatus'] = (
-                    'source_only_pending_interpretation' if row['microbiomeFactIds'] else 'none'
-                )
-                if owned_workups:
-                    pending = [fid for fid in row['factIds'] if facts[fid]['kind'] in {'microbe', 'function'}
-                        or fid in row['microbiomeFactIds']]
-                    row['sourceOnlyPendingMicrobiomeFactIds'] = pending
-                    for field in _ID_FIELDS:
-                        row[field] = [fid for fid in row[field] if fid not in pending]
-                    if pending:
-                        row['microbiomeRelationStatus'] = 'source_only_pending_interpretation'
-                kinds = {facts[fid]['kind'] for fid in row['factIds']}
-                if kinds == {'clinical'} and row['priority'] != 'P0' and len(codes) <= 1:
-                    content_issues.append(
-                        f'clusters.{code}: one clinical follow-up is not an integrated '
-                        'management theme; retain it in the clinical table and surveillance layer'
-                    )
-                if owned_workups and row['priority'] != 'P0':
-                    content_issues.append(
-                        f'clusters.{code}: retain priority P0 for the verified diagnostic evaluation '
-                        f'{owned_workups}; it does not imply emergency care'
-                    )
-            if section == 'recognitions':
-                if row.get('kind') == 'source_conflict':
-                    if len(row['conflictFactIds']) < 2:
-                        content_issues.append(f'recognitions.{code}: source_conflict needs conflicting source records')
-                elif row.get('kind') == 'goal_alignment':
-                    if not row['goalFactIds'] or any(
-                        facts[fid]['kind'] != 'self_reported' for fid in row['goalFactIds']
-                    ):
-                        content_issues.append(f'recognitions.{code}: goal_alignment needs an explicit personal goal')
-                else:
-                    content_issues.append(
-                        f'recognitions.{code}: background inventory is not a recognition '
-                        'item; use source_conflict or goal_alignment, or omit the row'
-                    )
-            if section == 'lifestyleFactors':
-                for fid in row['factIds']:
-                    nature = (facts[fid].get('_reportedSourceRole') or {}).get('role')
-                    clinical_behavior = any(
-                        item.get('role') == 'reported_behavior' for item in facts[fid].get('_clinicalPatientRows', ())
-                    )
-                    if (
-                        nature
-                        in {
-                            'reported_symptom',
-                            'reported_history',
-                            'qualified_history_context',
-                            'management_goal',
-                            'reported_goal',
-                        }
-                        or facts[fid].get('kind') == 'clinical'
-                        and not clinical_behavior
-                        or facts[fid].get('kind') not in {'clinical', 'self_reported'}
-                    ):
-                        content_issues.append(
-                            f'lifestyleFactors.{code}: {handles[fid]} is not a behavior/scenario anchor; '
-                            'retain symptoms in symptoms, and clinical findings/history/goals as relevant context'
-                        )
-                selections = row.get('sourceSelections', [])
-                if not isinstance(selections, list):
-                    raise ValueError(f'lifestyleFactors.{code}.sourceSelections: expected an array')
-                selected = []
-                for selection in selections:
-                    if not isinstance(selection, dict) or selection.get('recordId') not in reverse:
-                        raise ValueError(f'lifestyleFactors.{code}.sourceSelections: unknown recordId')
-                    fid, quote = reverse[selection['recordId']], selection.get('quote')
-                    admitted = [
-                        span['quote']
-                        for item in facts[fid].get('_clinicalPatientRows', ())
-                        if item.get('role') == 'reported_behavior'
-                        for span in item.get('sourceSpans', ())
-                    ]
-
-                    def literal_key(text):
-                        return re.sub(r'\s+', '', unicodedata.normalize('NFKC', text)).rstrip('。；;')
-
-                    restored = [
-                        original
-                        for original in admitted
-                        if isinstance(quote, str) and literal_key(original) == literal_key(quote)
-                    ]
-                    if fid not in row['factIds'] or len(set(restored)) != 1:
-                        content_issues.append(
-                            f'lifestyleFactors.{code}.sourceSelections: {selection["recordId"]} needs an owned, '
-                            'complete reported_behavior sourceSpans.quote; preserve its conditions'
-                        )
-                    else:
-                        selected.append({'recordId': fid, 'quote': restored[0]})
-                row['sourceSelections'] = selected
-                for fid in row['factIds']:
-                    facets = [
-                        item
-                        for item in facts[fid].get('_clinicalPatientRows', ())
-                        if item.get('role') == 'reported_behavior'
-                    ]
-                    if len(facets) > 1 and not any(item['recordId'] == fid for item in selected):
-                        content_issues.append(
-                            f'lifestyleFactors.{code}: choose the relevant complete behavior facets from '
-                            f'{handles[fid]} in sourceSelections instead of selecting its whole compound record'
-                        )
-            if section == 'cellScopes' and 'contextPurpose' in row:
-                if not isinstance(row['contextPurpose'], str) or not row['contextPurpose'].strip():
-                    raise ValueError(f'cellScopes.{code}: contextPurpose is required')
-                if row.get('contextStatus') not in {'related_sources_selected', 'no_additional_context'}:
-                    raise ValueError(f'cellScopes.{code}: contextStatus is required')
-                if row['contextFactIds'] and row['contextStatus'] != 'related_sources_selected':
-                    raise ValueError(f'cellScopes.{code}: contextStatus does not match selected sources')
-                relations = row.get('relations', [])
-                if not isinstance(relations, list):
-                    raise ValueError(f'cellScopes.{code}: relations must be an array')
-                converted = []
-                for relation in relations:
-                    if (
-                        not isinstance(relation, dict)
-                        or relation.get('recordId') not in reverse
-                        or relation.get('kind') not in _RELATION_KINDS
-                        or not isinstance(relation.get('purpose'), str)
-                        or not relation['purpose'].strip()
-                    ):
-                        raise ValueError(f'cellScopes.{code}: invalid source relation')
-                    fid = reverse[relation['recordId']]
-                    if fid not in row['contextFactIds']:
-                        raise ValueError(f'cellScopes.{code}: relations must bind contextFactIds')
-                    converted.append({**relation, 'recordId': fid})
-                if row['contextFactIds'] and not set(row['contextFactIds']) <= {
-                    relation['recordId'] for relation in converted
-                }:
-                    raise ValueError(f'cellScopes.{code}: explain each selected context source')
-                row['relations'] = converted
-                row['purpose'] = scopes[code]['question']
+        for index, source in enumerate(plan[section]):
+            try:
+                row, issues = _decode_row(section, source, used, context)
+            except (ValueError, TypeError, KeyError) as error:
+                row, issues = None, [str(error)]
+            if issues:
+                row_issues[(section, index)] = issues
+                continue
+            used.add(row['code'])
             rows.append(row)
         result[section] = rows
+    _resolve_priority(result['clusters'], items, facts)
     for slot in symptom_slots:
         identifiers = {reverse[fid] for fid in slot.get('factIds', ()) if fid in reverse}
         affirmed = {
@@ -785,26 +883,38 @@ def _decode(plan, facts, handles, scopes, problem_codes=(), *, symptom_slots=(),
             if (facts[fid].get('_reportedSourceRole') or {}).get('role') == 'reported_symptom'
         }
         if affirmed and not any(affirmed.intersection(row['factIds']) for row in result['symptoms']):
-            content_issues.append(
+            section_issues.append(('symptoms',
                 f'symptoms: retain affirmed symptom {slot.get("name")} from '
                 f'{[handles[fid] for fid in affirmed]}; preserve its original time/conditions. '
                 'Unsupported clinical or microbiome relationships may be omitted, not the affirmed symptom itself'
-            )
+            ))
     if check_workup_coverage:
-        covered = {code for row in result['clusters'] for code in row['priorityWorkupCodes']}
-        for code, clinical in confirmed_workups.items():
-            if clinical and code not in covered:
-                content_issues.append(
-                    f'clusters: source-bound diagnostic evaluation {code} '
-                    'has not been assigned a workup theme'
-                )
+        covered = {code for row in result['clusters'] for code in row['priorityItemCodes']}
+        for item in items:
+            if item['code'] not in covered:
+                section_issues.append(('clusters',
+                    f'clusters: priority item {item["code"]} ({item.get("title")}) '
+                    'has not been assigned a P0 workup theme'
+                ))
     cluster_codes = {row['code'] for row in result['clusters']}
     for row in result['lifestyleFactors']:
         codes = row.get('clusterCodes', [])
-        if not isinstance(codes, list) or any(code not in cluster_codes for code in codes):
-            raise ValueError('content_plan_unknown_cluster')
-    if content_issues:
-        raise ValueError('; '.join(content_issues))
+        row['clusterCodes'] = [code for code in codes if code in cluster_codes] if isinstance(codes, list) else []
+    return result, row_issues, section_issues
+
+
+def _decode(plan, facts, handles, scopes, problem_codes=(), *, symptom_slots=(), check_workup_coverage=True,
+            priority_items=(), routine_problem_codes=()):
+    """Strict decode: any row or section issue rejects the plan (review feedback)."""
+    result, row_issues, section_issues = _decode_report(
+        plan, facts, handles, scopes, problem_codes, symptom_slots=symptom_slots,
+        check_workup_coverage=check_workup_coverage, priority_items=priority_items,
+        routine_problem_codes=routine_problem_codes,
+    )
+    messages = [message for issues in row_issues.values() for message in issues]
+    messages.extend(message for _, message in section_issues)
+    if messages:
+        raise ValueError('; '.join(messages))
     return result
 
 
@@ -922,10 +1032,89 @@ def _cluster_coverage(packet, draft):
         'sourceRecords': len(cell['factIds']),
         'recordsInThemes': len(assigned.intersection(cell['factIds'])),
     } for cell in packet['cells'] if cell['code'].startswith(('function.', 'organisms.')) and cell.get('factIds')]
-    return {'clinicalFollowupsOutsideThemes': followups, 'microbiomePanels': panels}
+    uncovered = [item['title'] for item in packet.get('priorityItems', ())
+                 if not assigned.intersection(item.get('recordIds', ()))
+                 and not assigned_problems.intersection(item.get('problemCodes', ()))]
+    return {'clinicalFollowupsOutsideThemes': followups, 'microbiomePanels': panels,
+            'priorityItemsOutsideThemes': uncovered}
 
 
-async def _plan_section(client, packet, person, sections, accepted, facts, handles, journal, *, label=None):
+def _review_failure(reviewed, sections):
+    if not isinstance(reviewed, dict) or any(
+        (reviewed.get('checks') or {}).get(key) is not True for key in _CHECKS
+    ):
+        return 'review_checks_incomplete'
+    subset = reviewed.get('plan')
+    if not isinstance(subset, dict) or any(not isinstance(subset.get(key), list) for key in sections):
+        return 'sections_missing'
+    return None
+
+
+def _section_status(sections):
+    return {key: {'state': 'failed', 'reasons': [], 'dropped': [], 'repaired': [], 'rows': 0} for key in sections}
+
+
+def _row_code(row, index):
+    code = row.get('code') if isinstance(row, dict) else None
+    return code if isinstance(code, str) and code.strip() else f'#{index}'
+
+
+async def _repair_rows(client, patient, person, sections, subset, row_issues, section_issues, schema, scope_tasks,
+                       diagnostic):
+    """One directed repair: only the failing rows, each with its own errors."""
+    from .evaluation_report import _write_private_diagnostic
+
+    failed = [
+        {'section': key, 'row': subset[key][index], 'errors': messages}
+        for (key, index), messages in sorted(row_issues.items(), key=lambda item: (item[0][0], item[0][1]))
+        if key in sections
+    ]
+    response = await client.generate(
+        {
+            'task': 'repair_source_bound_assessment_content_items',
+            'section': '+'.join(sections),
+            'subject': person,
+            'patient': patient,
+            'acceptedRows': {
+                key: [row for index, row in enumerate(subset[key]) if (key, index) not in row_issues]
+                for key in sections
+            },
+            'failedRows': failed,
+            'sectionIssues': [message for _, message in section_issues],
+            'instructions': [
+                *_PLAN_RULES,
+                *scope_tasks,
+                '只修正failedRows中的条目，并补足sectionIssues指出的缺项。按每条errors逐项修正来源编号、'
+                '来源性质和原文选择；无法用真实来源修正的条目直接省去，不要改成其他主题。',
+                'acceptedRows已通过核对，只作上下文，不要重复返回。checks只评价本次返回的条目。',
+            ],
+            'checksRequired': list(_CHECKS),
+            'outputSchema': {'checks': {key: True for key in _CHECKS}, 'plan': schema},
+        }
+    )
+    _write_private_diagnostic(f'content-plan-{diagnostic}-repair', response)
+    if not isinstance(response, dict) or any(
+        (response.get('checks') or {}).get(key) is not True for key in _CHECKS
+    ) or not isinstance(response.get('plan'), dict):
+        return None
+    plan = response['plan']
+    repaired = {key: [row for row in plan.get(key, ()) if isinstance(row, dict)]
+                if isinstance(plan.get(key), list) else [] for key in sections}
+    if 'lifestyleFactors' in repaired:
+        repaired['lifestyleFactors'] = [{**row, 'clusterCodes': []} for row in repaired['lifestyleFactors']]
+    return repaired
+
+
+async def _plan_section(client, packet, person, sections, accepted, facts, handles, journal, *, label=None,
+                        rules=None):
+    """Plan, review and validate one duty. Never raises for content problems.
+
+    Returns ``(rows_by_section, status_by_section)``. A row that fails
+    validation gets one directed repair; if it still fails it is dropped and
+    the reason is recorded. Only a failed model call or a review that stays
+    structurally incomplete empties the section (cells fall back to their
+    source-bound baseline instead).
+    """
     from .evaluation_report import _write_private_diagnostic
 
     started = monotonic()
@@ -935,6 +1124,8 @@ async def _plan_section(client, packet, person, sections, accepted, facts, handl
     patient = {key: value for key, value in packet.items() if cell_stage or key != 'cells'}
     scopes = {row['code']: row for row in packet['cells']}
     schema = _contract(sections)
+    rules = rules or {}
+    status = _section_status(sections)
     scope_tasks = []
     if 'clusters' in sections:
         scope_tasks.append(
@@ -949,265 +1140,690 @@ async def _plan_section(client, packet, person, sections, accepted, facts, handl
             '分别盘点所有明确的本人目标和可核对的来源冲突。不同目标对应不同复评指标时分别说明，'
             '给出两端的记录；临床原文相互冲突时说明待核对哪两处，不替受检者假设错误观点。'
         )
-    if cell_stage:
-        # Existing table ownership is authoritative. The review call can add
-        # relevant context directly to this source-backed baseline.
-        draft = {'cellScopes': [
-            {'code': row['code'], 'factIds': row['factIds'], 'purpose': row['question'],
-             'contextPurpose': row['question'], 'contextFactIds': [],
-             'contextStatus': 'no_additional_context', 'relations': []}
-            for row in scopes.values()
-        ]}
-        _write_private_diagnostic('content-plan-' + diagnostic + '-source-baseline', draft)
-    else:
-        response = await client.generate(
-            {
-                'task': 'plan_source_bound_assessment_content',
-                'section': section,
-                'subject': person,
-                'patient': patient,
-                'acceptedPlan': accepted,
-                'instructions': [
-                    *_PLAN_RULES,
-                    *scope_tasks,
-                    '本次只返回outputSchema指定数组。每个主题选足以支持判断的代表性锚点，'
-                    '不要枚举同一主题下所有指标或所有菌种。purpose用一句话明确本主题职责。',
-                ],
-                'outputSchema': schema,
-            }
+
+    def decode(subset):
+        combined = {key: deepcopy(accepted.get(key, [])) for key in _SECTIONS}
+        combined.update({key: subset[key] for key in sections})
+        return _decode_report(
+            combined,
+            facts,
+            handles,
+            scopes,
+            _problem_metadata(packet),
+            symptom_slots=packet.get('symptomSlots', ()) if 'symptoms' in sections else (),
+            check_workup_coverage=False,
+            priority_items=rules.get('priorityItems', ()),
+            routine_problem_codes=rules.get('routineProblemCodes', ()),
         )
-        _write_private_diagnostic('content-plan-' + diagnostic + '-author', response)
-        draft = response.get('plan', response) if isinstance(response, dict) else response
-    feedback = []
+
+    baseline = []
     unrequested_cell_codes = []
-    for attempt in range(2):
-        reviewed = await client.generate(
-            {
-                'task': 'review_source_bound_assessment_content',
-                'section': section,
-                'subject': person,
-                'patient': patient,
-                'acceptedPlan': accepted,
-                'draftPlan': draft,
-                **({'themeCoverage': _cluster_coverage(packet, draft)} if 'clusters' in sections else {}),
-                **({'requestedCellCodes': list(scopes)} if cell_stage else {}),
-                'structuralFeedback': feedback,
-                'instructions': [
-                    *_PLAN_RULES,
-                    *scope_tasks,
-                    *(['核对themeCoverage所示未覆盖项：是否有会改变下一步安排的独立管理目标。'
-                       '仅在有来源、有实际不同任务时补入；不将未分配检查强行凑成一组。']
-                      if 'clusters' in sections else []),
-                    *(['逐格审查已固定的主记录，主动选择对本格有直接帮助的相关背景及理由。'] if cell_stage else []),
-                    '先修正草案的无源事实、无关关系、编号和结构，再独立检查修正后的plan。'
-                    'checks只评价返回的修订plan。只返回checks和本次指定数组组成的plan，'
-                    '无来源的可选条目省去，无法修正的检查返回false。',
-                ],
-                'checksRequired': list(_CHECKS),
-                'outputSchema': {'checks': {key: True for key in _CHECKS}, 'plan': schema},
-            }
-        )
-        _write_private_diagnostic(f'content-plan-{diagnostic}-review-{attempt + 1}', reviewed)
-        try:
-            if not isinstance(reviewed, dict) or any(
-                (reviewed.get('checks') or {}).get(key) is not True for key in _CHECKS
-            ):
-                raise ValueError('content_plan_independent_review_incomplete')
-            subset = reviewed.get('plan')
-            if not isinstance(subset, dict) or any(not isinstance(subset.get(key), list) for key in sections):
-                raise ValueError('content_plan_sections_missing')
-            if 'lifestyleFactors' in sections:
-                subset = {**subset, 'lifestyleFactors': [
-                    {**row, 'clusterCodes': []} if isinstance(row, dict) else row
-                    for row in subset['lifestyleFactors']
-                ]}
+    try:
+        if cell_stage:
+            # Existing table ownership is authoritative. The review call can add
+            # relevant context directly to this source-backed baseline.
+            baseline = [
+                {'code': row['code'], 'factIds': row['factIds'], 'purpose': row['question'],
+                 'contextPurpose': row['question'], 'contextFactIds': [],
+                 'contextStatus': 'no_additional_context', 'relations': []}
+                for row in scopes.values()
+            ]
+            draft = {'cellScopes': deepcopy(baseline)}
+            _write_private_diagnostic('content-plan-' + diagnostic + '-source-baseline', draft)
+        else:
+            response = await client.generate(
+                {
+                    'task': 'plan_source_bound_assessment_content',
+                    'section': section,
+                    'subject': person,
+                    'patient': patient,
+                    'acceptedPlan': accepted,
+                    'instructions': [
+                        *_PLAN_RULES,
+                        *scope_tasks,
+                        '本次只返回outputSchema指定数组。每个主题选足以支持判断的代表性锚点，'
+                        '不要枚举同一主题下所有指标或所有菌种。purpose用一句话明确本主题职责。',
+                    ],
+                    'outputSchema': schema,
+                }
+            )
+            _write_private_diagnostic('content-plan-' + diagnostic + '-author', response)
+            draft = response.get('plan', response) if isinstance(response, dict) else response
+        feedback = []
+        subset = None
+        failure = None
+        for attempt in range(2):
+            reviewed = await client.generate(
+                {
+                    'task': 'review_source_bound_assessment_content',
+                    'section': section,
+                    'subject': person,
+                    'patient': patient,
+                    'acceptedPlan': accepted,
+                    'draftPlan': draft,
+                    **({'themeCoverage': _cluster_coverage(packet, draft)} if 'clusters' in sections else {}),
+                    **({'requestedCellCodes': list(scopes)} if cell_stage else {}),
+                    'structuralFeedback': feedback,
+                    'instructions': [
+                        *_PLAN_RULES,
+                        *scope_tasks,
+                        *(['核对themeCoverage所示未覆盖项：是否有会改变下一步安排的独立管理目标。'
+                           '仅在有来源、有实际不同任务时补入；不将未分配检查强行凑成一组。']
+                          if 'clusters' in sections else []),
+                        *(['逐格审查已固定的主记录，主动选择对本格有直接帮助的相关背景及理由。'] if cell_stage else []),
+                        '先修正草案的无源事实、无关关系、编号和结构，再独立检查修正后的plan。'
+                        'checks只评价返回的修订plan。只返回checks和本次指定数组组成的plan，'
+                        '无来源的可选条目省去，无法修正的检查返回false。',
+                    ],
+                    'checksRequired': list(_CHECKS),
+                    'outputSchema': {'checks': {key: True for key in _CHECKS}, 'plan': schema},
+                }
+            )
+            _write_private_diagnostic(f'content-plan-{diagnostic}-review-{attempt + 1}', reviewed)
+            failure = _review_failure(reviewed, sections)
+            candidate = reviewed.get('plan') if isinstance(reviewed, dict) else None
+            if failure is None:
+                subset = {key: list(candidate[key]) for key in sections}
+                break
+            feedback = [failure]
+            draft = candidate if isinstance(candidate, dict) else draft
+            if isinstance(candidate, dict) and all(isinstance(candidate.get(key), list) for key in sections):
+                # Tell the second review exactly which rows also fail validation.
+                _, issues, gaps = decode({key: list(candidate[key]) for key in sections})
+                feedback.extend(message for messages in issues.values() for message in messages)
+                feedback.extend(message for _, message in gaps)
+        if subset is None:
+            for key in sections:
+                status[key]['reasons'].append(failure or 'review_missing')
             if cell_stage:
-                # Each batch owns only its requested cells. A model may echo
-                # another cell from the shared source catalogue; quarantine
-                # that output rather than invalidate all independently
-                # reviewed cells or let it overwrite another batch's owner.
-                returned = {code: [] for code in scopes}
-                for row in subset['cellScopes']:
-                    code = row.get('code') if isinstance(row, dict) else None
-                    if not isinstance(code, str) or code not in returned:
-                        unexpected = code if isinstance(code, str) else '<invalid-cell-code>'
-                        if unexpected not in unrequested_cell_codes:
-                            unrequested_cell_codes.append(unexpected)
-                        continue
-                    returned[code].append(row)
-                missing = [code for code, rows in returned.items() if not rows]
-                duplicated = [code for code, rows in returned.items() if len(rows) > 1]
-                if missing or duplicated:
-                    raise ValueError(
-                        f'cellScopes: missing={missing}; duplicated={duplicated}; '
-                        f'return each requestedCellCodes entry exactly once: {list(scopes)}'
-                    )
-                subset = {**subset, 'cellScopes': [rows[0] for rows in returned.values()]}
+                status['cellScopes'].update(state='fallback', rows=len(baseline))
+                status['cellScopes']['reasons'].append('source_baseline_used')
+                journal[diagnostic] = {'status': 'fallback', 'reason': failure,
+                                       'elapsedMs': round((monotonic() - started) * 1000, 3)}
+                return {'cellScopes': deepcopy(baseline)}, status
+            journal[diagnostic] = {'status': 'failed', 'reason': failure,
+                                   'elapsedMs': round((monotonic() - started) * 1000, 3)}
+            return {key: [] for key in sections}, status
+        if 'lifestyleFactors' in sections:
+            subset['lifestyleFactors'] = [
+                {**row, 'clusterCodes': []} if isinstance(row, dict) else row for row in subset['lifestyleFactors']
+            ]
+        if cell_stage:
+            # Each batch owns only its requested cells. A model may echo
+            # another cell from the shared source catalogue; quarantine that
+            # output. A missing, duplicated or incomplete cell keeps its
+            # source-bound baseline instead of invalidating the batch.
+            returned = {code: [] for code in scopes}
+            for row in subset['cellScopes']:
+                code = row.get('code') if isinstance(row, dict) else None
+                if not isinstance(code, str) or code not in returned:
+                    unexpected = code if isinstance(code, str) else '<invalid-cell-code>'
+                    if unexpected not in unrequested_cell_codes:
+                        unrequested_cell_codes.append(unexpected)
+                    continue
+                returned[code].append(row)
+            by_code = {row['code']: row for row in baseline}
+            cells = []
+            for code, rows in returned.items():
+                row = rows[0] if rows else None
+                if row is None or any(field not in row for field in ('contextPurpose', 'contextStatus', 'relations')):
+                    status['cellScopes']['dropped'].append({'code': code, 'errors': ['cell_context_missing']})
+                    cells.append(deepcopy(by_code[code]))
+                    continue
                 # The planner owns relationships, not the identity or purpose
                 # of a source-bound table cell.
-                for row in subset['cellScopes']:
-                    if any(field not in row for field in ('contextPurpose', 'contextStatus', 'relations')):
-                        raise ValueError('cellScopes: contextPurpose, contextStatus and relations are required')
-                    row['factIds'] = list(scopes[row['code']]['factIds'])
-                    row['purpose'] = scopes[row['code']]['question']
-            combined = {key: deepcopy(accepted.get(key, [])) for key in _SECTIONS}
-            combined.update({key: subset[key] for key in sections})
-            decoded = _decode(
-                combined,
-                facts,
-                handles,
-                scopes,
-                _problem_metadata(packet),
-                symptom_slots=packet.get('symptomSlots', ()) if 'symptoms' in sections else (),
-                check_workup_coverage='clusters' in sections,
-            )
-            if 'symptoms' in sections:
-                for original, resolved in zip(subset['symptoms'], decoded['symptoms'], strict=True):
-                    original.update(name=resolved['name'], purpose=resolved['purpose'],
-                        factIds=[handles[fid] for fid in resolved['factIds']],
-                        contextFactIds=[handles[fid] for fid in resolved['contextFactIds']])
-            if 'clusters' in sections:
-                for original, resolved in zip(subset['clusters'], decoded['clusters'], strict=True):
-                    original.update(
-                        priority=resolved['priority'],
-                        purpose=resolved['purpose'],
-                        sourceOnlyPendingMicrobiomeFactIds=[
-                            handles[fid] for fid in resolved.get('sourceOnlyPendingMicrobiomeFactIds', ())
-                        ],
-                    )
-            journal[diagnostic] = {
-                'status': 'reviewed', 'rows': {key: len(subset[key]) for key in sections},
-                'elapsedMs': round((monotonic() - started) * 1000, 3),
-                **({'unrequestedCellCodesIgnored': unrequested_cell_codes} if unrequested_cell_codes else {}),
-            }
-            return {key: subset[key] for key in sections}
-        except (ValueError, TypeError) as error:
-            if attempt:
-                raise
-            feedback = [str(error)]
-            draft = reviewed.get('plan', reviewed) if isinstance(reviewed, dict) else reviewed
-    raise ValueError('content_plan_review_missing')
+                cells.append({**row, 'factIds': list(scopes[code]['factIds']), 'purpose': scopes[code]['question']})
+            subset = {'cellScopes': cells}
+        decoded, row_issues, section_issues = decode(subset)
+        original_failures = {(key, _row_code(subset[key][index], index)): messages
+                             for (key, index), messages in row_issues.items()}
+        if (row_issues or section_issues) and not cell_stage:
+            repaired = await _repair_rows(client, patient, person, sections, subset, row_issues, section_issues,
+                                          schema, scope_tasks, diagnostic)
+            if repaired is None:
+                for key in sections:
+                    status[key]['reasons'].append('repair_rejected')
+            else:
+                subset = {
+                    key: [*(row for index, row in enumerate(subset[key]) if (key, index) not in row_issues),
+                          *repaired[key]]
+                    for key in sections
+                }
+                repaired_codes = {(key, _row_code(row, index)) for key in sections
+                                  for index, row in enumerate(repaired[key])}
+                decoded, row_issues, section_issues = decode(subset)
+                failing = {(key, _row_code(subset[key][index], index)) for key, index in row_issues}
+                for key, code in sorted(repaired_codes - failing):
+                    status[key]['repaired'].append(code)
+        if cell_stage and row_issues:
+            by_code = {row['code']: row for row in baseline}
+            for (key, index), messages in row_issues.items():
+                code = _row_code(subset[key][index], index)
+                status['cellScopes']['dropped'].append({'code': code, 'errors': [m[:240] for m in messages[:3]]})
+                if code in by_code:
+                    subset[key][index] = deepcopy(by_code[code])
+            decoded, row_issues, section_issues = decode(subset)
+        kept = {key: [row for index, row in enumerate(subset[key]) if (key, index) not in row_issues]
+                for key in sections}
+        dropped = {(key, _row_code(subset[key][index], index)): messages
+                   for (key, index), messages in row_issues.items()}
+        survivors = {(key, _row_code(row, index)) for key in sections for index, row in enumerate(kept[key])}
+        for (key, code), messages in original_failures.items():
+            if (key, code) not in survivors and (key, code) not in dropped:
+                dropped[(key, code)] = messages
+        for (key, code), messages in dropped.items():
+            status[key]['dropped'].append({'code': code, 'errors': [message[:240] for message in messages[:3]]})
+        if 'symptoms' in sections:
+            for original, resolved in zip(kept['symptoms'], decoded['symptoms'], strict=True):
+                original.update(name=resolved['name'], purpose=resolved['purpose'],
+                    factIds=[handles[fid] for fid in resolved['factIds']],
+                    contextFactIds=[handles[fid] for fid in resolved['contextFactIds']])
+        if 'clusters' in sections:
+            for original, resolved in zip(kept['clusters'], decoded['clusters'], strict=True):
+                original.update(
+                    priority=resolved['priority'],
+                    purpose=resolved['purpose'],
+                    sourceOnlyPendingMicrobiomeFactIds=[
+                        handles[fid] for fid in resolved.get('sourceOnlyPendingMicrobiomeFactIds', ())
+                    ],
+                )
+                if 'sourcePriority' in resolved:
+                    original['sourcePriority'] = resolved['sourcePriority']
+        for key in sections:
+            entry = status[key]
+            entry['rows'] = len(kept[key])
+            entry['state'] = 'partial' if entry['dropped'] else 'reviewed'
+            if entry['dropped']:
+                entry['reasons'].append('items_dropped')
+            if entry['repaired']:
+                entry['reasons'].append('items_repaired')
+        for key, message in section_issues:
+            if key in status and 'section_issue_pending' not in status[key]['reasons']:
+                status[key]['reasons'].append('section_issue_pending')
+        journal[diagnostic] = {
+            'status': 'reviewed' if all(status[key]['state'] == 'reviewed' for key in sections) else 'partial',
+            'rows': {key: len(kept[key]) for key in sections},
+            'elapsedMs': round((monotonic() - started) * 1000, 3),
+            **({'unrequestedCellCodesIgnored': unrequested_cell_codes} if unrequested_cell_codes else {}),
+            **({'dropped': {key: status[key]['dropped'] for key in sections if status[key]['dropped']}}
+               if any(status[key]['dropped'] for key in sections) else {}),
+        }
+        return {key: kept[key] for key in sections}, status
+    except asyncio.CancelledError:
+        raise
+    except Exception as error:
+        reason = 'model_call_failed:' + type(error).__name__
+        for key in sections:
+            status[key]['reasons'].append(reason)
+        journal[diagnostic] = {'status': 'failed', 'reason': reason + ':' + str(error)[:160],
+                               'elapsedMs': round((monotonic() - started) * 1000, 3)}
+        if cell_stage and baseline:
+            status['cellScopes'].update(state='fallback', rows=len(baseline))
+            status['cellScopes']['reasons'].append('source_baseline_used')
+            return {'cellScopes': deepcopy(baseline)}, status
+        return {key: [] for key in sections}, status
+
+
+def _unique_code(base, used):
+    code = re.sub(r'[^0-9A-Za-z_.:-]+', '_', base).strip('_') or 'item'
+    candidate, index = code, 2
+    while candidate in used:
+        candidate, index = f'{code}_{index}', index + 1
+    used.add(candidate)
+    return candidate
+
+
+def _auto_selections(fids, facts, handles, hints=()):
+    """Choose admitted observation quotes for program-built theme rows."""
+    hint_text = _clinical_literal(' '.join(str(hint) for hint in hints))
+    selections = []
+    for fid in fids:
+        quotes = list(dict.fromkeys(_observation_quotes(facts[fid])))
+        observations = [item for item in facts[fid].get('_clinicalPatientRows', ())
+                        if item.get('role') in _OBSERVATION_ROLES]
+        if len(observations) <= 1 or not quotes:
+            continue
+        chosen = [quote for quote in quotes if _clinical_literal(quote) and (
+            _clinical_literal(quote) in hint_text
+            or any(part and part in _clinical_literal(quote) for part in re.split(r'[：:，,。；;]', hint_text)
+                   if len(part) >= 4)
+        )] or quotes[:1]
+        selections.extend({'recordId': handles[fid], 'quote': quote} for quote in chosen)
+    return selections
+
+
+def _anchor_ids(fids, facts):
+    return [fid for fid in fids if fid in facts and facts[fid].get('kind') == 'clinical'
+            and facts[fid].get('_clinicalPatientObservation') is not False]
+
+
+def _rule_cluster(item, facts, handles, problem_codes, used):
+    clinical = _anchor_ids(item.get('factIds', ()), facts)
+    if not clinical:
+        return None
+    checks = '、'.join(item.get('checks', ()))
+    return {
+        'code': _unique_code('p0_' + item['code'].lower(), used),
+        'name': item['title'],
+        'priority': 'P0',
+        'factIds': [],
+        'clinicalFactIds': [handles[fid] for fid in clinical],
+        'microbiomeFactIds': [],
+        'problemCodes': [code for code in item.get('problemCodes', ()) if code in problem_codes],
+        'clinicalSelections': _auto_selections(clinical, facts, handles, item.get('evidenceText', ())),
+        'purpose': f'按危险信号规则优先完成{item.get("department") or "相关专科"}评估'
+                   f'（{item["timeframe"]["text"]}）：{checks}。',
+        'origin': 'red_flag_rule',
+    }
+
+
+def _routine_problem(problem, routine_codes):
+    return problem.get('code') in routine_codes or problem.get('role') == 'secondary_finding'
+
+
+def _fallback_clusters(packet, facts, handles, rules, used):
+    """Program themes when abnormal findings exist but no reviewed theme survived."""
+    reverse = {value: key for key, value in handles.items()}
+    covered = {code for item in rules.get('priorityItems', ()) for code in item.get('problemCodes', ())}
+    groups = {}
+    for problem in packet.get('clinicalProblems', ()):
+        if problem.get('code') in covered or _routine_problem(problem, rules.get('routineProblemCodes', ())):
+            continue
+        if problem.get('role') not in {None, 'health_problem'}:
+            continue
+        groups.setdefault(problem.get('category') or problem.get('code'), []).append(problem)
+    clusters = []
+    for problems in groups.values():
+        fids = [reverse[handle] for problem in problems for handle in problem.get('factIds', ()) if handle in reverse]
+        clinical = _anchor_ids(list(dict.fromkeys(fids)), facts)
+        if not clinical:
+            continue
+        names = [str(problem.get('name')) for problem in problems if problem.get('name')]
+        title = '、'.join(names[:3]) + ('等' if len(names) > 3 else '')
+        priority = 'P1' if any(problem.get('focusLabel') in {'重点管理', '近期复评', '优先查因'}
+                               for problem in problems) else 'P2'
+        clusters.append({
+            'code': _unique_code('rule_' + str(problems[0].get('category') or 'problem'), used),
+            'name': title + '的管理与复评',
+            'priority': priority,
+            'factIds': [],
+            'clinicalFactIds': [handles[fid] for fid in clinical],
+            'microbiomeFactIds': [],
+            'problemCodes': [problem['code'] for problem in problems if problem.get('code')],
+            'clinicalSelections': _auto_selections(clinical, facts, handles, names),
+            'purpose': f'围绕{title}说明实际检查结果、原检查建议及需要复评的指标。',
+            'origin': 'rule_fallback',
+        })
+    if clusters:
+        return clusters
+    microbiome = [fid for fid, fact in facts.items() if fact.get('kind') in {'microbe', 'function'}
+                  and fact.get('abnormal') is True and _specific_microbiome_fact(fact)][:8]
+    if microbiome:
+        return [{
+            'code': _unique_code('rule_microbiome', used),
+            'name': '肠道菌群分项偏移的观察与支持',
+            'priority': 'P2',
+            'factIds': [],
+            'clinicalFactIds': [],
+            'microbiomeFactIds': [handles[fid] for fid in microbiome],
+            'problemCodes': [],
+            'clinicalSelections': [],
+            'purpose': '说明本次粪便样本中偏离参考范围的菌群与功能分项及共同观察目标；'
+                       '不把相对丰度或功能评分改写成人体缺乏、感染或疾病。',
+            'origin': 'rule_fallback',
+        }]
+    abnormal = [fid for fid in _anchor_ids(list(facts), facts)
+                if facts[fid].get('abnormal') is True and not _SUMMARY_RECORD.search(str(facts[fid].get('name')))][:8]
+    if abnormal:
+        return [{
+            'code': _unique_code('rule_abnormal_results', used),
+            'name': '需复评的异常检查结果',
+            'priority': 'P2',
+            'factIds': [],
+            'clinicalFactIds': [handles[fid] for fid in abnormal],
+            'microbiomeFactIds': [],
+            'problemCodes': [],
+            'clinicalSelections': _auto_selections(abnormal, facts, handles),
+            'purpose': '按原参考范围说明各项异常结果，并列出需要复查的指标。',
+            'origin': 'rule_fallback',
+        }]
+    return []
+
+
+def _imbalance_present(packet, facts, rules):
+    """Abnormal findings that warrant at least one theme (routine-only findings do not)."""
+    if rules.get('priorityItems'):
+        return True
+    routine = rules.get('routineProblemCodes', ())
+    problems = packet.get('clinicalProblems', ())
+    if any(problem.get('role') in {None, 'health_problem'} and not _routine_problem(problem, routine)
+           for problem in problems):
+        return True
+    # The clinical organiser's problem list decides which abnormal results are
+    # health problems. Only without any such list do raw flags stand in for it.
+    routine_ids = {fid for item in rules.get('routineFollowups', ()) for fid in item.get('factIds', ())}
+    if not problems and any(fact.get('kind') == 'clinical' and fact.get('abnormal') is True
+                            and fid not in routine_ids and not _SUMMARY_RECORD.search(str(fact.get('name')))
+                            for fid, fact in facts.items()):
+        return True
+    return any(fact.get('kind') in {'microbe', 'function'} and fact.get('abnormal') is True
+               and _specific_microbiome_fact(fact) for fact in facts.values())
+
+
+def _fallback_symptoms(packet, facts, handles, rows):
+    reverse = {value: key for key, value in handles.items()}
+    present = {reverse[handle] for row in rows for handle in row.get('factIds', ()) if handle in reverse}
+    used = {row.get('code') for row in rows}
+    result = []
+    for slot in packet.get('symptomSlots', ()):
+        affirmed = [reverse[handle] for handle in slot.get('factIds', ()) if handle in reverse
+                    and (facts[reverse[handle]].get('_reportedSourceRole') or {}).get('role') == 'reported_symptom']
+        if not affirmed or present.intersection(affirmed):
+            continue
+        result.append({
+            'code': _unique_code(str(slot.get('code') or 'symptom'), used),
+            'name': str(slot.get('name') or facts[affirmed[0]].get('name')),
+            'factIds': [handles[fid] for fid in affirmed],
+            'clinicalFactIds': [],
+            'microbiomeFactIds': [],
+            'lifestyleFactIds': [],
+            'contextFactIds': [],
+            'clinicalSelections': [],
+            'purpose': '说明本人报告的这项不适及其原始时间和条件；相关检查只在有来源时说明，不推断病因。',
+            'origin': 'rule_fallback',
+        })
+    return result
+
+
+def _fallback_lifestyle(facts, handles):
+    buckets = {}
+    for fid, fact in facts.items():
+        if fact.get('kind') != 'self_reported' or not _behavior_anchor(fact):
+            continue
+        question, answer = str(fact.get('name') or ''), str(fact.get('value') or '').strip()
+        if not answer or _LIFESTYLE_EXCLUDED_QUESTIONS.search(question):
+            continue
+        for code, _, pattern in _LIFESTYLE_DIMENSIONS:
+            if re.search(pattern, question):
+                buckets.setdefault(code, []).append(fid)
+                break
+    return [
+        {
+            'code': code,
+            'name': name,
+            'factIds': [handles[fid] for fid in buckets[code]],
+            'contextFactIds': [],
+            'clusterCodes': [],
+            'sourceSelections': [],
+            'purpose': f'按原题条件说明{name}方面的实际回答，以及与本次检查结果有来源支持的关系。',
+            'origin': 'rule_fallback',
+        }
+        for code, name, _ in _LIFESTYLE_DIMENSIONS
+        if code in buckets
+    ]
+
+
+def _ensure_priority_coverage(clusters, rules, facts, handles, problem_codes):
+    """Every P0 rule item is owned by a theme; add a rule theme for the rest."""
+    reverse = {value: key for key, value in handles.items()}
+    used = {row.get('code') for row in clusters}
+    added = []
+    for item in rules.get('priorityItems', ()):
+        owners = [
+            row for row in clusters
+            if {reverse.get(handle) for handle in (
+                row.get('clinicalFactIds') or [h for field in _ID_FIELDS for h in row.get(field, ())]
+            )}.intersection(item.get('factIds', ()))
+            or set(row.get('problemCodes', ())).intersection(item.get('problemCodes', ()))
+        ]
+        if owners:
+            continue
+        row = _rule_cluster(item, facts, handles, problem_codes, used)
+        if row is not None:
+            added.append(row)
+    return [*added, *clusters], added
+
+
+def _finish_status(status, key, rows, *, fallback=(), empty_reason=None):
+    """Final state of a planned section after program fallbacks."""
+    entry = status.setdefault(key, _section_status((key,))[key])
+    if fallback:
+        entry['reasons'].append('rule_fallback')
+        entry['state'] = 'partial' if len(rows) > len(fallback) else 'fallback'
+    elif not rows and empty_reason:
+        entry['reasons'].append(empty_reason)
+        entry['state'] = 'empty'
+    elif not rows and entry['state'] == 'reviewed':
+        entry['state'] = 'empty'
+    entry['rows'] = len(rows)
+    entry['reasons'] = list(dict.fromkeys(entry['reasons']))
+    return entry
 
 
 async def plan_assessment_content(client, blueprint, subject, *, deadline=None, audit=None):
-    """Return an independently reviewed source plan, or an explicit empty receipt."""
+    """Return a reviewed source plan whose sections fail independently.
+
+    A failing row is repaired once and otherwise dropped; a failing section is
+    emptied or filled by program rules. ``status`` stays ``reviewed`` whenever
+    usable content exists; ``sectionStatus`` and ``completeness`` say exactly
+    what was degraded and why. Only a person without source facts (or without
+    any time budget) gets ``status='unavailable'``.
+    """
     unavailable = {'version': PLAN_VERSION, 'status': 'unavailable', **{key: [] for key in _SECTIONS}}
     journal = audit if isinstance(audit, dict) else {}
     started = monotonic()
-    facts, handles, packet = _snapshot(blueprint)
+    person = subject.model_dump(mode='json', by_alias=True) if hasattr(subject, 'model_dump') else subject
+    facts, handles, packet, rules = _snapshot(blueprint, person)
     if not facts:
         journal['contentPlan'] = {'status': 'unavailable', 'reason': 'no_source_facts'}
         return unavailable
     remaining = None if deadline is None else max(0.0, deadline - started)
     budget = min(720.0, remaining) if remaining is not None else 720.0
     if budget <= 0:
+        journal['contentPlan'] = {'status': 'unavailable', 'reason': 'no_time_budget'}
         return unavailable
-    person = subject.model_dump(mode='json', by_alias=True) if hasattr(subject, 'model_dump') else subject
     from .evaluation_report import _write_private_diagnostic
 
     _write_private_diagnostic('content-plan-sources', packet)
     stages = {}
+    empty = {key: [] for key in _SECTIONS}
+    stable = [
+        row
+        for row in packet['cells']
+        if row.get('factIds')
+        and (
+            row['code'].startswith(
+                ('body.', 'clinical.', 'clinicalRow.', 'digestive.', 'structure.', 'organisms.', 'function.')
+            )
+            or row['code']
+            in {
+                'bodySummary',
+                'clinicalLead',
+                'specialtySummary',
+                'trendSummary',
+                'microbiomeLead',
+                'structureSummary',
+                'riskSummary',
+                'sampleSummary',
+                'fermentationSummary',
+            }
+        )
+    ]
+    limiter = asyncio.Semaphore(4)
+
+    async def plan_cells(index, cells):
+        async with limiter:
+            return await _plan_section(
+                client, {**packet, 'cells': cells}, person, ('cellScopes',), empty, facts, handles, stages,
+                label=f'cellScopes-{index:02d}', rules=rules,
+            )
+
+    duties = {
+        'clusters': ('clusters',),
+        'symptoms': ('symptoms',),
+        'lifestyleFactors+recognitions': ('lifestyleFactors', 'recognitions'),
+    }
+    tasks = {
+        name: asyncio.create_task(_plan_section(
+            client, packet, person, sections, empty, facts, handles, stages, rules=rules,
+        ))
+        for name, sections in duties.items()
+    }
+    batches = [stable[start: start + 24] for start in range(0, len(stable), 24)]
+    for index, cells in enumerate(batches, 1):
+        tasks[f'cellScopes-{index:02d}'] = asyncio.create_task(plan_cells(index, cells))
     try:
-        async with asyncio.timeout(budget):
-            empty = {key: [] for key in _SECTIONS}
-            # Each planning duty reviews its own source anchors concurrently.
-            stable = [
-                row
-                for row in packet['cells']
-                if row.get('factIds')
-                and (
-                    row['code'].startswith(
-                        ('body.', 'clinical.', 'clinicalRow.', 'digestive.', 'structure.', 'organisms.', 'function.')
-                    )
-                    or row['code']
-                    in {
-                        'bodySummary',
-                        'clinicalLead',
-                        'specialtySummary',
-                        'trendSummary',
-                        'microbiomeLead',
-                        'structureSummary',
-                        'riskSummary',
-                        'sampleSummary',
-                        'fermentationSummary',
-                    }
-                )
-            ]
-            limiter = asyncio.Semaphore(4)
-            cluster_task = asyncio.create_task(
-                _plan_section(client, packet, person, ('clusters',), empty, facts, handles, stages)
-            )
-
-            async def plan_cells(index, cells):
-                async with limiter:
-                    return await _plan_section(
-                        client,
-                        {**packet, 'cells': cells},
-                        person,
-                        ('cellScopes',),
-                        empty,
-                        facts,
-                        handles,
-                        stages,
-                        label=f'cellScopes-{index:02d}',
-                    )
-
-            symptoms_task = asyncio.create_task(
-                _plan_section(client, packet, person, ('symptoms',), empty, facts, handles, stages)
-            )
-            tasks = [
-                cluster_task,
-                symptoms_task,
-                asyncio.create_task(_plan_section(
-                    client, packet, person, ('lifestyleFactors', 'recognitions'), empty, facts, handles, stages,
-                )),
-                *(asyncio.create_task(plan_cells(index, stable[start : start + 24]))
-                    for index, start in enumerate(range(0, len(stable), 24), 1)
-                ),
-            ]
-            try:
-                clusters, symptoms, lifestyle, *scoped = await asyncio.gather(*tasks)
-            finally:
-                for task in tasks:
-                    if not task.done():
-                        task.cancel()
-                await asyncio.gather(*tasks, return_exceptions=True)
-            accepted = {**empty, **clusters, **symptoms, **lifestyle}
-            accepted['lifestyleFactors'] = _connect_lifestyle_to_clusters(
-                accepted['lifestyleFactors'], accepted['clusters'],
-            )
-            derived = {row['code']: row for row in _related_scopes(accepted, packet['cells'])}
-            for subset in scoped:
-                derived.update({row['code']: row for row in subset['cellScopes']})
-            accepted['cellScopes'] = list(derived.values())
-            result = _decode(
-                accepted,
-                facts,
-                handles,
-                {row['code']: row for row in packet['cells']},
-                _problem_metadata(packet),
-                symptom_slots=packet.get('symptomSlots', ()),
-            )
+        done, pending = await asyncio.wait(tasks.values(), timeout=budget)
+    finally:
+        for task in tasks.values():
+            if not task.done():
+                task.cancel()
+        await asyncio.gather(*tasks.values(), return_exceptions=True)
+    section_status = {}
+    accepted = {key: [] for key in _SECTIONS}
+    cell_rows = []
+    cell_states = []
+    for name, task in tasks.items():
+        sections = duties.get(name, ('cellScopes',))
+        if task in pending or task.cancelled():
+            outcome = {key: [] for key in sections}
+            status = _section_status(sections)
+            for key in sections:
+                status[key]['reasons'].append('timeout')
+            stages.setdefault(name, {'status': 'timeout'})
+        elif task.exception() is not None:
+            outcome = {key: [] for key in sections}
+            status = _section_status(sections)
+            for key in sections:
+                status[key]['reasons'].append('stage_error:' + type(task.exception()).__name__)
+        else:
+            outcome, status = task.result()
+        if sections == ('cellScopes',):
+            cell_rows.extend(outcome['cellScopes'])
+            cell_states.append(status['cellScopes'])
+            continue
+        for key in sections:
+            accepted[key] = list(outcome[key])
+            section_status[key] = status[key]
+    try:
+        problem_codes = _problem_metadata(packet)
+        imbalance = _imbalance_present(packet, facts, rules)
+        fallback_clusters = []
+        if imbalance and not accepted['clusters']:
+            # Themes for the non-P0 problems; P0 items get their own rule theme below.
+            fallback_clusters = _fallback_clusters(packet, facts, handles, rules, set())
+            accepted['clusters'] = list(fallback_clusters)
+        accepted['clusters'], rule_clusters = _ensure_priority_coverage(
+            accepted['clusters'], rules, facts, handles, problem_codes,
+        )
+        program_clusters = [*rule_clusters, *fallback_clusters] if fallback_clusters or not any(
+            row.get('origin') is None for row in accepted['clusters']) else []
+        fallback_symptoms = _fallback_symptoms(packet, facts, handles, accepted['symptoms'])
+        accepted['symptoms'] = [*accepted['symptoms'], *fallback_symptoms]
+        fallback_lifestyle = [] if accepted['lifestyleFactors'] else _fallback_lifestyle(facts, handles)
+        accepted['lifestyleFactors'] = accepted['lifestyleFactors'] or fallback_lifestyle
+        accepted['lifestyleFactors'] = _connect_lifestyle_to_clusters(
+            accepted['lifestyleFactors'], accepted['clusters'],
+        )
+        derived = {row['code']: row for row in _related_scopes(accepted, packet['cells'])}
+        derived.update({row['code']: row for row in cell_rows if isinstance(row, dict) and row.get('code')})
+        accepted['cellScopes'] = list(derived.values())
+        result, row_issues, section_issues = _decode_report(
+            accepted,
+            facts,
+            handles,
+            {row['code']: row for row in packet['cells']},
+            problem_codes,
+            symptom_slots=packet.get('symptomSlots', ()),
+            priority_items=rules.get('priorityItems', ()),
+            routine_problem_codes=rules.get('routineProblemCodes', ()),
+        )
+        for (key, index), messages in row_issues.items():
+            entry = section_status.setdefault(key, _section_status((key,))[key])
+            entry['dropped'].append({'code': _row_code(accepted[key][index], index),
+                                     'errors': [message[:240] for message in messages[:3]]})
+            entry['reasons'].append('items_dropped_in_final_check')
+            if entry['state'] == 'reviewed':
+                entry['state'] = 'partial'
+        for key, _ in section_issues:
+            entry = section_status.setdefault(key, _section_status((key,))[key])
+            entry['reasons'].append('uncovered_priority_item' if key == 'clusters' else 'uncovered_reported_symptom')
+            if entry['state'] == 'reviewed':
+                entry['state'] = 'partial'
+        origins = {key: {row.get('code'): row.get('origin', 'model') for row in accepted[key] if isinstance(row, dict)}
+                   for key in ('clusters', 'symptoms', 'lifestyleFactors')}
+        for key, mapping in origins.items():
+            for row in result[key]:
+                row['origin'] = mapping.get(row['code'], 'model')
+        if rule_clusters:
+            entry = section_status.setdefault('clusters', _section_status(('clusters',))['clusters'])
+            entry['reasons'].append('priority_rule_cluster_added')
+        _finish_status(section_status, 'clusters', result['clusters'], fallback=program_clusters,
+                       empty_reason=None if imbalance else 'no_imbalance')
+        if rule_clusters and section_status['clusters']['state'] == 'reviewed':
+            section_status['clusters']['state'] = 'partial'
+        _finish_status(section_status, 'symptoms', result['symptoms'], fallback=fallback_symptoms,
+                       empty_reason=None if packet.get('symptomSlots') else 'no_reported_symptoms')
+        has_answers = bool(_fallback_lifestyle(facts, handles))
+        _finish_status(section_status, 'lifestyleFactors', result['lifestyleFactors'], fallback=fallback_lifestyle,
+                       empty_reason=None if has_answers else 'no_lifestyle_answers')
+        recognition_failed = section_status.get('recognitions', {}).get('state') == 'failed'
+        _finish_status(section_status, 'recognitions', result['recognitions'],
+                       empty_reason=None if recognition_failed else 'no_recognition_items')
+        cell_entry = _section_status(('cellScopes',))['cellScopes']
+        cell_entry['reasons'] = list(dict.fromkeys(reason for state in cell_states for reason in state['reasons']))
+        cell_entry['dropped'] = [item for state in cell_states for item in state['dropped']]
+        cell_entry['rows'] = len(result['cellScopes'])
+        cell_entry['state'] = (
+            'reviewed' if cell_states and all(state['state'] == 'reviewed' for state in cell_states)
+            else 'fallback' if cell_states and all(state['state'] in {'fallback', 'failed'} for state in cell_states)
+            else 'partial' if cell_states else 'empty'
+        )
+        section_status['cellScopes'] = cell_entry
+        cluster_codes = {item: [row['code'] for row in result['clusters'] if item in row['priorityItemCodes']]
+                         for item in (entry['code'] for entry in rules.get('priorityItems', ()))}
+        result['priorityItems'] = [{**deepcopy(item), 'clusterCodes': cluster_codes.get(item['code'], [])}
+                                   for item in rules.get('priorityItems', ())]
+        excluded = {code for item in [*rules.get('priorityItems', ()), *rules.get('routineFollowups', ())]
+                    for code in item.get('problemCodes', ())}
+        excluded.update(code for row in result['clusters'] for code in row.get('problemCodes', ()))
+        result['routineFollowups'] = [
+            *deepcopy(rules.get('routineFollowups', [])),
+            *advice_followups(rules.get('problems', ()), facts.values(), exclude_problem_codes=excluded),
+        ]
+        result['testGaps'] = deepcopy(rules.get('testGaps', []))
+        result['clusterState'] = 'clusters_present' if result['clusters'] else (
+            'no_imbalance' if not imbalance else 'unavailable')
+        section_status['priorityItems'] = {'state': 'rule', 'reasons': [], 'rows': len(result['priorityItems'])}
+        section_status['routineFollowups'] = {'state': 'rule', 'reasons': [], 'rows': len(result['routineFollowups'])}
+        section_status['testGaps'] = {'state': 'rule', 'reasons': [], 'rows': len(result['testGaps'])}
+        result['sectionStatus'] = section_status
+        result['completeness'] = 'degraded' if any(
+            entry.get('state') in {'partial', 'fallback', 'failed'} for entry in section_status.values()
+        ) else 'complete'
+        result['rulesVersion'] = deepcopy(rules.get('versions', {}))
     except asyncio.CancelledError:
         raise
     except Exception as error:
         _write_private_diagnostic(
             'content-plan-failure',
-            {
-                'errorType': type(error).__name__,
-                'reason': str(error),
-                'stages': stages,
-            },
+            {'errorType': type(error).__name__, 'reason': str(error), 'stages': stages,
+             'sectionStatus': section_status},
         )
         journal['contentPlan'] = {
             'status': 'unavailable',
             'reason': type(error).__name__ + ':' + str(error)[:160],
+            'stages': stages,
             'elapsedMs': round((monotonic() - started) * 1000, 3),
         }
         return unavailable
+    if result['completeness'] == 'degraded':
+        _write_private_diagnostic('content-plan-degraded', {'sectionStatus': section_status, 'stages': stages})
     signature = json.dumps(records := packet['records'], ensure_ascii=False, sort_keys=True).encode()
     journal['contentPlan'] = {
         'status': 'reviewed',
+        'completeness': result['completeness'],
+        'sectionStatus': deepcopy(section_status),
         'sourceSha256': hashlib.sha256(signature).hexdigest(),
         'sourceCount': len(records),
         'plan': deepcopy(result),
