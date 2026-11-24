@@ -766,6 +766,29 @@ def _related(hit_label: str, p0_text: str) -> bool:
     return bool(grams) and len(grams & _bigrams(p0_text)) / len(grams) >= 0.5
 
 
+def request_fact_rows(request: dict) -> list[dict]:
+    """Source fact rows (the red-flag rule input shape) from request ``hospitalData``."""
+    rows = []
+    for index, row in enumerate(request.get('hospitalData') or ()):
+        if not isinstance(row, dict):
+            continue
+        value = row.get('testResultValue')
+        if value in (None, ''):
+            value = row.get('examResult') or row.get('examConclusion')
+        rows.append(
+            {
+                'factId': f'R{index + 1}',
+                'kind': 'clinical',
+                'name': row.get('itemName'),
+                'value': value,
+                'unit': row.get('unit'),
+                'status': row.get('resultStatusName'),
+                'referenceRange': row.get('referenceRange'),
+            }
+        )
+    return rows
+
+
 def red_flag_hits(request: dict, function: str | None = None) -> dict:
     """Call the optional red-flag rule module; never fail the whole check."""
     module_name, _, attribute = (function or RED_FLAG_MODULE).partition(':')
@@ -781,6 +804,21 @@ def red_flag_hits(request: dict, function: str | None = None) -> dict:
     candidates = [getattr(module, name) for name in names if callable(getattr(module, name, None))]
     if not candidates:
         return {'available': False, 'reason': f'{module_name} 中未找到 {"/".join(names)}', 'hits': []}
+    evaluate = getattr(module, 'evaluate_red_flags', None)
+    if callable(evaluate) and not attribute:
+        # The rule table reads source fact rows; build them from the request rows.
+        facts = request_fact_rows(request)
+        subject = {'sex': request.get('sex'), 'age': request.get('age')}
+        try:
+            result = evaluate(facts, subject=subject)
+        except (TypeError, AttributeError, KeyError, ValueError) as error:
+            return {'available': False, 'reason': f'evaluate_red_flags 调用失败：{type(error).__name__}', 'hits': []}
+        hits = list((result or {}).get('priorityItems') or [])
+        return {
+            'available': True,
+            'reason': f'{module_name}.evaluate_red_flags(请求体检行 {len(facts)} 条)',
+            'hits': [_hit_label(hit) for hit in hits],
+        }
     arguments = []
     try:
         from modules.report.schemas import ReportRequest
