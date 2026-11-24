@@ -805,7 +805,7 @@ def red_flag_hits(request: dict, function: str | None = None) -> dict:
     if not candidates:
         return {'available': False, 'reason': f'{module_name} 中未找到 {"/".join(names)}', 'hits': []}
     evaluate = getattr(module, 'evaluate_red_flags', None)
-    if callable(evaluate) and not attribute:
+    if callable(evaluate) and not attribute and module_name == RED_FLAG_MODULE:
         # The rule table reads source fact rows; build them from the request rows.
         facts = request_fact_rows(request)
         subject = {'sex': request.get('sex'), 'age': request.get('age')}

@@ -288,3 +288,25 @@ def test_local_callback_is_converted_when_no_frontend_body(tmp_path, monkeypatch
     body, source = check.load_body(tmp_path)
     assert source == 'callback.json (converted)'
     assert body['data']['version'] == 'assessment.v2'
+
+
+def test_request_fact_rows_feed_the_real_rule_table():
+    request = {
+        'sex': '男',
+        'age': 50,
+        'hospitalData': [
+            {
+                'itemName': '粪便隐血试验',
+                'testResultValue': '阳性',
+                'resultStatusName': '阳性',
+                'referenceRange': '阴性',
+            },
+            {'itemName': '血红蛋白', 'testResultValue': '150', 'unit': 'g/L', 'referenceRange': '130-175'},
+        ],
+    }
+    rows = check.request_fact_rows(request)
+    assert [row['factId'] for row in rows] == ['R1', 'R2']
+    assert all(row['kind'] == 'clinical' for row in rows)
+    flags = check.red_flag_hits(request)
+    assert flags['available'] is True
+    assert any('隐血' in hit for hit in flags['hits'])
