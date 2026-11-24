@@ -106,7 +106,9 @@ _SUMMARY_NAME = re.compile(
     r'^\s*(?:主检(?:结论|建议|小结)|总检(?:结论|建议)|原报告建议)[：:]|(?:原报告|原始报告)[)）]?\s*$'
 )
 _ADVICE_NAME = re.compile(r'^\s*(?:主检建议|总检建议|原报告(?:复查|随访)?建议|医嘱)(?:\s*$|\s*[：:])')
-_ADVICE_SENTENCE = re.compile(r'^\s*(?:建议|请|宜|应|需|可)|建议|就诊|随诊|复查|咨询|门诊|结合临床')
+# 必要时/医生指导 open an advice sentence of their own ("必要时在医生指导下使用…");
+# without them such a sentence would be read as a result.
+_ADVICE_SENTENCE = re.compile(r'^\s*(?:建议|请|宜|应|需|可)|建议|就诊|随诊|复查|咨询|门诊|结合临床|必要时|医生指导')
 
 
 def _reader_name(row):

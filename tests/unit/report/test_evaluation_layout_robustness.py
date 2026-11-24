@@ -297,8 +297,12 @@ def test_grouped_results_are_listed_once_without_advice_or_capture_markers():
     for hidden in ('主检', '建议', '未核验', '检查异常'):
         assert hidden not in value
     advice = _member_advice(members)
-    assert '建议心内科咨询就诊。必要时在医生指导下使用调脂药物。' in advice
+    # A conclusion line is split into its advice sentences; each is kept verbatim.
+    assert '建议心内科咨询就诊。' in advice and '必要时在医生指导下使用调脂药物。' in advice
     assert '建议心内科随诊，控制血压、血糖、血脂。' in advice
+    # An advice sentence without 建议 is still advice, never a listed result.
+    renamed = MedicalFinding(name='血脂', value='必要时在医生指导下使用调脂药物。')
+    assert _reader_value([*members, renamed]) == value
 
 
 def test_score_format_slips_with_one_rubric_reading_do_not_void_a_dimension():
