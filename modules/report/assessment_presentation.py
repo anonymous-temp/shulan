@@ -2439,6 +2439,8 @@ def _complete_systems(result, clinical, microbiome):
     ``moreCount`` the rest. A system without a reviewed cell is still listed so
     that a reader sees it as measured or ``notTested``; it carries no verdict.
     """
+    from .assessment_chart_fields import OTHER_SYSTEM_CODE
+    from .assessment_chart_fields import OTHER_SYSTEM_NAME
     from .assessment_chart_fields import system_atoms
     from .assessment_chart_fields import system_chart_fields
 
@@ -2451,6 +2453,17 @@ def _complete_systems(result, clinical, microbiome):
         atoms = system_atoms(code, group_codes, clinical, microbiome)
         item.update(system_chart_fields(atoms, item['rows'], microbiome=code == 'microbiome'))
         complete.append(item)
+    # Abnormal results outside the five systems get a sixth card instead of
+    # disappearing from the overview (spec 1.2).
+    atoms = system_atoms(OTHER_SYSTEM_CODE, (OTHER_SYSTEM_CODE,), clinical, microbiome)
+    fields = system_chart_fields(atoms, [], microbiome=False)
+    if fields.get('level') in ('focus', 'borderline'):
+        complete.append({
+            'code': OTHER_SYSTEM_CODE, 'name': OTHER_SYSTEM_NAME, 'status': None,
+            'summary': f'另有{len(fields.get("anchors") or ()) + int(fields.get("moreCount") or 0)}项需关注的检查结果，'
+                       '详见第三章分系统评估与专项检测。',
+            'evidenceRefs': [], 'rows': [], **fields,
+        })
     return complete
 
 

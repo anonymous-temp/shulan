@@ -341,6 +341,11 @@ def _record_ids(row):
     return {source.get('recordId') for source in row.get('sources') or () if source.get('recordId')}
 
 
+OTHER_SYSTEM_CODE = 'otherClinical'
+OTHER_SYSTEM_NAME = '其他器官与专项检查'
+CARDIOMETABOLIC_DEVICE = re.compile(r'脑血|动脉|血管|心电|心脏|心功能|EZSCAN|糖尿病.{0,4}筛查', re.IGNORECASE)
+
+
 def system_atoms(code, group_codes, clinical, microbiome) -> list[dict]:
     """Atomic member rows of one overview system, read from chapters three and four."""
     if code == 'microbiome':
@@ -363,9 +368,14 @@ def system_atoms(code, group_codes, clinical, microbiome) -> list[dict]:
         panels = group.get('templateRows') or ()
         members = [row for panel in panels for row in panel.get('rows') or ()]
         rows.extend(members or group.get('rows') or ())
+    specialty = [row for row in clinical.get('specialtyFindings') or () if isinstance(row, dict)]
     if code == 'cardiometabolic':
         body = [row for group in clinical.get('bodyGroups') or () for row in group.get('rows') or ()]
         rows.extend(body or clinical.get('bodyMetrics') or ())
+        # Vascular and glucose-screening device tests belong to this system (spec 1.2).
+        rows.extend(row for row in specialty if CARDIOMETABOLIC_DEVICE.search(str(row.get('name') or '')))
+    elif code == OTHER_SYSTEM_CODE:
+        rows.extend(row for row in specialty if not CARDIOMETABOLIC_DEVICE.search(str(row.get('name') or '')))
     return rows
 
 

@@ -619,3 +619,25 @@ def test_relabelled_questionnaire_answers_are_split_into_lines():
         '<span class="qa">最近通常每日睡眠时长：6至7小时</span><span class="qa">平时每周安排运动天数：没有运动</span>'
         in page
     )
+
+
+def test_overview_adds_sixth_system_only_for_abnormal_results_outside_five():
+    from modules.report.assessment_chart_fields import CARDIOMETABOLIC_DEVICE
+    from modules.report.assessment_chart_fields import OTHER_SYSTEM_CODE
+    from modules.report.assessment_chart_fields import system_atoms
+
+    clinical = {
+        'clinicalGroups': [
+            {'code': 'otherClinical', 'rows': [{'name': '乙肝表面抗原', 'value': '阳性', 'level': 'focus'}]},
+        ],
+        'specialtyFindings': [
+            {'name': '双侧脑血流速度减慢', 'level': 'focus'},
+            {'name': '动脉硬化检测(ABI/baPWV) · ABI：右下肢1.00', 'level': None},
+            {'name': '骨龄测评', 'level': 'borderline'},
+        ],
+    }
+    cardio = system_atoms('cardiometabolic', ('cardiometabolic',), clinical, {})
+    other = system_atoms(OTHER_SYSTEM_CODE, (OTHER_SYSTEM_CODE,), clinical, {})
+    assert [row['name'] for row in cardio] == ['双侧脑血流速度减慢', '动脉硬化检测(ABI/baPWV) · ABI：右下肢1.00']
+    assert [row['name'] for row in other] == ['乙肝表面抗原', '骨龄测评']
+    assert CARDIOMETABOLIC_DEVICE.search('糖尿病早期风险筛查(EZSCAN)')
