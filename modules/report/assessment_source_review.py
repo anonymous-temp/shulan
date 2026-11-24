@@ -19,12 +19,17 @@ from .assessment_measurement_claims import claim_authority_issue
 from .assessment_measurement_claims import exact_advice_support
 from .assessment_measurement_claims import paragraph_claim_candidates
 from .assessment_measurement_claims import paragraph_literal_issues
+from .assessment_rule_sources import is_rule_handle
+from .assessment_rule_sources import passage_handles
+from .assessment_rule_sources import rule_action_issue
+from .assessment_rule_sources import rule_handles
+from .assessment_rule_sources import rule_paragraph_issues
 from .assessment_source_receipts import ACTION_PASSAGES
 from .assessment_source_receipts import claim_issue_code
 from .assessment_source_receipts import normalize_receipt
 from .assessment_source_receipts import renumber_cell_claims
 
-SOURCE_REVIEW_VERSION = 'source-grounding-v20'
+SOURCE_REVIEW_VERSION = 'source-grounding-v21-rule-conclusions'
 _VIOLATION_KINDS = {
     'source_fact',
     'clinical_assessment',
@@ -152,6 +157,12 @@ GROUNDING_GUIDE = [
     '按P的实际role及passageRoles判断引用用途；文献真实内容不能因题名含同词就认定适用。',
     '方法或编写检查报告的指引即使真实，也不能代替本例结果的意义。只应承接其中适用的临床命题，'
     '不能把作者应如何写报告的流程内容当患者解读而判通过。',
+    'ruleConclusions中的R是程序规则表对本人已绑定F作出的确定性结论：危险信号事项的时限、科室和需完成的检查，'
+    '常规随访的间隔与科室，建议补查的项目及理由，目标区间及其适用条件，带规则出处，与原医嘱A同级核对。'
+    'R只在该P的ruleIds中引用时可用。转述这些安排或数值的K用rule_conclusion并给ruleIds；'
+    '同句也准确转述原医嘱时可同时给adviceIds，A原有的条件与力度仍须保留。'
+    '论断须与R一致，改动或新增时限、科室、检查、补查项目或目标值即为来源错误，也不得把R写成原医嘱或医生建议。'
+    'R不是患者事实：触发发现、测值、日期和症状仍须由本P的F/O支持；R的出处只支持该规则结论，不为机制解释或其他新行动背书。',
     'violations只报告真实错误：quote须是该P.text或title中未改一字的连续原句，reason指出具体错误和实际依据，'
     'recordIds/passageIds只选该P实际使用的F/E，不要求补不存在的来源。没有错误用supported和空violations。'
     '格式修复只补遗漏P/回执字段，不改正文，不把原句的错误换一个枚举伪装为通过。',
@@ -306,6 +317,7 @@ def proof_output_schema():
                                 'observationIds': ['仅observed_measurement/applied_threshold取实际来源O'],
                                 'adviceIds': ['仅reported_advice取覆盖本K所有转述的精确原医嘱A'],
                                 'passageIds': ['仅patient_management取直接支持本动作的E，没有时省略'],
+                                'ruleIds': ['仅rule_conclusion取本P所引、支持本K的规则结论R'],
                             }
                         ],
                         'violations': [
@@ -314,6 +326,7 @@ def proof_output_schema():
                                 'quote': '该P.text或title中实际有错的连续原句，不改字',
                                 'recordIds': ['该命题实际使用的F；没有则空数组'],
                                 'passageIds': ['该命题实际引用的E；没有则空数组'],
+                                'ruleIds': ['该命题实际引用的R；没有则省略'],
                                 'reason': '具体语义错误及实际源依据；不改正文',
                             }
                         ],
@@ -389,7 +402,7 @@ def draft_source_findings(cell, parts, records):
         if part.get('role') != 'action' and re.search(r'建议|请前往|需复查|需就诊|应复查|应就诊', part['text']):
             issues.append('核实这句是否有给患者的实际行动。如有且本格允许，请单列action，引用该动作的原医嘱'
                           '或适用依据。如本格只负责解释，保留发现、优先关注的理由及结论。')
-        if part.get('cite') and len(re.split(r'[。！？](?=\S)', part['text'])) > 1:
+        if passage_handles(part.get('cite')) and len(re.split(r'[。！？](?=\S)', part['text'])) > 1:
             issues.append('核对每句所需的依据，将文献直接支持的判断与个人实测或原医嘱分开绑定。')
         if issues:
             findings.append({'paragraph': index, 'issues': issues})
@@ -415,17 +428,23 @@ def build_source_frame(cells, paragraphs, *, registry, records, evidence, subjec
     private = {'cells': {}, 'registry': registry}
     for cell_id, parts in paragraphs.items():
         cell = cells[cell_id]
+        rules = {row['id']: deepcopy(row) for row in cell.get('ruleConclusions') or () if is_rule_handle(row.get('id'))}
         immutable = [
             {
                 'id': f'P{index:02d}',
                 'title': part.get('title'),
                 'text': part['text'],
                 'recordIds': list(part.get('factIds') or ()),
-                'passageIds': list(part.get('cite') or ()),
+                'passageIds': passage_handles(part.get('cite')),
+                'ruleIds': [rid for rid in dict.fromkeys(rule_handles(part.get('cite'))) if rid in rules],
                 'role': part.get('role'),
             }
             for index, part in enumerate(parts, 1)
         ]
+        unknown_rules = {
+            f'P{index:02d}': [rid for rid in dict.fromkeys(rule_handles(part.get('cite'))) if rid not in rules]
+            for index, part in enumerate(parts, 1)
+        }
         version = paragraph_version(parts)
         used = {rid for part in immutable for rid in part['recordIds']}
         cited = {pid for part in immutable for pid in part['passageIds']}
@@ -493,6 +512,31 @@ def build_source_frame(cells, paragraphs, *, registry, records, evidence, subjec
                 if item not in advice:
                     advice.append(item)
         advice = [{'id': f'A{index:02d}', **item} for index, item in enumerate(advice, 1)]
+        cited_rules = [rid for rid in rules if any(rid in part['ruleIds'] for part in immutable)]
+        for part in immutable:
+            if not part['ruleIds'] and not unknown_rules[part['id']]:
+                continue
+            corpus = [
+                str(row.get('sourceQuote') or '')
+                for row in advice
+                if set(row.get('recordIds', ())).intersection(part['recordIds'])
+            ]
+            corpus.extend(
+                json.dumps(records_by_id[rid], ensure_ascii=False, default=str)
+                for rid in part['recordIds']
+                if rid in records_by_id
+            )
+            corpus.extend(
+                str(passage_by_id[pid].get('text') or '') for pid in part['passageIds'] if pid in passage_by_id
+            )
+            literal_issues[part['id']].extend(
+                rule_paragraph_issues(
+                    part,
+                    {rid: rules[rid] for rid in part['ruleIds']},
+                    unknown=unknown_rules[part['id']],
+                    corpus=corpus,
+                )
+            )
         selected_records = []
         for rid in sorted(used):
             if rid not in records_by_id:
@@ -537,6 +581,7 @@ def build_source_frame(cells, paragraphs, *, registry, records, evidence, subjec
             'sourceSelections': deepcopy(cell.get('sourceSelections') or []),
             'clinicalSelections': deepcopy(cell.get('clinicalSelections') or []),
             'sourceAdvice': advice,
+            'ruleConclusions': [rules[rid] for rid in cited_rules],
             'evidence': [passage_by_id[pid] for pid in sorted(cited) if pid in passage_by_id],
             'passageRoles': {pid: cell.get('passageRoles', {}).get(pid, []) for pid in sorted(cited)},
         }
@@ -549,6 +594,7 @@ def build_source_frame(cells, paragraphs, *, registry, records, evidence, subjec
             'records': {record['id']: record for record in selected_records},
             'sourceBoundaries': scoped['sourceBoundaries'],
             'advice': {row['id']: row for row in advice},
+            'rules': {rid: rules[rid] for rid in cited_rules},
             'evidence': {row['pid']: row for row in scoped['evidence']},
             'passageRoles': scoped['passageRoles'],
             'literalIssues': literal_issues,
@@ -597,6 +643,47 @@ def _exact_advice_correction(candidate, allowed, record_ids):
     return matches[0] if len(matches) == 1 else None
 
 
+def _rule_decision(decision, candidate, source, cell, *, semantic, cell_id, location, kid):
+    """A K supported by a cited rule conclusion R; returns False after reporting a finding."""
+    cited = source.get('ruleIds') or []
+    rule_ids = decision.get('ruleIds')
+    rule_ids = [rid for rid in rule_ids if rid in cited] if _strings(rule_ids) else []
+    if not rule_ids and len(cited) == 1:
+        rule_ids = list(cited)
+    term = candidate.get('term') or candidate['kind']
+    if not rule_ids:
+        _issue(
+            semantic,
+            cell_id,
+            f'{location}.{kid}',
+            f'{source["id"]}/{kid}（{term}）：所用规则结论未在本段cite中引用，规则结论须引用本格列出的R编号。',
+            paragraph=source['id'],
+        )
+        return False
+    decision['ruleIds'] = rule_ids
+    allowed = _advice_entries_for_paragraph(source, cell)
+    advice_ids = [aid for aid in decision.get('adviceIds') or () if aid in allowed] if _strings(
+        decision.get('adviceIds', [])
+    ) else []
+    problem = rule_action_issue(
+        candidate,
+        [cell['rules'][rid] for rid in rule_ids if rid in cell.get('rules', {})],
+        [allowed[aid] for aid in advice_ids],
+    )
+    if problem:
+        _issue(
+            semantic,
+            cell_id,
+            f'{location}.{kid}',
+            f'{source["id"]}/{kid}（{term}）：{problem}',
+            paragraph=source['id'],
+            term=candidate.get('term'),
+            start=candidate.get('start'),
+        )
+        return False
+    return True
+
+
 def _check_claim_decisions(part, source, cell, *, formats, semantic, cell_id, location, advice_corrections):
     expected = {candidate['id']: candidate for candidate in source['claimCandidates']}
     decisions = part.get('claimDecisions', [])
@@ -642,6 +729,11 @@ def _check_claim_decisions(part, source, cell, *, formats, semantic, cell_id, lo
         ):
             _issue(formats, cell_id, location, f'{kid}仅实际新增动作可选择本P实际对应的E。')
             continue
+        if use == 'rule_conclusion':
+            if not _rule_decision(
+                decision, candidate, source, cell, semantic=semantic, cell_id=cell_id, location=location, kid=kid
+            ):
+                continue
         if use == 'reported_advice':
             allowed = _advice_entries_for_paragraph(source, cell)
             if not allowed:
@@ -729,7 +821,7 @@ def _check_claim_decisions(part, source, cell, *, formats, semantic, cell_id, lo
                 start=candidate.get('start'),
             )
             continue
-        if use in {'patient_management', 'reported_advice'}:
+        if use in {'patient_management', 'reported_advice', 'rule_conclusion'}:
             actual_action = actual_action or source.get('role') == 'action'
         attached.update(passages)
     if seen != set(expected):
@@ -836,11 +928,14 @@ def validate_source_proofs(frame, private, response):
                     _issue(formats, cell_id, issue_location, '须指出原句具体错误及实际源依据。')
                     continue
                 records, passages = violation.get('recordIds'), violation.get('passageIds')
+                rules = violation.get('ruleIds', [])
                 if (
                     not _strings(records)
                     or not set(records).issubset(source['recordIds'])
                     or not _strings(passages)
                     or not set(passages).issubset(source['passageIds'])
+                    or not _strings(rules)
+                    or not set(rules).issubset(source.get('ruleIds') or ())
                 ):
                     _issue(formats, cell_id, issue_location, 'F/E仅限该P实际使用者；无相应来源时留空数组。')
                     continue
@@ -859,7 +954,7 @@ def validate_source_proofs(frame, private, response):
             proof = deepcopy(row)
             proof['serverVersionHash'] = cell['versionHash']
             proof['serverSourceBindings'] = {
-                pid: {key: deepcopy(part[key]) for key in ('recordIds', 'passageIds')}
+                pid: {key: deepcopy(part[key]) for key in ('recordIds', 'passageIds', 'ruleIds') if key in part}
                 for pid, part in cell['paragraphs'].items()
             }
             if advice_corrections:

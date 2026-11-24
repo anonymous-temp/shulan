@@ -18,6 +18,7 @@ from decimal import Decimal
 from typing import Any
 
 from . import evaluation_schema as public
+from .assessment_rule_sources import cell_rule_conclusions
 from .evaluation_builder import project_evaluation_source_data
 from .evaluation_clinical_focus import selected_source_clinical_focus
 from .evaluation_derived_indices import derived_index_context
@@ -1407,6 +1408,15 @@ def build_report_blueprint(request, parsed, document, health_assessment=None, *,
                 duty = 'classification'
             identity = json.dumps([typed, own.get('kind'), own.get('code'), primary],
                 ensure_ascii=False, separators=(',', ':'))
+            if isinstance(content_plan, dict) and publication_scope == 'assessment':
+                # Rule conclusions that matched inside this cell's scope are a
+                # citable source (R) for writing and source review.
+                rule_conclusions = cell_rule_conclusions(
+                    scope_code, content_plan, comparison_claims=own.get('comparisonClaims') or (),
+                    scope_fact_ids=bound,
+                )
+                if rule_conclusions:
+                    own['ruleConclusions'] = rule_conclusions
             allowed_roles = ['observation', 'interpretation', 'action']
             if own.get('contentPlanVersion') and (scope_code or '').startswith(
                 ('body.', 'function.', 'organisms.', 'structure.', 'system.', 'specialtyRow.'),
