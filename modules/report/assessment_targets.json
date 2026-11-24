@@ -1,0 +1,2360 @@
+{
+  "version": "2026-11-24",
+  "generatedBy": "scripts/build_assessment_targets.py",
+  "model": "deepseek-flash",
+  "note": "目标区间仅在条件适用时显示；不适用或无条目时只显示临床参考区间。每条出处已由程序核对原文数值。",
+  "conditions": {
+    "diabetes": "糖尿病",
+    "ascvd": "动脉粥样硬化性心血管疾病（冠心病、心肌梗死、缺血性脑卒中等）",
+    "hypertension": "高血压",
+    "chronicKidneyDisease": "慢性肾脏病",
+    "thyroidDisease": "甲状腺疾病或正在服用甲状腺药物",
+    "thyroidSurgery": "甲状腺术后",
+    "gout": "痛风",
+    "liverDisease": "慢性肝病",
+    "lipidLoweringTherapy": "正在服用降脂药"
+  },
+  "indicators": {
+    "fpg": {
+      "label": "空腹血糖",
+      "aliases": [
+        "空腹血糖",
+        "空腹葡萄糖",
+        "空腹血浆葡萄糖",
+        "葡萄糖",
+        "血糖",
+        "血清葡萄糖",
+        "血浆葡萄糖"
+      ],
+      "abbreviations": [
+        "GLU",
+        "FPG",
+        "FBG",
+        "FBS"
+      ],
+      "unit": "mmol/L",
+      "conversions": {
+        "mmol/l": 1,
+        "mg/dl": 0.0555
+      },
+      "excludeName": "餐后|随机|尿|[12]\\s*(?:h|小时)|糖耐量|OGTT|胰岛素|糖化|果糖胺|脑脊液|胸水|腹水"
+    },
+    "fastingInsulin": {
+      "label": "空腹胰岛素",
+      "aliases": [
+        "空腹胰岛素",
+        "胰岛素",
+        "血清胰岛素",
+        "空腹血清胰岛素"
+      ],
+      "abbreviations": [
+        "INS",
+        "FINS"
+      ],
+      "unit": "μIU/mL",
+      "conversions": {
+        "μiu/ml": 1,
+        "miu/l": 1,
+        "μu/ml": 1,
+        "mu/l": 1,
+        "pmol/l": 0.16666666666666666
+      },
+      "excludeName": "抗体|餐后|释放|[12]\\s*(?:h|小时)|C\\s*-?\\s*肽|样生长因子|IGF"
+    },
+    "cPeptide": {
+      "label": "空腹C肽",
+      "aliases": [
+        "空腹C肽",
+        "C肽",
+        "血清C肽",
+        "C-肽"
+      ],
+      "abbreviations": [
+        "CP",
+        "C-P",
+        "CPR",
+        "C-peptide"
+      ],
+      "unit": "ng/mL",
+      "conversions": {
+        "ng/ml": 1,
+        "μg/l": 1,
+        "nmol/l": 3.02,
+        "pmol/l": 0.00302
+      },
+      "excludeName": "餐后|释放|[12]\\s*(?:h|小时)"
+    },
+    "hba1c": {
+      "label": "糖化血红蛋白",
+      "aliases": [
+        "糖化血红蛋白",
+        "糖化血红蛋白A1c",
+        "血红蛋白A1c",
+        "糖基化血红蛋白"
+      ],
+      "abbreviations": [
+        "HbA1c",
+        "A1C",
+        "GHb",
+        "HbA1C"
+      ],
+      "unit": "%",
+      "conversions": {
+        "%": 1,
+        "mmol/mol": "ifcc"
+      },
+      "excludeName": "白蛋白"
+    },
+    "homaIr": {
+      "label": "HOMA-IR",
+      "aliases": [
+        "胰岛素抵抗指数",
+        "稳态模型胰岛素抵抗指数",
+        "稳态模型评估胰岛素抵抗指数"
+      ],
+      "abbreviations": [
+        "HOMA-IR",
+        "HOMAIR"
+      ],
+      "unit": "",
+      "conversions": {
+        "": 1
+      }
+    },
+    "tg": {
+      "label": "甘油三酯",
+      "aliases": [
+        "甘油三酯",
+        "三酰甘油",
+        "甘油三脂",
+        "血清甘油三酯"
+      ],
+      "abbreviations": [
+        "TG",
+        "TRIG",
+        "TRIGL"
+      ],
+      "unit": "mmol/L",
+      "conversions": {
+        "mmol/l": 1,
+        "mg/dl": 0.01129
+      },
+      "excludeName": "/|比值|比率"
+    },
+    "tgHdl": {
+      "label": "TG/HDL-C",
+      "aliases": [
+        "甘油三酯/HDL-C 比值",
+        "甘油三酯/高密度脂蛋白胆固醇比值",
+        "甘油三酯与高密度脂蛋白胆固醇比值"
+      ],
+      "abbreviations": [
+        "TG/HDL-C",
+        "TG/HDL"
+      ],
+      "unit": "",
+      "conversions": {
+        "": 1,
+        "mmol/l": 1,
+        "mg/dl": 0.4366
+      },
+      "sourceUnits": [
+        "mmol/l",
+        "mg/dl"
+      ]
+    },
+    "tc": {
+      "label": "总胆固醇",
+      "aliases": [
+        "总胆固醇",
+        "胆固醇",
+        "血清总胆固醇"
+      ],
+      "abbreviations": [
+        "TC",
+        "CHOL",
+        "T-CHO",
+        "TCHO"
+      ],
+      "unit": "mmol/L",
+      "conversions": {
+        "mmol/l": 1,
+        "mg/dl": 0.02586
+      },
+      "excludeName": "高密度|低密度|非高|残余|残粒|/|比值"
+    },
+    "hdlC": {
+      "label": "HDL-C",
+      "aliases": [
+        "高密度脂蛋白胆固醇",
+        "高密度脂蛋白",
+        "高密度脂蛋白-胆固醇"
+      ],
+      "abbreviations": [
+        "HDL-C",
+        "HDL",
+        "HDLC",
+        "HDL-CH"
+      ],
+      "unit": "mmol/L",
+      "conversions": {
+        "mmol/l": 1,
+        "mg/dl": 0.02586
+      },
+      "excludeName": "非高|/|比值|亚型"
+    },
+    "ldlC": {
+      "label": "LDL-C",
+      "aliases": [
+        "低密度脂蛋白胆固醇",
+        "低密度脂蛋白",
+        "低密度脂蛋白-胆固醇"
+      ],
+      "abbreviations": [
+        "LDL-C",
+        "LDL",
+        "LDLC",
+        "LDL-CH"
+      ],
+      "unit": "mmol/L",
+      "conversions": {
+        "mmol/l": 1,
+        "mg/dl": 0.02586
+      },
+      "excludeName": "小而密|sdLDL|氧化|/|比值|受体"
+    },
+    "nonHdlC": {
+      "label": "非HDL-C",
+      "aliases": [
+        "非高密度脂蛋白胆固醇"
+      ],
+      "abbreviations": [
+        "non-HDL-C",
+        "nonHDL-C",
+        "NHDL-C"
+      ],
+      "unit": "mmol/L",
+      "conversions": {
+        "mmol/l": 1,
+        "mg/dl": 0.02586
+      }
+    },
+    "apoB": {
+      "label": "ApoB",
+      "aliases": [
+        "载脂蛋白B",
+        "载脂蛋白B100",
+        "载脂蛋白B-100"
+      ],
+      "abbreviations": [
+        "ApoB",
+        "APO-B",
+        "ApoB100"
+      ],
+      "unit": "g/L",
+      "conversions": {
+        "g/l": 1,
+        "mg/dl": 0.01
+      },
+      "excludeName": "/|比值"
+    },
+    "lpa": {
+      "label": "脂蛋白(a)",
+      "aliases": [
+        "脂蛋白(a)",
+        "脂蛋白a",
+        "脂蛋白α"
+      ],
+      "abbreviations": [
+        "Lp(a)",
+        "LPA",
+        "LP-a"
+      ],
+      "unit": "mg/L",
+      "conversions": {
+        "mg/l": 1,
+        "mg/dl": 10,
+        "g/l": 1000
+      }
+    },
+    "uricAcid": {
+      "label": "血尿酸",
+      "aliases": [
+        "尿酸",
+        "血尿酸",
+        "血清尿酸"
+      ],
+      "abbreviations": [
+        "UA",
+        "URIC",
+        "SUA"
+      ],
+      "unit": "μmol/L",
+      "conversions": {
+        "μmol/l": 1,
+        "mg/dl": 59.48,
+        "mmol/l": 1000
+      },
+      "excludeName": "尿液|尿尿酸|24\\s*h|排泄|清除|/|比值"
+    },
+    "hsCrp": {
+      "label": "hs-CRP",
+      "aliases": [
+        "超敏C反应蛋白",
+        "高敏C反应蛋白",
+        "超敏CRP",
+        "全程C反应蛋白超敏部分"
+      ],
+      "abbreviations": [
+        "hs-CRP",
+        "hsCRP",
+        "hCRP",
+        "HS-CRP"
+      ],
+      "unit": "mg/L",
+      "conversions": {
+        "mg/l": 1,
+        "mg/dl": 10
+      }
+    },
+    "alt": {
+      "label": "ALT",
+      "aliases": [
+        "丙氨酸氨基转移酶",
+        "丙氨酸转氨酶",
+        "谷丙转氨酶",
+        "丙氨酸氨基转氨酶"
+      ],
+      "abbreviations": [
+        "ALT",
+        "GPT",
+        "SGPT"
+      ],
+      "unit": "U/L",
+      "conversions": {
+        "u/l": 1,
+        "iu/l": 1
+      },
+      "excludeName": "/|比值"
+    },
+    "ast": {
+      "label": "AST",
+      "aliases": [
+        "天门冬氨酸氨基转移酶",
+        "天冬氨酸氨基转移酶",
+        "天门冬氨酸转氨酶",
+        "天冬氨酸转氨酶",
+        "谷草转氨酶"
+      ],
+      "abbreviations": [
+        "AST",
+        "GOT",
+        "SGOT"
+      ],
+      "unit": "U/L",
+      "conversions": {
+        "u/l": 1,
+        "iu/l": 1
+      },
+      "excludeName": "/|比值|线粒体|同工酶"
+    },
+    "ggt": {
+      "label": "GGT",
+      "aliases": [
+        "γ-谷氨酰转移酶",
+        "γ-谷氨酰基转移酶",
+        "谷氨酰转肽酶",
+        "γ-谷氨酰转肽酶",
+        "谷氨酰基转移酶",
+        "谷氨酰转移酶",
+        "谷氨酰胺转移酶"
+      ],
+      "abbreviations": [
+        "GGT",
+        "γ-GT",
+        "GGTP",
+        "r-GT",
+        "γGT"
+      ],
+      "unit": "U/L",
+      "conversions": {
+        "u/l": 1,
+        "iu/l": 1
+      }
+    },
+    "alp": {
+      "label": "ALP",
+      "aliases": [
+        "碱性磷酸酶",
+        "血清碱性磷酸酶"
+      ],
+      "abbreviations": [
+        "ALP",
+        "AKP"
+      ],
+      "unit": "U/L",
+      "conversions": {
+        "u/l": 1,
+        "iu/l": 1
+      },
+      "excludeName": "骨|同工酶"
+    },
+    "ferritin": {
+      "label": "铁蛋白",
+      "aliases": [
+        "铁蛋白",
+        "血清铁蛋白"
+      ],
+      "abbreviations": [
+        "Fer",
+        "FER",
+        "SF",
+        "Ferritin",
+        "FERR"
+      ],
+      "unit": "ng/mL",
+      "conversions": {
+        "ng/ml": 1,
+        "μg/l": 1,
+        "pmol/l": 0.445
+      },
+      "excludeName": "转铁|结合"
+    },
+    "mcv": {
+      "label": "MCV",
+      "aliases": [
+        "平均红细胞体积",
+        "红细胞平均体积"
+      ],
+      "abbreviations": [
+        "MCV"
+      ],
+      "unit": "fL",
+      "conversions": {
+        "fl": 1,
+        "μm3": 1
+      }
+    },
+    "tsh": {
+      "label": "TSH",
+      "aliases": [
+        "促甲状腺激素",
+        "促甲状腺素",
+        "促甲状腺刺激激素",
+        "超敏促甲状腺激素",
+        "促甲状腺激素(超敏)"
+      ],
+      "abbreviations": [
+        "TSH",
+        "sTSH",
+        "hTSH",
+        "S-TSH",
+        "TSH3"
+      ],
+      "unit": "mIU/L",
+      "conversions": {
+        "miu/l": 1,
+        "μiu/ml": 1,
+        "mu/l": 1,
+        "μu/ml": 1
+      },
+      "excludeName": "受体|抗体|释放激素"
+    },
+    "hcy": {
+      "label": "同型半胱氨酸",
+      "aliases": [
+        "同型半胱氨酸",
+        "血同型半胱氨酸",
+        "血清同型半胱氨酸"
+      ],
+      "abbreviations": [
+        "Hcy",
+        "HCY",
+        "HCYS"
+      ],
+      "unit": "μmol/L",
+      "conversions": {
+        "μmol/l": 1
+      }
+    },
+    "vitaminD": {
+      "label": "25-羟维生素D",
+      "aliases": [
+        "25-羟基维生素D",
+        "25羟维生素D",
+        "25-羟维生素D",
+        "25羟基维生素D",
+        "维生素D",
+        "总维生素D",
+        "25-羟基维生素D3",
+        "25-羟维生素D总"
+      ],
+      "abbreviations": [
+        "25(OH)D",
+        "25-OH-D",
+        "25OHD",
+        "25-OHD",
+        "VD",
+        "VitD"
+      ],
+      "unit": "ng/mL",
+      "conversions": {
+        "ng/ml": 1,
+        "μg/l": 1,
+        "nmol/l": 0.4006
+      },
+      "excludeName": "1\\s*,\\s*25|二羟|受体|结合蛋白"
+    },
+    "bmi": {
+      "label": "BMI",
+      "aliases": [
+        "体重指数",
+        "体质指数",
+        "身体质量指数",
+        "体重指数BMI"
+      ],
+      "abbreviations": [
+        "BMI"
+      ],
+      "unit": "kg/m2",
+      "conversions": {
+        "kg/m2": 1,
+        "": 1
+      }
+    },
+    "waist": {
+      "label": "腰围",
+      "aliases": [
+        "腰围"
+      ],
+      "abbreviations": [
+        "WC"
+      ],
+      "unit": "cm",
+      "conversions": {
+        "cm": 1,
+        "m": 100,
+        "mm": 0.1
+      },
+      "excludeName": "臀|比"
+    },
+    "whr": {
+      "label": "腰臀比",
+      "aliases": [
+        "腰臀比",
+        "腰臀围比"
+      ],
+      "abbreviations": [
+        "WHR"
+      ],
+      "unit": "",
+      "conversions": {
+        "": 1
+      }
+    },
+    "bodyFat": {
+      "label": "体脂率",
+      "aliases": [
+        "体脂率",
+        "体脂百分比",
+        "体脂肪率",
+        "体脂肪百分比",
+        "体脂肪含量百分比"
+      ],
+      "abbreviations": [
+        "PBF",
+        "BF%"
+      ],
+      "unit": "%",
+      "conversions": {
+        "%": 1
+      }
+    },
+    "visceralFat": {
+      "label": "内脏脂肪面积",
+      "aliases": [
+        "内脏脂肪面积"
+      ],
+      "abbreviations": [
+        "VFA"
+      ],
+      "unit": "cm2",
+      "conversions": {
+        "cm2": 1
+      }
+    },
+    "sbp": {
+      "label": "收缩压",
+      "aliases": [
+        "收缩压",
+        "血压收缩压",
+        "血压(收缩压)"
+      ],
+      "abbreviations": [
+        "SBP"
+      ],
+      "unit": "mmHg",
+      "conversions": {
+        "mmhg": 1,
+        "kpa": 7.50062
+      },
+      "excludeName": "踝|下肢|脚|肺动脉"
+    },
+    "dbp": {
+      "label": "舒张压",
+      "aliases": [
+        "舒张压",
+        "血压舒张压",
+        "血压(舒张压)"
+      ],
+      "abbreviations": [
+        "DBP"
+      ],
+      "unit": "mmHg",
+      "conversions": {
+        "mmhg": 1,
+        "kpa": 7.50062
+      },
+      "excludeName": "踝|下肢|脚|肺动脉"
+    }
+  },
+  "targets": [
+    {
+      "id": "homaIr-1",
+      "indicator": "homaIr",
+      "label": "HOMA-IR",
+      "aliases": [
+        "胰岛素抵抗指数",
+        "稳态模型胰岛素抵抗指数",
+        "稳态模型评估胰岛素抵抗指数"
+      ],
+      "abbreviations": [
+        "HOMA-IR",
+        "HOMAIR"
+      ],
+      "unit": "",
+      "unitConversions": {
+        "": 1
+      },
+      "low": null,
+      "high": 1.4,
+      "lowInclusive": null,
+      "highInclusive": false,
+      "text": "<1.4",
+      "riskTier": "NGT/低风险（低于糖代谢异常切点）",
+      "conditions": {
+        "sex": null,
+        "minAge": 18,
+        "maxAge": null,
+        "nonPregnant": true,
+        "excludeConditions": [
+          "diabetes"
+        ],
+        "requiresConditions": []
+      },
+      "basis": "该中国15年前瞻研究推荐1.4作为区分糖代谢异常与NGT的HOMA-IR切点，低于该切点风险较低。",
+      "evidenceLevel": "人群研究",
+      "sources": [
+        {
+          "title": "Optimal Cut-Offs of Homeostasis Model Assessment of Insulin Resistance (HOMA-IR) to Identify Dysglycemia and Type 2 Diabetes Mellitus: A 15-Year Prospective Study in Chinese.",
+          "year": 2016,
+          "doi": "10.1371/journal.pone.0163424",
+          "pmid": "27658115",
+          "journal": "PloS one",
+          "url": "https://journals.plos.org/plosone/article?id=10.1371%2fjournal.pone.0163424"
+        }
+      ],
+      "verification": {
+        "method": "fetchedPage",
+        "quote": "Therefore, combining these two different approaches, we recommend the HOMA-IR cut-offs of 1.4 and 2.0 for discrimination of dysglycemia from NGT, and T2DM from non-DM, respectively in Chinese.",
+        "sourceValue": {
+          "low": null,
+          "high": 1.4,
+          "unit": ""
+        },
+        "checkedAt": "2026-11-24"
+      }
+    },
+    {
+      "id": "hba1c-1",
+      "indicator": "hba1c",
+      "label": "糖化血红蛋白",
+      "aliases": [
+        "糖化血红蛋白",
+        "糖化血红蛋白A1c",
+        "血红蛋白A1c",
+        "糖基化血红蛋白"
+      ],
+      "abbreviations": [
+        "HbA1c",
+        "A1C",
+        "GHb",
+        "HbA1C"
+      ],
+      "unit": "%",
+      "unitConversions": {
+        "%": 1,
+        "mmol/mol": "ifcc"
+      },
+      "low": null,
+      "high": 5.7,
+      "lowInclusive": null,
+      "highInclusive": false,
+      "text": "<5.7 %",
+      "riskTier": "正常血糖/低于ADA糖尿病前期切点",
+      "conditions": {
+        "sex": null,
+        "minAge": 18,
+        "maxAge": null,
+        "nonPregnant": true,
+        "excludeConditions": [
+          "diabetes"
+        ],
+        "requiresConditions": []
+      },
+      "basis": "ADA指南将A1C 5.7–6.4%定义为糖尿病前期，故以低于5.7%作为较低风险上限。",
+      "evidenceLevel": "指南",
+      "sources": [
+        {
+          "title": "2. Diagnosis and Classification of Diabetes: Standards of Care in Diabetes-2026.",
+          "year": 2026,
+          "doi": "10.2337/dc26-S002",
+          "pmid": "41358893",
+          "journal": "Diabetes care",
+          "url": "https://diabetesjournals.org/care/article/49/Supplement_1/S27/163926/2-Diagnosis-and-Classification-of-Diabetes"
+        }
+      ],
+      "verification": {
+        "method": "searchExtract",
+        "quote": "People with prediabetes are defined by the presence of IFG and/or IGT and/or A1C 5.7–6.4% (39–47 mmol/mol) (Table 2.2).",
+        "sourceValue": {
+          "low": null,
+          "high": 5.7,
+          "unit": "%"
+        },
+        "checkedAt": "2026-11-24"
+      }
+    },
+    {
+      "id": "fpg-1",
+      "indicator": "fpg",
+      "label": "空腹血糖",
+      "aliases": [
+        "空腹血糖",
+        "空腹葡萄糖",
+        "空腹血浆葡萄糖",
+        "葡萄糖",
+        "血糖",
+        "血清葡萄糖",
+        "血浆葡萄糖"
+      ],
+      "abbreviations": [
+        "GLU",
+        "FPG",
+        "FBG",
+        "FBS"
+      ],
+      "unit": "mmol/L",
+      "unitConversions": {
+        "mmol/l": 1,
+        "mg/dl": 0.0555
+      },
+      "low": null,
+      "high": 5.6,
+      "lowInclusive": null,
+      "highInclusive": false,
+      "text": "<5.6 mmol/L",
+      "riskTier": "正常空腹血糖（ADA）",
+      "conditions": {
+        "sex": null,
+        "minAge": 18,
+        "maxAge": null,
+        "nonPregnant": true,
+        "excludeConditions": [
+          "diabetes"
+        ],
+        "requiresConditions": []
+      },
+      "basis": "ADA专家委员会将正常空腹血糖定义为FPG<100 mg/dl（5.6 mmol/l）。",
+      "evidenceLevel": "指南",
+      "sources": [
+        {
+          "title": "Diagnosis and classification of diabetes mellitus.",
+          "year": 2006,
+          "doi": null,
+          "pmid": "16373932",
+          "journal": "Diabetes care",
+          "url": "https://diabetesjournals.org/care/article/29/suppl_1/s43/23313/care/article/41/6/1299/36487/Insulin-Access-and-Affordability-Working-Group"
+        }
+      ],
+      "verification": {
+        "method": "searchExtract",
+        "quote": "FPG <100 mg/dl (5.6 mmol/l) = normal fasting glucose;",
+        "sourceValue": {
+          "low": null,
+          "high": 5.6,
+          "unit": "mmol/l"
+        },
+        "checkedAt": "2026-11-24"
+      }
+    },
+    {
+      "id": "tg-1",
+      "indicator": "tg",
+      "label": "甘油三酯",
+      "aliases": [
+        "甘油三酯",
+        "三酰甘油",
+        "甘油三脂",
+        "血清甘油三酯"
+      ],
+      "abbreviations": [
+        "TG",
+        "TRIG",
+        "TRIGL"
+      ],
+      "unit": "mmol/L",
+      "unitConversions": {
+        "mmol/l": 1,
+        "mg/dl": 0.01129
+      },
+      "low": null,
+      "high": 1.7,
+      "lowInclusive": null,
+      "highInclusive": false,
+      "text": "<1.7 mmol/L",
+      "riskTier": "ASCVD一级预防低风险人群的Reasonable level",
+      "conditions": {
+        "sex": null,
+        "minAge": 18,
+        "maxAge": null,
+        "nonPregnant": true,
+        "excludeConditions": [
+          "lipidLoweringTherapy"
+        ],
+        "requiresConditions": []
+      },
+      "basis": "2023中国血脂管理指南表2中TG无Ideal level，按Reasonable level取<1.7 mmol/L作为低风险目标上限。",
+      "evidenceLevel": "指南",
+      "sources": [
+        {
+          "title": "2023 Chinese guideline for lipid management.",
+          "year": 2023,
+          "doi": "10.3389/fphar.2023.1190934",
+          "pmid": "37711173",
+          "journal": "Frontiers in pharmacology",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/37711173/"
+        }
+      ],
+      "verification": {
+        "method": "pmcFullText",
+        "quote": "Reasonable level <5.2 <3.4 - <1.7 <4.1 <300",
+        "sourceValue": {
+          "low": null,
+          "high": 1.7,
+          "unit": "mmol/L"
+        },
+        "checkedAt": "2026-11-24"
+      }
+    },
+    {
+      "id": "tc-1",
+      "indicator": "tc",
+      "label": "总胆固醇",
+      "aliases": [
+        "总胆固醇",
+        "胆固醇",
+        "血清总胆固醇"
+      ],
+      "abbreviations": [
+        "TC",
+        "CHOL",
+        "T-CHO",
+        "TCHO"
+      ],
+      "unit": "mmol/L",
+      "unitConversions": {
+        "mmol/l": 1,
+        "mg/dl": 0.02586
+      },
+      "low": null,
+      "high": 5.2,
+      "lowInclusive": null,
+      "highInclusive": false,
+      "text": "<5.2 mmol/L",
+      "riskTier": "低风险一级预防/合理水平",
+      "conditions": {
+        "sex": null,
+        "minAge": 18,
+        "maxAge": null,
+        "nonPregnant": true,
+        "excludeConditions": [
+          "ascvd",
+          "diabetes",
+          "lipidLoweringTherapy"
+        ],
+        "requiresConditions": []
+      },
+      "basis": "2023中国血脂管理指南表2中TC无Ideal level，取Reasonable level为<5.2 mmol/L。",
+      "evidenceLevel": "指南",
+      "sources": [
+        {
+          "title": "2023 Chinese guideline for lipid management.",
+          "year": 2023,
+          "doi": "10.3389/fphar.2023.1190934",
+          "pmid": "37711173",
+          "journal": "Frontiers in pharmacology",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/37711173/"
+        }
+      ],
+      "verification": {
+        "method": "pmcFullText",
+        "quote": "TABLE 2 Reference standards for major lipid indicators in low-risk groups for primary prevention of ASCVD in China a . Classification TC LDL-C HDL-C TG Non-HDL-C Lp(a) Ideal level - <2.6 - - <3.4 - Reasonable level <5.2 <3.4 - <1.7 <4.1 <300",
+        "sourceValue": {
+          "low": null,
+          "high": 5.2,
+          "unit": "mmol/L"
+        },
+        "checkedAt": "2026-11-24"
+      }
+    },
+    {
+      "id": "ldlC-1",
+      "indicator": "ldlC",
+      "label": "LDL-C",
+      "aliases": [
+        "低密度脂蛋白胆固醇",
+        "低密度脂蛋白",
+        "低密度脂蛋白-胆固醇"
+      ],
+      "abbreviations": [
+        "LDL-C",
+        "LDL",
+        "LDLC",
+        "LDL-CH"
+      ],
+      "unit": "mmol/L",
+      "unitConversions": {
+        "mmol/l": 1,
+        "mg/dl": 0.02586
+      },
+      "low": null,
+      "high": 2.6,
+      "lowInclusive": null,
+      "highInclusive": false,
+      "text": "<2.6 mmol/L",
+      "riskTier": "低风险/理想水平",
+      "conditions": {
+        "sex": null,
+        "minAge": 18,
+        "maxAge": null,
+        "nonPregnant": true,
+        "excludeConditions": [
+          "ascvd",
+          "diabetes",
+          "lipidLoweringTherapy"
+        ],
+        "requiresConditions": []
+      },
+      "basis": "2023中国血脂管理指南表2将低风险一级预防人群LDL-C的Ideal level列为<2.6，表内单位为mmol/L。",
+      "evidenceLevel": "指南",
+      "sources": [
+        {
+          "title": "2023 Chinese guideline for lipid management.",
+          "year": 2023,
+          "doi": "10.3389/fphar.2023.1190934",
+          "pmid": "37711173",
+          "journal": "Frontiers in pharmacology",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/37711173/"
+        }
+      ],
+      "verification": {
+        "method": "pmcFullText",
+        "quote": "TABLE 2 Reference standards for major lipid indicators in low-risk groups for primary prevention of ASCVD in China a . Classification TC LDL-C HDL-C TG Non-HDL-C Lp(a) Ideal level - <2.6 - - <3.4 - Reasonable level <5.2 <3.4 - <1.7 <4.1 <300",
+        "sourceValue": {
+          "low": null,
+          "high": 2.6,
+          "unit": "mmol/L"
+        },
+        "checkedAt": "2026-11-24"
+      }
+    },
+    {
+      "id": "nonHdlC-1",
+      "indicator": "nonHdlC",
+      "label": "非HDL-C",
+      "aliases": [
+        "非高密度脂蛋白胆固醇"
+      ],
+      "abbreviations": [
+        "non-HDL-C",
+        "nonHDL-C",
+        "NHDL-C"
+      ],
+      "unit": "mmol/L",
+      "unitConversions": {
+        "mmol/l": 1,
+        "mg/dl": 0.02586
+      },
+      "low": null,
+      "high": 3.4,
+      "lowInclusive": null,
+      "highInclusive": false,
+      "text": "<3.4 mmol/L",
+      "riskTier": "低风险/理想水平",
+      "conditions": {
+        "sex": null,
+        "minAge": 18,
+        "maxAge": null,
+        "nonPregnant": true,
+        "excludeConditions": [
+          "ascvd",
+          "diabetes",
+          "lipidLoweringTherapy"
+        ],
+        "requiresConditions": []
+      },
+      "basis": "2023中国血脂管理指南表2将中国ASCVD一级预防低风险人群非HDL-C的理想水平列为<3.4 mmol/L。",
+      "evidenceLevel": "指南",
+      "sources": [
+        {
+          "title": "2023 Chinese guideline for lipid management.",
+          "year": 2023,
+          "doi": "10.3389/fphar.2023.1190934",
+          "pmid": "37711173",
+          "journal": "Frontiers in pharmacology",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/37711173/"
+        }
+      ],
+      "verification": {
+        "method": "pmcFullText",
+        "quote": "TABLE 2 Reference standards for major lipid indicators in low-risk groups for primary prevention of ASCVD in China a . Classification TC LDL-C HDL-C TG Non-HDL-C Lp(a) Ideal level - <2.6 - - <3.4 - Reasonable level <5.2 <3.4 - <1.7 <4.1 <300",
+        "sourceValue": {
+          "low": null,
+          "high": 3.4,
+          "unit": "mmol/L"
+        },
+        "checkedAt": "2026-11-24"
+      }
+    },
+    {
+      "id": "apoB-1",
+      "indicator": "apoB",
+      "label": "ApoB",
+      "aliases": [
+        "载脂蛋白B",
+        "载脂蛋白B100",
+        "载脂蛋白B-100"
+      ],
+      "abbreviations": [
+        "ApoB",
+        "APO-B",
+        "ApoB100"
+      ],
+      "unit": "g/L",
+      "unitConversions": {
+        "g/l": 1,
+        "mg/dl": 0.01
+      },
+      "low": null,
+      "high": 0.65,
+      "lowInclusive": null,
+      "highInclusive": false,
+      "text": "<0.65 g/L",
+      "riskTier": "非常高风险患者次要治疗目标",
+      "conditions": {
+        "sex": null,
+        "minAge": 18,
+        "maxAge": null,
+        "nonPregnant": true,
+        "excludeConditions": [
+          "lipidLoweringTherapy"
+        ],
+        "requiresConditions": [
+          "ascvd"
+        ]
+      },
+      "basis": "2019 ESC/EAS指南将ApoB作为次要治疗目标，非常高风险患者推荐<65 mg/dL。",
+      "evidenceLevel": "人群研究",
+      "sources": [
+        {
+          "title": "Apolipoprotein B in cardiovascular risk assessment: beyond traditional lipid markers.",
+          "year": 2026,
+          "doi": "10.3389/fcvm.2026.1857230",
+          "pmid": "42876934",
+          "journal": "Frontiers in cardiovascular medicine",
+          "url": "https://www.frontiersin.org/journals/cardiovascular-medicine/articles/10.3389/fcvm.2026.1857230/full"
+        }
+      ],
+      "verification": {
+        "method": "searchExtract",
+        "quote": "The 2019 European Society of Cardiology/European Atherosclerosis Society (ESC/EAS) Guidelines for the Management of Dyslipidaemias identified ApoB as a secondary treatment target, with recommended levels of <65 mg/dL, <80 mg/dL, and <100 mg/dL for patients at very high, high, and moderate cardiovascular risk, respectively.",
+        "sourceValue": {
+          "low": null,
+          "high": 65,
+          "unit": "mg/dL"
+        },
+        "checkedAt": "2026-11-24"
+      }
+    },
+    {
+      "id": "apoB-2",
+      "indicator": "apoB",
+      "label": "ApoB",
+      "aliases": [
+        "载脂蛋白B",
+        "载脂蛋白B100",
+        "载脂蛋白B-100"
+      ],
+      "abbreviations": [
+        "ApoB",
+        "APO-B",
+        "ApoB100"
+      ],
+      "unit": "g/L",
+      "unitConversions": {
+        "g/l": 1,
+        "mg/dl": 0.01
+      },
+      "low": null,
+      "high": 0.8,
+      "lowInclusive": null,
+      "highInclusive": false,
+      "text": "<0.8 g/L",
+      "riskTier": "高风险患者次要治疗目标",
+      "conditions": {
+        "sex": null,
+        "minAge": 18,
+        "maxAge": null,
+        "nonPregnant": true,
+        "excludeConditions": [
+          "lipidLoweringTherapy"
+        ],
+        "requiresConditions": [
+          "diabetes"
+        ]
+      },
+      "basis": "2019 ESC/EAS指南将ApoB作为次要治疗目标，高风险患者推荐<80 mg/dL。",
+      "evidenceLevel": "人群研究",
+      "sources": [
+        {
+          "title": "Apolipoprotein B in cardiovascular risk assessment: beyond traditional lipid markers.",
+          "year": 2026,
+          "doi": "10.3389/fcvm.2026.1857230",
+          "pmid": "42876934",
+          "journal": "Frontiers in cardiovascular medicine",
+          "url": "https://www.frontiersin.org/journals/cardiovascular-medicine/articles/10.3389/fcvm.2026.1857230/full"
+        }
+      ],
+      "verification": {
+        "method": "searchExtract",
+        "quote": "The 2019 European Society of Cardiology/European Atherosclerosis Society (ESC/EAS) Guidelines for the Management of Dyslipidaemias identified ApoB as a secondary treatment target, with recommended levels of <65 mg/dL, <80 mg/dL, and <100 mg/dL for patients at very high, high, and moderate cardiovascular risk, respectively.",
+        "sourceValue": {
+          "low": null,
+          "high": 80,
+          "unit": "mg/dL"
+        },
+        "checkedAt": "2026-11-24"
+      }
+    },
+    {
+      "id": "lpa-1",
+      "indicator": "lpa",
+      "label": "脂蛋白(a)",
+      "aliases": [
+        "脂蛋白(a)",
+        "脂蛋白a",
+        "脂蛋白α"
+      ],
+      "abbreviations": [
+        "Lp(a)",
+        "LPA",
+        "LP-a"
+      ],
+      "unit": "mg/L",
+      "unitConversions": {
+        "mg/l": 1,
+        "mg/dl": 10,
+        "g/l": 1000
+      },
+      "low": null,
+      "high": 300,
+      "lowInclusive": null,
+      "highInclusive": false,
+      "text": "<300 mg/L",
+      "riskTier": "低风险合理水平（<300 mg/L）",
+      "conditions": {
+        "sex": null,
+        "minAge": 18,
+        "maxAge": null,
+        "nonPregnant": true,
+        "excludeConditions": [],
+        "requiresConditions": []
+      },
+      "basis": "中国血脂管理指南将Lp(a) 300 mg/L作为风险升高切点，并列出低风险合理水平<300 mg/L。",
+      "evidenceLevel": "指南",
+      "sources": [
+        {
+          "title": "2023 Chinese guideline for lipid management.",
+          "year": 2023,
+          "doi": "10.3389/fphar.2023.1190934",
+          "pmid": "37711173",
+          "journal": "Frontiers in pharmacology",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/37711173/"
+        }
+      ],
+      "verification": {
+        "method": "pmcFullText",
+        "quote": "A cut-off point of 300 mg/L is usually used, above which the risk of CVD increases ( Yan, 2003 ; Laboratory Medicine Society of Chinese Medical Association et al., 2022 ).",
+        "sourceValue": {
+          "low": null,
+          "high": 300,
+          "unit": "mg/L"
+        },
+        "checkedAt": "2026-11-24"
+      }
+    },
+    {
+      "id": "hdlC-1",
+      "indicator": "hdlC",
+      "label": "HDL-C",
+      "aliases": [
+        "高密度脂蛋白胆固醇",
+        "高密度脂蛋白",
+        "高密度脂蛋白-胆固醇"
+      ],
+      "abbreviations": [
+        "HDL-C",
+        "HDL",
+        "HDLC",
+        "HDL-CH"
+      ],
+      "unit": "mmol/L",
+      "unitConversions": {
+        "mmol/l": 1,
+        "mg/dl": 0.02586
+      },
+      "low": 1,
+      "high": null,
+      "lowInclusive": true,
+      "highInclusive": null,
+      "text": "≥1 mmol/L",
+      "riskTier": "低风险/ASCVD一级预防",
+      "conditions": {
+        "sex": null,
+        "minAge": 18,
+        "maxAge": null,
+        "nonPregnant": true,
+        "excludeConditions": [
+          "ascvd",
+          "lipidLoweringTherapy"
+        ],
+        "requiresConditions": []
+      },
+      "basis": "该指南表2将低风险一级预防人群HDL-C的Reduction界值列为<1.0 mmol/L，反向目标为≥1.0 mmol/L。",
+      "evidenceLevel": "指南",
+      "sources": [
+        {
+          "title": "2023 Chinese guideline for lipid management.",
+          "year": 2023,
+          "doi": "10.3389/fphar.2023.1190934",
+          "pmid": "37711173",
+          "journal": "Frontiers in pharmacology",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/37711173/"
+        }
+      ],
+      "verification": {
+        "method": "pmcFullText",
+        "quote": "3) HDL-C <1.0 mmol/L; 4) body mass index ≥28 kg/m2; 5) smoking.",
+        "sourceValue": {
+          "low": 1.0,
+          "high": null,
+          "unit": "mmol/L"
+        },
+        "checkedAt": "2026-11-24"
+      }
+    },
+    {
+      "id": "hsCrp-1",
+      "indicator": "hsCrp",
+      "label": "hs-CRP",
+      "aliases": [
+        "超敏C反应蛋白",
+        "高敏C反应蛋白",
+        "超敏CRP",
+        "全程C反应蛋白超敏部分"
+      ],
+      "abbreviations": [
+        "hs-CRP",
+        "hsCRP",
+        "hCRP",
+        "HS-CRP"
+      ],
+      "unit": "mg/L",
+      "unitConversions": {
+        "mg/l": 1,
+        "mg/dl": 10
+      },
+      "low": null,
+      "high": 1,
+      "lowInclusive": null,
+      "highInclusive": false,
+      "text": "<1 mg/L",
+      "riskTier": "低风险/最低风险参照组",
+      "conditions": {
+        "sex": null,
+        "minAge": 18,
+        "maxAge": null,
+        "nonPregnant": true,
+        "excludeConditions": [
+          "ascvd"
+        ],
+        "requiresConditions": []
+      },
+      "basis": "UK Biobank 一般人群无已知 ASCVD 者中，hsCRP >3 mg/L 较 <1 mg/L 的 MACE、心血管死亡和全因死亡风险更高，<1 mg/L 为最低风险参照。",
+      "evidenceLevel": "人群研究",
+      "sources": [
+        {
+          "title": "C-reactive protein and cardiovascular risk in the general population.",
+          "year": 2025,
+          "doi": "10.1093/eurheartj/ehaf937",
+          "pmid": "41378999",
+          "journal": "European heart journal",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/41378999/"
+        }
+      ],
+      "verification": {
+        "method": "pubmedAbstract",
+        "quote": "In covariate-adjusted models individuals with hsCRP levels >3 mg/L had a 34% higher risk of MACE, a 61% and 54% increased risk of CV death and all-cause death compared to those with hsCRP <1 mg/L.",
+        "sourceValue": {
+          "low": null,
+          "high": 1.0,
+          "unit": "mg/L"
+        },
+        "checkedAt": "2026-11-24"
+      }
+    },
+    {
+      "id": "alt-1",
+      "indicator": "alt",
+      "label": "ALT",
+      "aliases": [
+        "丙氨酸氨基转移酶",
+        "丙氨酸转氨酶",
+        "谷丙转氨酶",
+        "丙氨酸氨基转氨酶"
+      ],
+      "abbreviations": [
+        "ALT",
+        "GPT",
+        "SGPT"
+      ],
+      "unit": "U/L",
+      "unitConversions": {
+        "u/l": 1,
+        "iu/l": 1
+      },
+      "low": null,
+      "high": 25,
+      "lowInclusive": null,
+      "highInclusive": true,
+      "text": "≤25 U/L",
+      "riskTier": "健康成人真实正常ALT上限（女性取范围较大值）",
+      "conditions": {
+        "sex": "female",
+        "minAge": 18,
+        "maxAge": null,
+        "nonPregnant": false,
+        "excludeConditions": [
+          "liverDisease"
+        ],
+        "requiresConditions": []
+      },
+      "basis": "ACG临床指南指出女性真实健康正常ALT上限范围为19–25 IU/l，超过此范围应评估。",
+      "evidenceLevel": "指南",
+      "sources": [
+        {
+          "title": "ACG Clinical Guideline: Evaluation of Abnormal Liver Chemistries.",
+          "year": 2017,
+          "doi": "10.1038/ajg.2016.517",
+          "pmid": "27995906",
+          "journal": "The American journal of gastroenterology",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/27995906/"
+        }
+      ],
+      "verification": {
+        "method": "pubmedAbstract",
+        "quote": "A true healthy normal ALT level ranges from 29 to 33 IU/l for males, 19 to 25 IU/l for females and levels above this should be assessed.",
+        "sourceValue": {
+          "low": null,
+          "high": 25,
+          "unit": "IU/l"
+        },
+        "checkedAt": "2026-11-24"
+      }
+    },
+    {
+      "id": "alt-2",
+      "indicator": "alt",
+      "label": "ALT",
+      "aliases": [
+        "丙氨酸氨基转移酶",
+        "丙氨酸转氨酶",
+        "谷丙转氨酶",
+        "丙氨酸氨基转氨酶"
+      ],
+      "abbreviations": [
+        "ALT",
+        "GPT",
+        "SGPT"
+      ],
+      "unit": "U/L",
+      "unitConversions": {
+        "u/l": 1,
+        "iu/l": 1
+      },
+      "low": null,
+      "high": 33,
+      "lowInclusive": null,
+      "highInclusive": true,
+      "text": "≤33 U/L",
+      "riskTier": "健康成人真实正常ALT上限（男性取范围较大值）",
+      "conditions": {
+        "sex": "male",
+        "minAge": 18,
+        "maxAge": null,
+        "nonPregnant": false,
+        "excludeConditions": [
+          "liverDisease"
+        ],
+        "requiresConditions": []
+      },
+      "basis": "ACG临床指南指出男性真实健康正常ALT上限范围为29–33 IU/l，超过此范围应评估。",
+      "evidenceLevel": "指南",
+      "sources": [
+        {
+          "title": "ACG Clinical Guideline: Evaluation of Abnormal Liver Chemistries.",
+          "year": 2017,
+          "doi": "10.1038/ajg.2016.517",
+          "pmid": "27995906",
+          "journal": "The American journal of gastroenterology",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/27995906/"
+        }
+      ],
+      "verification": {
+        "method": "pubmedAbstract",
+        "quote": "A true healthy normal ALT level ranges from 29 to 33 IU/l for males, 19 to 25 IU/l for females and levels above this should be assessed.",
+        "sourceValue": {
+          "low": null,
+          "high": 33,
+          "unit": "IU/l"
+        },
+        "checkedAt": "2026-11-24"
+      }
+    },
+    {
+      "id": "ferritin-1",
+      "indicator": "ferritin",
+      "label": "铁蛋白",
+      "aliases": [
+        "铁蛋白",
+        "血清铁蛋白"
+      ],
+      "abbreviations": [
+        "Fer",
+        "FER",
+        "SF",
+        "Ferritin",
+        "FERR"
+      ],
+      "unit": "ng/mL",
+      "unitConversions": {
+        "ng/ml": 1,
+        "μg/l": 1,
+        "pmol/l": 0.445
+      },
+      "low": null,
+      "high": 200,
+      "lowInclusive": null,
+      "highInclusive": true,
+      "text": "≤200 ng/mL",
+      "riskTier": "otherwise healthy men and non-menstruating women; iron overload risk above 200 µg/L",
+      "conditions": {
+        "sex": null,
+        "minAge": 18,
+        "maxAge": null,
+        "nonPregnant": true,
+        "excludeConditions": [],
+        "requiresConditions": []
+      },
+      "basis": "WHO推荐称，otherwise healthy男性和非月经女性铁蛋白超过200 µg/L可能提示铁过载风险。",
+      "evidenceLevel": "指南",
+      "sources": [
+        {
+          "title": "Use of ferritin concentrations to assess iron status in individuals and populations",
+          "year": 2023,
+          "doi": null,
+          "pmid": null,
+          "journal": null,
+          "url": "https://www.who.int/tools/elena/interventions/ferritin-concentrations"
+        }
+      ],
+      "verification": {
+        "method": "fetchedPage",
+        "quote": "A ferritin concentration exceeding 150 µg/L in menstruating women and 200 µg/L in men and non-menstruating women who are otherwise healthy may indicate a risk of iron overload (conditional recommendation, based on previous WHO recommendation).",
+        "sourceValue": {
+          "low": null,
+          "high": 200,
+          "unit": "µg/L"
+        },
+        "checkedAt": "2026-11-24"
+      }
+    },
+    {
+      "id": "ferritin-2",
+      "indicator": "ferritin",
+      "label": "铁蛋白",
+      "aliases": [
+        "铁蛋白",
+        "血清铁蛋白"
+      ],
+      "abbreviations": [
+        "Fer",
+        "FER",
+        "SF",
+        "Ferritin",
+        "FERR"
+      ],
+      "unit": "ng/mL",
+      "unitConversions": {
+        "ng/ml": 1,
+        "μg/l": 1,
+        "pmol/l": 0.445
+      },
+      "low": null,
+      "high": 150,
+      "lowInclusive": null,
+      "highInclusive": true,
+      "text": "≤150 ng/mL",
+      "riskTier": "otherwise healthy menstruating women; iron overload risk above 150 µg/L",
+      "conditions": {
+        "sex": "female",
+        "minAge": 18,
+        "maxAge": 49,
+        "nonPregnant": true,
+        "excludeConditions": [],
+        "requiresConditions": []
+      },
+      "basis": "WHO推荐称，otherwise healthy月经女性铁蛋白超过150 µg/L可能提示铁过载风险。",
+      "evidenceLevel": "指南",
+      "sources": [
+        {
+          "title": "Use of ferritin concentrations to assess iron status in individuals and populations",
+          "year": 2023,
+          "doi": null,
+          "pmid": null,
+          "journal": null,
+          "url": "https://www.who.int/tools/elena/interventions/ferritin-concentrations"
+        }
+      ],
+      "verification": {
+        "method": "fetchedPage",
+        "quote": "A ferritin concentration exceeding 150 µg/L in menstruating women and 200 µg/L in men and non-menstruating women who are otherwise healthy may indicate a risk of iron overload (conditional recommendation, based on previous WHO recommendation).",
+        "sourceValue": {
+          "low": null,
+          "high": 150,
+          "unit": "µg/L"
+        },
+        "checkedAt": "2026-11-24"
+      }
+    },
+    {
+      "id": "hcy-1",
+      "indicator": "hcy",
+      "label": "同型半胱氨酸",
+      "aliases": [
+        "同型半胱氨酸",
+        "血同型半胱氨酸",
+        "血清同型半胱氨酸"
+      ],
+      "abbreviations": [
+        "Hcy",
+        "HCY",
+        "HCYS"
+      ],
+      "unit": "μmol/L",
+      "unitConversions": {
+        "μmol/l": 1
+      },
+      "low": null,
+      "high": 10,
+      "lowInclusive": null,
+      "highInclusive": true,
+      "text": "≤10 μmol/L",
+      "riskTier": "非HHcy（AHA/ASA定义Hcy≤10 μmol/L）",
+      "conditions": {
+        "sex": null,
+        "minAge": 18,
+        "maxAge": null,
+        "nonPregnant": false,
+        "excludeConditions": [],
+        "requiresConditions": [
+          "hypertension"
+        ]
+      },
+      "basis": "资料转述AHA/ASA指南将Hcy>10 μmol/L定义为HHcy，故非HHcy为≤10 μmol/L。",
+      "evidenceLevel": "人群研究",
+      "sources": [
+        {
+          "title": "同型半胱氨酸与心脑血管疾病的关系及其干预界值争议",
+          "year": 2026,
+          "doi": null,
+          "pmid": null,
+          "journal": null,
+          "url": "https://rs.yiigle.com/cmaid/1673278"
+        }
+      ],
+      "verification": {
+        "method": "fetchedPage",
+        "quote": "美国心脏协会/美国卒中协会相关指南将Hcy>10 μmol/L定义为HHcy [ 9 ]",
+        "sourceValue": {
+          "low": null,
+          "high": 10,
+          "unit": "μmol/L"
+        },
+        "checkedAt": "2026-11-24"
+      }
+    },
+    {
+      "id": "hcy-2",
+      "indicator": "hcy",
+      "label": "同型半胱氨酸",
+      "aliases": [
+        "同型半胱氨酸",
+        "血同型半胱氨酸",
+        "血清同型半胱氨酸"
+      ],
+      "abbreviations": [
+        "Hcy",
+        "HCY",
+        "HCYS"
+      ],
+      "unit": "μmol/L",
+      "unitConversions": {
+        "μmol/l": 1
+      },
+      "low": null,
+      "high": 15,
+      "lowInclusive": null,
+      "highInclusive": true,
+      "text": "≤15 μmol/L",
+      "riskTier": "非HHcy（联合声明定义空腹tHcy≤15 μmol/L）",
+      "conditions": {
+        "sex": null,
+        "minAge": 18,
+        "maxAge": null,
+        "nonPregnant": false,
+        "excludeConditions": [],
+        "requiresConditions": []
+      },
+      "basis": "资料转述美国人类遗传学会等联合声明指出HHcy通常指空腹tHcy>15 μmol/L。",
+      "evidenceLevel": "人群研究",
+      "sources": [
+        {
+          "title": "同型半胱氨酸与心脑血管疾病的关系及其干预界值争议",
+          "year": 2026,
+          "doi": null,
+          "pmid": null,
+          "journal": null,
+          "url": "https://rs.yiigle.com/cmaid/1673278"
+        }
+      ],
+      "verification": {
+        "method": "fetchedPage",
+        "quote": "美国人类遗传学会与美国医学遗传学院的联合声明则指出，HHcy通常指空腹tHcy>15 μmol/L [ 38 ]。",
+        "sourceValue": {
+          "low": null,
+          "high": 15,
+          "unit": "μmol/L"
+        },
+        "checkedAt": "2026-11-24"
+      }
+    },
+    {
+      "id": "vitaminD-1",
+      "indicator": "vitaminD",
+      "label": "25-羟维生素D",
+      "aliases": [
+        "25-羟基维生素D",
+        "25羟维生素D",
+        "25-羟维生素D",
+        "25羟基维生素D",
+        "维生素D",
+        "总维生素D",
+        "25-羟基维生素D3",
+        "25-羟维生素D总"
+      ],
+      "abbreviations": [
+        "25(OH)D",
+        "25-OH-D",
+        "25OHD",
+        "25-OHD",
+        "VD",
+        "VitD"
+      ],
+      "unit": "ng/mL",
+      "unitConversions": {
+        "ng/ml": 1,
+        "μg/l": 1,
+        "nmol/l": 0.4006
+      },
+      "low": 20,
+      "high": 50,
+      "lowInclusive": true,
+      "highInclusive": true,
+      "text": "20–50 ng/mL",
+      "riskTier": "高于此水平风险增加的上限",
+      "conditions": {
+        "sex": null,
+        "minAge": 19,
+        "maxAge": null,
+        "nonPregnant": true,
+        "excludeConditions": [],
+        "requiresConditions": []
+      },
+      "basis": "IOM报告指出，对应RDA的血清25-羟基维生素D水平至少为20 ng/ml。；IOM报告提到，血清25OHD高于50 ng/ml时存在风险担忧。",
+      "evidenceLevel": "科学声明",
+      "sources": [
+        {
+          "title": "The 2011 report on dietary reference intakes for calcium and vitamin D from the Institute of Medicine: what clinicians need to know.",
+          "year": 2011,
+          "doi": "10.1210/jc.2010-2704",
+          "pmid": "21118827",
+          "journal": "The Journal of clinical endocrinology and metabolism",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/21118827/"
+        }
+      ],
+      "verification": [
+        {
+          "method": "pmcFullText",
+          "quote": "emerging concerns about risks at serum 25OHD levels above 50 ng/ml (125 nmol/liter).",
+          "sourceValue": {
+            "low": null,
+            "high": 50,
+            "unit": "ng/ml"
+          },
+          "checkedAt": "2026-11-24"
+        },
+        {
+          "method": "pubmedAbstract",
+          "quote": "For vitamin D, RDAs of 600 IU/d for ages 1-70 yr and 800 IU/d for ages 71 yr and older, corresponding to a serum 25-hydroxyvitamin D level of at least 20 ng/ml (50 nmol/liter), meet the requirements of at least 97.5% of the population.",
+          "sourceValue": {
+            "low": 20,
+            "high": null,
+            "unit": "ng/ml"
+          },
+          "checkedAt": "2026-11-24"
+        }
+      ]
+    },
+    {
+      "id": "bmi-1",
+      "indicator": "bmi",
+      "label": "BMI",
+      "aliases": [
+        "体重指数",
+        "体质指数",
+        "身体质量指数",
+        "体重指数BMI"
+      ],
+      "abbreviations": [
+        "BMI"
+      ],
+      "unit": "kg/m2",
+      "unitConversions": {
+        "kg/m2": 1,
+        "": 1
+      },
+      "low": null,
+      "high": 24,
+      "lowInclusive": null,
+      "highInclusive": false,
+      "text": "<24 kg/m2",
+      "riskTier": "正常/低风险（低于超重切点）",
+      "conditions": {
+        "sex": null,
+        "minAge": 18,
+        "maxAge": null,
+        "nonPregnant": true,
+        "excludeConditions": [],
+        "requiresConditions": []
+      },
+      "basis": "该资料采用中国肥胖问题工作组标准，将超重切点定为BMI≥24 kg/m2，故健康成人宜低于该切点。",
+      "evidenceLevel": "人群研究",
+      "sources": [
+        {
+          "title": "A comprehensive comparison of two commonly used BMI thresholds for non-communicable diseases and multimorbidity in the Chinese population.",
+          "year": 2025,
+          "doi": "10.1016/j.clnu.2025.03.016",
+          "pmid": "40154198",
+          "journal": "Clinical nutrition (Edinburgh, Scotland)",
+          "url": "https://www.sciencedirect.com/science/article/abs/pii/S0261561425000846"
+        }
+      ],
+      "verification": {
+        "method": "fetchedPage",
+        "quote": "China Working Group criteria (overweight: BMI≥24 kg/m2; obesity: BMI≥28 kg/m2) across 14 non-communicable diseases and multimorbidity.",
+        "sourceValue": {
+          "low": null,
+          "high": 24.0,
+          "unit": "kg/m2"
+        },
+        "checkedAt": "2026-11-24"
+      }
+    },
+    {
+      "id": "waist-1",
+      "indicator": "waist",
+      "label": "腰围",
+      "aliases": [
+        "腰围"
+      ],
+      "abbreviations": [
+        "WC"
+      ],
+      "unit": "cm",
+      "unitConversions": {
+        "cm": 1,
+        "m": 100,
+        "mm": 0.1
+      },
+      "low": null,
+      "high": 80,
+      "lowInclusive": null,
+      "highInclusive": false,
+      "text": "<80 cm",
+      "riskTier": "较低风险（腰围控制目标）",
+      "conditions": {
+        "sex": "female",
+        "minAge": 18,
+        "maxAge": null,
+        "nonPregnant": true,
+        "excludeConditions": [],
+        "requiresConditions": []
+      },
+      "basis": "该中国成人肥胖工作组Meta分析推荐将女性腰围控制在80 cm以下以降低危险因素聚集风险。",
+      "evidenceLevel": "人群研究",
+      "sources": [
+        {
+          "title": "Predictive values of body mass index and waist circumference for risk factors of certain related diseases in Chinese adults--study on optimal cut-off points of body mass index and waist circumference in Chinese adults.",
+          "year": 2002,
+          "doi": null,
+          "pmid": "12046553",
+          "journal": "Biomedical and environmental sciences : BES",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/12046553/"
+        }
+      ],
+      "verification": {
+        "method": "pubmedAbstract",
+        "quote": "The waist circumference controlled under 85 cm for men and under 80 cm for women, could prevent 47%-58% clustering of risk factors.",
+        "sourceValue": {
+          "low": null,
+          "high": 80,
+          "unit": "cm"
+        },
+        "checkedAt": "2026-11-24"
+      }
+    },
+    {
+      "id": "waist-2",
+      "indicator": "waist",
+      "label": "腰围",
+      "aliases": [
+        "腰围"
+      ],
+      "abbreviations": [
+        "WC"
+      ],
+      "unit": "cm",
+      "unitConversions": {
+        "cm": 1,
+        "m": 100,
+        "mm": 0.1
+      },
+      "low": null,
+      "high": 85,
+      "lowInclusive": null,
+      "highInclusive": false,
+      "text": "<85 cm",
+      "riskTier": "较低风险（腰围控制目标）",
+      "conditions": {
+        "sex": "male",
+        "minAge": 18,
+        "maxAge": null,
+        "nonPregnant": true,
+        "excludeConditions": [],
+        "requiresConditions": []
+      },
+      "basis": "该中国成人肥胖工作组Meta分析推荐将男性腰围控制在85 cm以下以降低危险因素聚集风险。",
+      "evidenceLevel": "人群研究",
+      "sources": [
+        {
+          "title": "Predictive values of body mass index and waist circumference for risk factors of certain related diseases in Chinese adults--study on optimal cut-off points of body mass index and waist circumference in Chinese adults.",
+          "year": 2002,
+          "doi": null,
+          "pmid": "12046553",
+          "journal": "Biomedical and environmental sciences : BES",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/12046553/"
+        }
+      ],
+      "verification": {
+        "method": "pubmedAbstract",
+        "quote": "The waist circumference controlled under 85 cm for men and under 80 cm for women, could prevent 47%-58% clustering of risk factors.",
+        "sourceValue": {
+          "low": null,
+          "high": 85,
+          "unit": "cm"
+        },
+        "checkedAt": "2026-11-24"
+      }
+    },
+    {
+      "id": "bodyFat-1",
+      "indicator": "bodyFat",
+      "label": "体脂率",
+      "aliases": [
+        "体脂率",
+        "体脂百分比",
+        "体脂肪率",
+        "体脂肪百分比",
+        "体脂肪含量百分比"
+      ],
+      "abbreviations": [
+        "PBF",
+        "BF%"
+      ],
+      "unit": "%",
+      "unitConversions": {
+        "%": 1
+      },
+      "low": null,
+      "high": 35,
+      "lowInclusive": null,
+      "highInclusive": true,
+      "text": "≤35 %",
+      "riskTier": "低风险/未定义超额脂肪",
+      "conditions": {
+        "sex": "female",
+        "minAge": 18,
+        "maxAge": null,
+        "nonPregnant": true,
+        "excludeConditions": [],
+        "requiresConditions": []
+      },
+      "basis": "该成人肥胖标准写明超额脂肪常用定义为男性>25%、女性>35%，目标上限取未超过该界值。",
+      "evidenceLevel": "指南",
+      "sources": [
+        {
+          "title": "Screening, Diagnosis, Evaluation, and Staging of Obesity in Adults: Standards of Care in Overweight and Obesity-2026.",
+          "year": 2026,
+          "doi": "10.2337/doci26-0003",
+          "pmid": "42888986",
+          "journal": "Diabetes, obesity, and cardiometabolic CARE",
+          "url": "https://diabetesjournals.org/docm-care/article/1/4/536/170058/Screening-Diagnosis-Evaluation-and-Staging-of"
+        }
+      ],
+      "verification": {
+        "method": "searchExtract",
+        "quote": "BMI in the overweight range (25–29.9 kg/m2) corresponds to 20–25% body fat in men and 32–38% in women, which has laid the foundation for the frequently cited definition of excess adiposity of >25% in men and >35% in women (43,44).",
+        "sourceValue": {
+          "low": null,
+          "high": 35,
+          "unit": "%"
+        },
+        "checkedAt": "2026-11-24"
+      }
+    },
+    {
+      "id": "bodyFat-2",
+      "indicator": "bodyFat",
+      "label": "体脂率",
+      "aliases": [
+        "体脂率",
+        "体脂百分比",
+        "体脂肪率",
+        "体脂肪百分比",
+        "体脂肪含量百分比"
+      ],
+      "abbreviations": [
+        "PBF",
+        "BF%"
+      ],
+      "unit": "%",
+      "unitConversions": {
+        "%": 1
+      },
+      "low": null,
+      "high": 25,
+      "lowInclusive": null,
+      "highInclusive": true,
+      "text": "≤25 %",
+      "riskTier": "低风险/未定义超额脂肪",
+      "conditions": {
+        "sex": "male",
+        "minAge": 18,
+        "maxAge": null,
+        "nonPregnant": true,
+        "excludeConditions": [],
+        "requiresConditions": []
+      },
+      "basis": "该成人肥胖标准写明超额脂肪常用定义为男性>25%、女性>35%，目标上限取未超过该界值。",
+      "evidenceLevel": "指南",
+      "sources": [
+        {
+          "title": "Screening, Diagnosis, Evaluation, and Staging of Obesity in Adults: Standards of Care in Overweight and Obesity-2026.",
+          "year": 2026,
+          "doi": "10.2337/doci26-0003",
+          "pmid": "42888986",
+          "journal": "Diabetes, obesity, and cardiometabolic CARE",
+          "url": "https://diabetesjournals.org/docm-care/article/1/4/536/170058/Screening-Diagnosis-Evaluation-and-Staging-of"
+        }
+      ],
+      "verification": {
+        "method": "searchExtract",
+        "quote": "BMI in the overweight range (25–29.9 kg/m2) corresponds to 20–25% body fat in men and 32–38% in women, which has laid the foundation for the frequently cited definition of excess adiposity of >25% in men and >35% in women (43,44).",
+        "sourceValue": {
+          "low": null,
+          "high": 25,
+          "unit": "%"
+        },
+        "checkedAt": "2026-11-24"
+      }
+    },
+    {
+      "id": "visceralFat-1",
+      "indicator": "visceralFat",
+      "label": "内脏脂肪面积",
+      "aliases": [
+        "内脏脂肪面积"
+      ],
+      "abbreviations": [
+        "VFA"
+      ],
+      "unit": "cm2",
+      "unitConversions": {
+        "cm2": 1
+      },
+      "low": null,
+      "high": 100,
+      "lowInclusive": null,
+      "highInclusive": false,
+      "text": "<100 cm2",
+      "riskTier": "低风险/非腹型肥胖（VFA<100 cm²）",
+      "conditions": {
+        "sex": null,
+        "minAge": 18,
+        "maxAge": null,
+        "nonPregnant": true,
+        "excludeConditions": [],
+        "requiresConditions": []
+      },
+      "basis": "资料指出按中国医学会指南，VFA≥100 cm²定义为腹型肥胖，故较低风险目标为低于100 cm²。",
+      "evidenceLevel": "人群研究",
+      "sources": [
+        {
+          "title": "Circulating CCDC3 as an Indicator of Visceral Fat Accumulation in Patients with Type 2 Diabetes Mellitus.",
+          "year": 2026,
+          "doi": "10.3390/metabo16020111",
+          "pmid": "41745594",
+          "journal": "Metabolites",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/41745594/"
+        }
+      ],
+      "verification": {
+        "method": "pmcFullText",
+        "quote": "Abdominal obesity (AO) was defined as VFA ≥ 100 cm 2 according to guidelines from the Chinese Medical Association.",
+        "sourceValue": {
+          "low": null,
+          "high": 100,
+          "unit": "cm2"
+        },
+        "checkedAt": "2026-11-24"
+      }
+    },
+    {
+      "id": "sbp-1",
+      "indicator": "sbp",
+      "label": "收缩压",
+      "aliases": [
+        "收缩压",
+        "血压收缩压",
+        "血压(收缩压)"
+      ],
+      "abbreviations": [
+        "SBP"
+      ],
+      "unit": "mmHg",
+      "unitConversions": {
+        "mmhg": 1,
+        "kpa": 7.50062
+      },
+      "low": null,
+      "high": 120,
+      "lowInclusive": null,
+      "highInclusive": false,
+      "text": "<120 mmHg",
+      "riskTier": "正常血压/较低风险",
+      "conditions": {
+        "sex": null,
+        "minAge": 18,
+        "maxAge": null,
+        "nonPregnant": true,
+        "excludeConditions": [
+          "hypertension"
+        ],
+        "requiresConditions": []
+      },
+      "basis": "该大样本人群研究按2017 ACC/AHA标准将正常血压定义为SBP<120 mm Hg，并以其作为较低风险参照类别。",
+      "evidenceLevel": "人群研究",
+      "sources": [
+        {
+          "title": "Stage 1 hypertension defined by the 2017 ACC/AHA blood pressure guideline and cardiometabolic multimorbidity in Chinese adults.",
+          "year": 2023,
+          "doi": "10.1111/jch.14719",
+          "pmid": "37710423",
+          "journal": "Journal of clinical hypertension (Greenwich, Conn.)",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/37710423/"
+        }
+      ],
+      "verification": {
+        "method": "pmcFullText",
+        "quote": "normal BP (systolic BP [SBP] < 120 mm Hg and diastolic BP [DBP] < 80 mm Hg)",
+        "sourceValue": {
+          "low": null,
+          "high": 120,
+          "unit": "mm Hg"
+        },
+        "checkedAt": "2026-11-24"
+      }
+    },
+    {
+      "id": "dbp-1",
+      "indicator": "dbp",
+      "label": "舒张压",
+      "aliases": [
+        "舒张压",
+        "血压舒张压",
+        "血压(舒张压)"
+      ],
+      "abbreviations": [
+        "DBP"
+      ],
+      "unit": "mmHg",
+      "unitConversions": {
+        "mmhg": 1,
+        "kpa": 7.50062
+      },
+      "low": null,
+      "high": 80,
+      "lowInclusive": null,
+      "highInclusive": false,
+      "text": "<80 mmHg",
+      "riskTier": "正常血压/较低风险",
+      "conditions": {
+        "sex": null,
+        "minAge": 18,
+        "maxAge": null,
+        "nonPregnant": true,
+        "excludeConditions": [
+          "hypertension"
+        ],
+        "requiresConditions": []
+      },
+      "basis": "该中国成人前瞻队列汇总分析显示，正常血压（SBP/DBP < 120/80 mmHg）相比1级高血压具有较低的心血管死亡风险，故以DBP<80 mmHg为上限。",
+      "evidenceLevel": "人群研究",
+      "sources": [
+        {
+          "title": "Associations of blood pressure categories defined by 2017 ACC/AHA guidelines with mortality in China: Pooled results from three prospective cohorts.",
+          "year": 2020,
+          "doi": "10.1177/2047487319862066",
+          "pmid": "31288541",
+          "journal": "European journal of preventive cardiology",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/31288541/"
+        }
+      ],
+      "verification": {
+        "method": "pubmedAbstract",
+        "quote": "Compared to normal blood pressure (SBP/DBP < 120/80 mmHg), newly defined stage 1 hypertension (SBP/DBP 130-139/80-89 mmHg) was associated with increased cardiovascular mortality",
+        "sourceValue": {
+          "low": null,
+          "high": 80,
+          "unit": "mmHg"
+        },
+        "checkedAt": "2026-11-24"
+      }
+    }
+  ],
+  "exampleValues": [
+    {
+      "indicator": "homaIr",
+      "exampleValue": "<1.5",
+      "status": "notAdopted",
+      "reason": "已核对出处给出的界值为 <1.4，示例数值无出处，不采用"
+    },
+    {
+      "indicator": "fastingInsulin",
+      "exampleValue": "<8 μIU/mL",
+      "status": "notAdopted",
+      "reason": "未找到给出该数值的指南、共识或高质量研究，不入表"
+    },
+    {
+      "indicator": "cPeptide",
+      "exampleValue": "1.2–2.5 ng/mL",
+      "status": "notAdopted",
+      "reason": "未找到给出该数值的指南、共识或高质量研究，不入表"
+    },
+    {
+      "indicator": "hba1c",
+      "exampleValue": "<5.4%",
+      "status": "notAdopted",
+      "reason": "已核对出处给出的界值为 <5.7 %，示例数值无出处，不采用"
+    },
+    {
+      "indicator": "fpg",
+      "exampleValue": "4.4–5.2 mmol/L",
+      "status": "notAdopted",
+      "reason": "已核对出处给出的界值为 <5.6 mmol/L，示例数值无出处，不采用"
+    },
+    {
+      "indicator": "tg",
+      "exampleValue": "<1.2 mmol/L",
+      "status": "notAdopted",
+      "reason": "已核对出处给出的界值为 <1.7 mmol/L，示例数值无出处，不采用"
+    },
+    {
+      "indicator": "tgHdl",
+      "exampleValue": "<1.3",
+      "status": "notAdopted",
+      "reason": "未找到给出该数值的指南、共识或高质量研究，不入表"
+    },
+    {
+      "indicator": "ldlC",
+      "exampleValue": "<2.6 mmol/L",
+      "status": "adopted",
+      "targetId": "ldlC-1",
+      "reason": "与已核对出处的界值一致"
+    },
+    {
+      "indicator": "apoB",
+      "exampleValue": "<0.8 g/L",
+      "status": "adopted",
+      "targetId": "apoB-2",
+      "reason": "与已核对出处的界值一致，但仅适用于糖尿病人群"
+    },
+    {
+      "indicator": "uricAcid",
+      "exampleValue": "男 ≤380 μmol/L",
+      "status": "notAdopted",
+      "reason": "未找到给出该数值的指南、共识或高质量研究，不入表"
+    },
+    {
+      "indicator": "hsCrp",
+      "exampleValue": "<1 mg/L",
+      "status": "adopted",
+      "targetId": "hsCrp-1",
+      "reason": "与已核对出处的界值一致"
+    },
+    {
+      "indicator": "ast",
+      "exampleValue": "18–25 U/L",
+      "status": "notAdopted",
+      "reason": "未找到给出该数值的指南、共识或高质量研究，不入表"
+    },
+    {
+      "indicator": "ggt",
+      "exampleValue": "男 <30 U/L",
+      "status": "notAdopted",
+      "reason": "未找到给出该数值的指南、共识或高质量研究，不入表"
+    },
+    {
+      "indicator": "alp",
+      "exampleValue": "≥50 U/L",
+      "status": "notAdopted",
+      "reason": "未找到给出该数值的指南、共识或高质量研究，不入表"
+    },
+    {
+      "indicator": "ferritin",
+      "exampleValue": "男 50–200 ng/mL",
+      "status": "notAdopted",
+      "reason": "已核对出处给出的界值为 ≤200 ng/mL，示例数值无出处，不采用"
+    },
+    {
+      "indicator": "mcv",
+      "exampleValue": "87–92 fL",
+      "status": "notAdopted",
+      "reason": "未找到给出该数值的指南、共识或高质量研究，不入表"
+    },
+    {
+      "indicator": "tsh",
+      "exampleValue": "1.0–2.5 mIU/L",
+      "status": "notAdopted",
+      "reason": "未找到给出该数值的指南、共识或高质量研究，不入表"
+    }
+  ],
+  "verifiedNotAdopted": [
+    {
+      "indicator": "apoB",
+      "value": 100,
+      "source": "Apolipoprotein B in cardiovascular risk assessment: beyond traditional lipid markers.",
+      "reason": "风险分层目标，报告无法判定受检者属于该层"
+    },
+    {
+      "indicator": "apoB",
+      "value": 130,
+      "source": "Apolipoprotein B in cardiovascular risk assessment: beyond traditional lipid markers.",
+      "reason": "风险分层目标，报告无法判定受检者属于该层"
+    },
+    {
+      "indicator": "uricAcid",
+      "value": 300,
+      "source": "2024 Update of Chinese Guidelines for Diagnosis and Treatment of Hyperuricemia and Gout Part I: Recommendations for General Patients.",
+      "reason": "风险分层目标，报告无法判定受检者属于该层"
+    },
+    {
+      "indicator": "ast",
+      "value": 32,
+      "source": "Upper limit of normal serum alanine and aspartate aminotransferase levels in Korea.",
+      "reason": "仅有单一人群（献血者）研究给出正常上限，无指南或共识支持，不作目标区间"
+    },
+    {
+      "indicator": "ast",
+      "value": 26,
+      "source": "Upper limit of normal serum alanine and aspartate aminotransferase levels in Korea.",
+      "reason": "仅有单一人群（献血者）研究给出正常上限，无指南或共识支持，不作目标区间"
+    },
+    {
+      "indicator": "fpg",
+      "value": "<6.1 mmol/L",
+      "source": "6. 中国人的易感性：当肥胖程度相同时，亚裔人糖尿病风险增加",
+      "reason": "同一指标已有证据等级更高或更新的出处"
+    },
+    {
+      "indicator": "lpa",
+      "value": "<500 mg/L",
+      "source": "Lipoprotein(a) as a cardiovascular risk factor: current status.",
+      "reason": "同一指标已有证据等级更高或更新的出处"
+    },
+    {
+      "indicator": "hcy",
+      "value": "≤10 μmol/L",
+      "source": "同型半胱氨酸与心脑血管疾病的关系及其干预界值争议",
+      "reason": "同一指标已有证据等级更高或更新的出处"
+    },
+    {
+      "indicator": "hcy",
+      "value": "<15 μmol/L",
+      "source": "同型半胱氨酸与心脑血管疾病的关系及其干预界值争议",
+      "reason": "同一指标已有证据等级更高或更新的出处"
+    }
+  ]
+}
