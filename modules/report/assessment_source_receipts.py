@@ -5,8 +5,9 @@ entry per P, one decision per server-listed claim (K) and its violations. Three
 kinds of deterministic help live here, none of which relaxes a source check:
 
 * Receipt normalization. A K returned under a sibling P or twice, a violation
-  naming records or passages that its P never used, citation ids attached to a
-  use that takes none, and a duplicated P entry are bookkeeping, not content.
+  naming records, passages or rule conclusions that its P never used, citation
+  ids attached to a use that takes none, and a duplicated P entry are
+  bookkeeping, not content.
   They are corrected before validation instead of costing a review round. No
   verdict is weakened and no violation is dropped.
 * Server repairs of receipt-only findings. A management action written inside
@@ -25,6 +26,9 @@ from __future__ import annotations
 import re
 import unicodedata
 from copy import deepcopy
+
+from .assessment_rule_sources import passage_handles
+from .assessment_rule_sources import rule_handles
 
 RECALL_TIMING_NOTE = '上述回顾内容的发生时间与相关检查结果的对应关系未确认。'
 
@@ -185,6 +189,18 @@ def normalize_receipt(row, cell):
                     if kept != passages:
                         corrections.append({'type': 'claim_passages_limited', 'id': kid})
                         decision['passageIds'] = list(dict.fromkeys(kept))
+            if 'ruleIds' in decision:
+                rules = decision['ruleIds']
+                if decision.get('use') != 'rule_conclusion':
+                    if rules:
+                        corrections.append({'type': 'claim_rules_dropped', 'id': kid})
+                    decision.pop('ruleIds')
+                elif isinstance(rules, list):
+                    allowed_rules = paragraphs[owner].get('ruleIds') or []
+                    kept = [rid for rid in rules if isinstance(rid, str) and rid in allowed_rules]
+                    if kept != rules:
+                        corrections.append({'type': 'claim_rules_limited', 'id': kid})
+                        decision['ruleIds'] = list(dict.fromkeys(kept))
             if 'observationIds' in decision and not isinstance(decision['observationIds'], list):
                 decision['observationIds'] = []
             placed[owner].append(decision)
@@ -220,7 +236,10 @@ def normalize_receipt(row, cell):
             for field, allowed in (
                 ('recordIds', source.get('recordIds') or []),
                 ('passageIds', source.get('passageIds') or []),
+                ('ruleIds', source.get('ruleIds') or []),
             ):
+                if field == 'ruleIds' and field not in violation:
+                    continue
                 values = violation.get(field)
                 limited = (
                     [value for value in values if isinstance(value, str) and value in allowed]
@@ -362,7 +381,7 @@ def repair_receipt_findings(paragraphs, issues, private_cell):
         remainder = ''.join(statement for position, statement in enumerate(statements) if position not in moved)
         action_text = _close(''.join(statements[position] for position in sorted(moved)))
         if not re.sub(r'[\W_]+', '', remainder):
-            result.append({**part, 'text': action_text, 'role': 'action', 'cite': []})
+            result.append({**part, 'text': action_text, 'role': 'action', 'cite': rule_handles(part.get('cite'))})
             origins.append(index)
             notes.append({'repair': ACTION_ROLE, 'paragraph': pid, 'mode': 'relabel'})
             continue
@@ -372,7 +391,7 @@ def repair_receipt_findings(paragraphs, issues, private_cell):
             {
                 'text': action_text,
                 'factIds': list(part.get('factIds') or ()),
-                'cite': [],
+                'cite': rule_handles(part.get('cite')),
                 'role': 'action',
             }
         )
@@ -425,6 +444,8 @@ def repaired_receipt(old_receipt, old_private, new_private, origins):
             decision = {**deepcopy(match), 'id': candidate['id']}
             if 'passageIds' in decision:
                 decision['passageIds'] = [value for value in decision['passageIds'] if value in part['passageIds']]
+            if 'ruleIds' in decision:
+                decision['ruleIds'] = [value for value in decision['ruleIds'] if value in part.get('ruleIds', ())]
             decisions.append(decision)
         paragraphs.append({'id': pid, 'sourceVerdict': 'supported', 'violations': [], 'claimDecisions': decisions})
     return {'id': old_receipt.get('id'), 'paragraphs': paragraphs}
@@ -529,9 +550,9 @@ def retained_paragraphs(paragraphs, statuses, issues):
         if text != part['text']:
             removed.append({'paragraph': pid, 'status': status, 'text': part['text'], 'kept': text})
         row = {**part, 'text': text}
-        if cell_level and row.get('role') == 'action' and row.get('cite'):
-            removed.append({'paragraph': pid, 'removedPassages': list(row['cite'])})
-            row['cite'] = []
+        if cell_level and row.get('role') == 'action' and passage_handles(row.get('cite')):
+            removed.append({'paragraph': pid, 'removedPassages': passage_handles(row['cite'])})
+            row['cite'] = rule_handles(row['cite'])
         kept.append(row)
         origins.append(index - 1)
     return kept, removed, origins

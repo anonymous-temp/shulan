@@ -3733,7 +3733,11 @@ def build_assessment_presentation(*, request, parsed, document, data, blueprint,
     from .assessment_clinical_view import build_clinical_view
     from .assessment_microbiome_view import annotate_microbiome_chart_fields
     from .assessment_microbiome_view import build_microbiome_view
+    from .assessment_rule_sources import attach_rule_references
 
+    # Literature of the rule conclusions cited by published text joins the
+    # final bibliography before any editorial reference list is read.
+    attach_rule_references(data, blueprint, accepted)
     clinical = build_clinical_view(request, parsed, document, data, reader_plan=True)
     data._assessment_reader_omitted_cells = list(clinical.pop('_readerOmittedCells', ()))
     blueprint.data._assessment_reader_omitted_cells = data._assessment_reader_omitted_cells

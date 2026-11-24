@@ -251,7 +251,7 @@ _CONDITION_LABELS = {'fasting': '空腹', 'non_fasting': '非空腹', 'postprand
 CLAIM_USES = {
     'acquisition_condition': ('observed_measurement', 'proposed_test', 'denied_or_general'),
     'external_threshold': ('applied_threshold', 'not_applied'),
-    'patient_action': ('patient_management', 'reported_advice', 'mixed_action', 'not_action'),
+    'patient_action': ('patient_management', 'reported_advice', 'rule_conclusion', 'mixed_action', 'not_action'),
     'event_relation': ('established_link', 'unestablished_or_other_event'),
 }
 
@@ -405,6 +405,20 @@ def _numeric_interval(text):
 
 def _named_action_objects(text, patterns):
     return {index for index, pattern in enumerate(patterns) if re.search(pattern, text, re.I)}
+
+
+def action_terms(text):
+    """Recognized specialties, procedures and explicit time limits named in ``text``.
+
+    Returns ``(specialties, procedures, intervals)``; the first two are indexes
+    into the shared vocabularies, intervals are ``(amount, unit)`` pairs.
+    """
+    normal = _normal(text)
+    return (
+        _named_action_objects(normal, _SPECIALTIES),
+        _named_action_objects(normal, _PROCEDURES),
+        _numeric_interval(normal),
+    )
 
 
 def _advice_instruction(term, item):
@@ -1427,6 +1441,8 @@ def claim_authority_issue(candidate, decision, paragraph, observations, *, passa
         return '本句含原医嘱及本报告新增行动，请分P分别核对象、条件、role和引文用途。'
     if kind == 'patient_action' and use != 'reported_advice' and _ADVICE_ORDER.search(candidate['term']):
         return '归为原医嘱的分层须有精确A依据；报告自己的分层应明确是本报告组织。'
+    if kind == 'patient_action' and use == 'rule_conclusion' and paragraph.get('role') != 'action':
+        return '本P实际提出患者管理行动，应与事实解释分段并标action；规则结论支持的安排同样单列行动段。'
     if kind == 'patient_action' and use == 'patient_management':
         if paragraph.get('role') != 'action':
             return '本P实际提出患者管理行动，应与事实解释分段并标action；不能借interpretation标签让背景引文给行动背书。'

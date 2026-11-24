@@ -34,6 +34,10 @@ from pydantic import BaseModel
 from utils.log import getLogger
 
 from .assessment_reviewed_synthesis import reviewed_cell_sources
+from .assessment_rule_sources import is_rule_handle
+from .assessment_rule_sources import model_rule_conclusions
+from .assessment_rule_sources import rule_conclusion_map
+from .assessment_rule_sources import sentence_rules
 from .assessment_source_receipts import add_recall_timing_note
 from .assessment_source_receipts import has_number
 from .assessment_source_receipts import recall_timing_targets
@@ -371,6 +375,11 @@ _PLANNED_WRITING_GUIDE = [
     'requiresPersonalAction要求至少一项实际适用的行动。',
     'contextPurpose列出程序已判定的内容（优先排查事项、常规随访、建议补查项目、体型判定要素等）时，'
     '逐项照用其中的时限、间隔、科室、检查和判定，不增删事项、不改写分级，只负责成句。',
+    'ruleConclusions列出本格范围内程序规则给出的结论（R编号），含时限、间隔、科室、需完成的检查、'
+    '补查项目及理由或目标区间，并附规则出处。照用这些内容的段落在cite中写对应R（可与E并列），'
+    '同时在factIds绑定该R的recordIds所列触发记录；时限、科室、检查、项目和数值照抄R，不改写、不新增。'
+    'R不是受检者的事实：发现、测值、日期和症状仍以F为依据；R也不是原检查建议，不写成医生原嘱。'
+    '只引用本格列出的R，正文不出现R编号。新增的其他行动另起一段，不与R的安排合写。',
     '需要呈现原检查建议时使用sourceAdviceScopes的quote与sourceFactIds成对绑定。每项建议独立表述，'
     '以实际含建议的F作为依据，cite留空。解释或总览只需概括有据的发现和先后，不必再转述其他格的建议。'
     '新行动另起action段，先核个人依据，再核引文能否在该人群和条件下支持此动作；'
@@ -427,6 +436,9 @@ _PLANNED_REVIEW_GUIDE = [
     '仅当实际正常项、对照或证据边界会改变判断时保留。引用的跨表事实必须说明它怎样影响本格判断。',
     'contextPurpose列出程序判定的事项时，核对每项是否都已成句，时限、间隔、科室、检查和分级是否照用；'
     '遗漏事项判missing_interpretation，改动或新增事项判unsupported_claim。',
+    'ruleConclusions中的R是程序规则结论。照用其时限、间隔、科室、检查、补查项目或目标值的段落须在cite中'
+    '引用相应R，并绑定R所列触发记录；与R不一致或超出R的内容判unsupported_claim，缺少R引用时在修订段补上。'
+    'R不能支持受检者的发现或测值，也不能写成原检查建议。',
     '章末小结须从本章已复核要点提炼优先判断或共同目标。它应告诉读者该先关心什么、为何或怎样复评，'
     '按question选择重点。逐行复述、单凭泛称下结论、忽略已核的重要矛盾或在小结引入新主张应修订。',
     '主张分别核实到本格实际F。外部引文核对同一人群、对象、检测、方向、研究端点和段落role。'
@@ -2178,12 +2190,12 @@ def _paragraphs(raw, *, clean_prose=True):
         text = re.sub(r'[ \t]*\n+[ \t]*', '', row['text'].strip())
         # Internal record/passage handles (F012, E3.1) are never content; a leaked
         # handle is removed rather than costing the whole cell.
-        handle = r'(?<![A-Za-z0-9])(?:F\d{2,4}|E\d{1,4}\.\d+|E\d{2,4})(?![0-9A-Za-z])'
+        handle = r'(?<![A-Za-z0-9])(?:F\d{2,4}|E\d{1,4}\.\d+|E\d{2,4}|R\d{2})(?![0-9A-Za-z])'
         text = re.sub(r'[（(\[【]?\s*' + handle + r'(?:\s*[,，、]\s*' + handle + r')*\s*[）)\]】]?', '', text)
         text = _LEAKED_LABEL.sub('', text)
         if clean_prose:
             text = reader_text(text, prose=True)
-        text = re.sub(r'\s*[\[【]\s*E\d+(?:\.\d+)?(?:\s*[,，、]\s*E\d+(?:\.\d+)?)*\s*[\]】]', '', text)
+        text = re.sub(r'\s*[\[【]\s*[ER]\d+(?:\.\d+)?(?:\s*[,，、]\s*[ER]\d+(?:\.\d+)?)*\s*[\]】]', '', text)
         title = _item_title(row.get('title'))
         if title and text and not text.startswith(title + '：'):
             text = title + '：' + text
@@ -2349,6 +2361,7 @@ def _block(target, paragraphs, dossier, library, spec):
         allowed_targets = getattr(library, 'allowed_targets', {})
         pids = [pid for pid in row['cite'] if pid not in allowed_targets or target['id'] in allowed_targets[pid]]
         citations = library.citation(pids) if spec['form'] == 'paragraph' else []
+        rules = sentence_rules(target.get('owner'), row['cite']) if spec['form'] == 'paragraph' else []
         used.update(ids)
         sentences.append(
             {
@@ -2357,6 +2370,7 @@ def _block(target, paragraphs, dossier, library, spec):
                 'role': sentence_role,
                 'evidence': citations,
                 'support': 'evidence' if citations else 'clinical_synthesis',
+                **({'rules': rules} if rules else {}),
             }
         )
     if (not (target.get('owner') or {}).get('contentPlanVersion') and primary
@@ -2921,6 +2935,8 @@ async def author_report_chapters(
                     ]
                 if owner.get('originalAdvice'):
                     cell['originalClinicalAdvice'] = list(owner['originalAdvice'])
+                if owner.get('ruleConclusions'):
+                    cell['ruleConclusions'] = model_rule_conclusions(owner['ruleConclusions'], dossier.handles)
                 if owner.get('sourceSemantics'):
                     cell['sourceSemantics'] = [
                         model_source_semantics({**source_semantic_context(row),
@@ -3023,13 +3039,22 @@ async def author_report_chapters(
                     role = part.get('role')
                     if role not in (target.get('allowedRoles') or ('interpretation',)):
                         return 'paragraph.role须显式填写本格allowedRoles之一；观察、解释与建议分别标识。'
+                    rules = {row['id']: row for row in cells[handle].get('ruleConclusions', ())}
                     for pid in part['cite']:
+                        if is_rule_handle(pid):
+                            if pid not in rules:
+                                return '本段cite中的规则编号不属于本格ruleConclusions；只引用本格列出的R。'
+                            triggers = set(rules[pid].get('recordIds') or ())
+                            if triggers and not triggers.intersection(part['factIds']):
+                                return ('引用规则结论R的段落须在factIds绑定触发该规则的记录：'
+                                        '受检者的发现和测值由F支持，R只支持时限、科室、检查、补查项目或目标值。')
+                            continue
                         roles = library.allowed_roles.get(pid, {}).get(target_id, set())
                         if role not in roles:
                             return ('本段引文不支持该对象或用途。核对allowedPassageIds和passageRoles，'
                                     '机制/意义与行动需要不同用途时分段。病例原值及原医嘱可以仅绑定recordIds。')
             elif any(pid in library.allowed_targets and target_id not in library.allowed_targets[pid]
-                     for part in paragraphs for pid in part['cite']):
+                     for part in paragraphs for pid in part['cite'] if not is_rule_handle(pid)):
                 return '引用对象、指标或适用人群不匹配；删去该推断或使用适用的原文证据。'
             prose = ' '.join(part['text'] for part in paragraphs)
             if not planned and any(dossier.uses_unverified_gene_label(
@@ -3178,7 +3203,8 @@ async def author_report_chapters(
                                             'text': '这一条的正文，不重复title；choice只填allowed中的一个值，'
                                                     'label只填短语',
                                             'factIds': ['本段用到的patient记录id，如F012'],
-                                            'cite': ['本段引用的evidence段落pid，如E3.1；没有引用则为空数组'],
+                                            'cite': ['本段引用的evidence段落pid（如E3.1）或本格ruleConclusions的'
+                                                     '规则编号（如R01）；没有引用则为空数组'],
                                             **({'role': 'observation|interpretation|action，选本段实际用途'}
                                                if planned else {}),
                                         }
@@ -3441,6 +3467,7 @@ async def author_report_chapters(
                 cell = cells[handle]
                 hints = _grounding_hints(
                     rows, known_numbers, library, json.dumps(cell.get('row', ''), ensure_ascii=False) + context_text
+                    + json.dumps(cell.get('ruleConclusions', []), ensure_ascii=False),
                 )
                 review_cells.append(
                     {
@@ -3480,6 +3507,7 @@ async def author_report_chapters(
                                 'clinicalSelections',
                                 'temporalRelations',
                                 'comparisonClaims',
+                                'ruleConclusions',
                                 'actionBasisRecordIds',
                                 'actionSourceDuty',
                                 'actionBasisScope',
@@ -3533,7 +3561,7 @@ async def author_report_chapters(
                                             'title': '原条目的小标题，保持不变',
                                             'text': '改好的这一条正文，不重复title',
                                             'factIds': ['F012'],
-                                            'cite': ['E3.1'],
+                                            'cite': ['E3.1', 'R01'],
                                             **({'role': 'observation|interpretation|action，保留或修正本段实际用途'}
                                                if planned else {}),
                                         }
@@ -3710,7 +3738,10 @@ async def author_report_chapters(
                                 if not part.get('factIds') or not set(part['factIds']) <= permitted:
                                     continue
                                 saved = previous.get('passageAnchors', {})
+                                current_rules = rule_conclusion_map(
+                                    (by_handle[handle].get('owner') or {}).get('ruleConclusions'))
                                 cites = [
+                                    (old if old in current_rules else None) if is_rule_handle(old) else
                                     next((pid for pid, value in library.passages.items()
                                           if list(value) == saved.get(old)
                                           and part['role'] in cells[handle]['passageRoles'].get(pid, ())), None)
@@ -3730,7 +3761,9 @@ async def author_report_chapters(
                         if scope.get('phase') != 'public_repair':
                             continue
                         if not candidate or not all(
-                            part.get('text') and part.get('factIds') and not part.get('cite')
+                            part.get('text') and part.get('factIds')
+                            and set(part.get('cite') or ()) <= set(rule_conclusion_map(
+                                (by_handle[handle].get('owner') or {}).get('ruleConclusions')))
                             and set(part['factIds']) <= permitted for part in candidate
                         ):
                             continue
