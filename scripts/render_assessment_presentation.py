@@ -968,11 +968,11 @@ def _abundance_svg(abundance, low, high, level, label):
 def _abundance_axis():
     labels = ''.join(
         f'<text class="tk" x="{_x(exponent, _LOG_LOW, _LOG_HIGH):.1f}" y="10" text-anchor="middle">'
-        f'{_e(_fmt(10.0**exponent))}%</text>'
+        f'{_e(_fmt(10.0**exponent))}</text>'
         for exponent in range(int(_LOG_LOW), int(_LOG_HIGH) + 1)
     )
     svg = f'<svg viewBox="0 0 {_SW:.0f} 13" aria-hidden="true">{labels}</svg>'
-    return f'<div class="as-axis"><div></div><div></div><div>{svg}</div><div>相对丰度（对数刻度）</div></div>'
+    return f'<div class="as-axis"><div></div><div></div><div>{svg}</div><div>相对丰度（%，对数刻度）</div></div>'
 
 
 def _trend_svg(points, label):
