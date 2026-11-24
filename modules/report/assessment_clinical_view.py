@@ -8,16 +8,15 @@ from collections import defaultdict
 from copy import deepcopy
 from decimal import Decimal
 from decimal import InvalidOperation
-from functools import cache
-from importlib.resources import files
 from types import SimpleNamespace
-from typing import Literal
-from typing import Pattern
 
-from pydantic import BaseModel
-from pydantic import Field
-from pydantic import field_validator
-
+from .assessment_clinical_rules import LEVEL_LABELS
+from .assessment_clinical_rules import SubjectContext
+from .assessment_clinical_rules import annotate_rows
+from .assessment_clinical_rules import judge
+from .assessment_clinical_rules import subject_context
+from .assessment_clinical_rules import summarize_levels
+from .assessment_clinical_rules import worst_level
 from .assessment_reading_labels import clinical_observation_display_name as clinical_observation_display_name
 from .clinical_report import _SYMPTOM_LABEL
 from .clinical_report import _denied_title
@@ -80,9 +79,10 @@ _CLINICAL_GROUPS = (
         '糖脂代谢、胰岛素敏感性与心血管系统评估',
         re.compile(
             r'血糖|葡萄糖|糖化|胰岛素|c[ -]?肽|homa|低密度|高密度|胆固醇|甘油三酯|载脂蛋白|脂蛋白\s*\(?a\)?|'
-            r'血脂|心电图|心脏|心肌|心动图|左心|右心|心室|血压|心率|脉搏|颈动脉|脑血流|脑血管|颅多普勒|'
-            r'动脉硬化|腕踝|踝肱|钠尿肽|早期糖(?:代谢|尿病)(?:风险|筛查)|肌酸激酶|肌钙蛋白|乳酸脱氢酶|'
-            r'(?<![A-Za-z])(?:CK(?:-?MB)?|LDH|cTn[IT]|BNP|NT-proBNP|TCD|ABI|baPWV|PWV|OGTT|eZscan)(?![A-Za-z])',
+            r'血脂|心电图|心脏|心肌|心动图|左心|右心|心室|心房|左室|右室|左房|右房|瓣膜|[二三]尖瓣|主动脉瓣|肺动脉瓣|射血分数|'
+            r'血压|心率|脉搏|颈动脉|颈部血管|颈[总内外]动脉|椎动脉|下肢动脉彩超|'
+            r'钠尿肽|肌酸激酶|肌钙蛋白|肌红蛋白|乳酸脱氢酶|'
+            r'(?<![A-Za-z])(?:CK(?:-?MB)?|LDH|cTn[IT]|BNP|NT-proBNP|OGTT|ECG|EKG)(?![A-Za-z])',
             re.I,
         ),
     ),
@@ -90,7 +90,8 @@ _CLINICAL_GROUPS = (
         'organMetabolism',
         '肝胆胰消化、肾脏代谢与营养辅酶状态评估',
         re.compile(
-            r'肝脏|脂肪肝|肝胆|胆囊|胆管|胆汁酸|胆红素|转氨酶|氨基(?:酸)?转移酶|谷氨酰(?:基转移|转肽)酶|胆碱酯酶|'
+            r'肝脏|脂肪肝|肝胆|(?<![乙丙甲戊型])肝(?!炎病毒)|胆囊|胆管|胆汁酸|胆红素|转氨酶|氨基(?:酸)?转移酶|'
+            r'谷氨酰(?:基转移|转肽)酶|胆碱酯酶|'
             r'肌酐|尿素|尿酸|肾(?!上腺)|尿常规|胃|肠镜|粪便|大便|肛门|直肠|胰腺|淀粉酶|脂肪酶|'
             r'幽门螺杆菌|碳\s*(?:13|14).*呼气|尿素呼气|腹部(?:彩超|超声|CT)|'
             r'总蛋白|白蛋白|(?<!免疫)球蛋白|白球蛋白比|碱性磷酸酶|肝纤维化|甘脯二肽|岩藻糖苷酶|腺苷脱氨酶|'
@@ -105,7 +106,11 @@ _CLINICAL_GROUPS = (
         re.compile(
             r'血常规|红细胞|血红蛋白|白细胞|血小板|淋巴细胞|单核细胞|粒细胞|铁蛋白|转铁蛋白|血清铁|同型半胱氨酸|'
             r'叶酸|维生素\s*b\s*12|c[ -]?反应蛋白|免疫球蛋白|类风湿因子|抗链球菌溶血素|'
-            r'炎症|凝血|(?<![A-Za-z])(?:MCV|MCHC?|RDW|HCY|IgG|IgA|IgM|RF|ASO)(?![A-Za-z])',
+            r'炎症|凝血|纤维蛋白原|D-?二聚体|血型|血沉|红细胞沉降率|降钙素原|补体|抗核抗体|抗双链|抗环瓜氨酸|'
+            r'乙肝|乙型肝炎|丙肝|丙型肝炎|表面抗原|表面抗体|e抗原|e抗体|核心抗体|艾滋|梅毒|人类免疫缺陷|病毒|'
+            r'结核|支原体|衣原体|过敏原|变应原|总IgE|乳头瘤|感染|'
+            r'(?<![A-Za-z])(?:MCV|MCHC?|RDW|HCY|IgG|IgA|IgM|IgE|RF|ASO|ESR|PCT|ANA|ENA|HBsAg|HBsAb|HBeAg|HBeAb|'
+            r'HBcAb|HCV|HIV|TPPA|TRUST|RPR|HPV|EBV|CMV|T-SPOT|APTT|INR|PT|TT|FIB|DD)(?![A-Za-z])',
             re.I,
         ),
     ),
@@ -115,8 +120,10 @@ _CLINICAL_GROUPS = (
         re.compile(
             r'甲状腺|甲状旁腺|甲状原氨酸|甲功|雌二醇|孕酮|睾酮|性激素|皮质醇|骨密度|骨骼|颈椎|胸椎|腰椎|椎间盘|肌量|'
             r'关节|肾上腺|泌乳素|促性腺激素|促卵泡刺激素|促黄体生成素|乳腺|钼靶|双乳|左乳|右乳|肺|前列腺|胸部|'
-            r'经腹妇科|妇科(?:检查|超声|彩超|影像)|子宫|卵巢|宫颈|盆腔(?:超声|彩超|影像)|'
-            r'口腔|牙周|视力|屈光|眼科|(?<![A-Za-z])(?:TSH|FT[34]|T[34]|FSH|LH|PRL)(?![A-Za-z0-9])',
+            r'经腹妇科|妇科|子宫|卵巢|附件|宫颈|阴道|白带|液基细胞|盆腔(?:超声|彩超|影像)|睾丸|精索|阴囊|'
+            r'纵隔|胸片|头颅|颅脑|垂体|骨|肌|脊柱|四肢|淋巴结|皮肤|耳|鼻|咽|喉|扁桃体|口腔|牙|视力|屈光|眼|'
+            r'内科|外科|查体|体格检查|一般情况|绒毛膜促性腺|'
+            r'(?<![A-Za-z])(?:TSH|FT[34]|T[34]|FSH|LH|PRL|TCT|TPOAb|TGAb|TRAb|DR|CT|MRI)(?![A-Za-z0-9])',
             re.I,
         ),
     ),
@@ -125,7 +132,7 @@ _CLINICAL_PANELS = {
     'cardiometabolic': (
         ('insulinSensitivity', '稳态胰岛素抵抗指数（HOMA-IR）', r'HOMA|稳态.*胰岛素抵抗'),
         ('fastingInsulin', '胰岛素与 C 肽', r'空腹胰岛素|(?:^|空腹)C[ -]?肽|^C[ -]?peptide|^胰岛素(?:INS)?$'),
-        ('glycemia', '糖化血红蛋白与血糖', r'糖化|血糖|葡萄糖|糖耐量|糖(?:尿病|代谢).*筛查|OGTT|eZscan'),
+        ('glycemia', '糖化血红蛋白与血糖', r'糖化|血糖|葡萄糖|糖耐量|OGTT'),
         ('triglycerides', '甘油三酯与相关指标', r'甘油三酯|^TG(?![A-Za-z])|残余胆固醇'),
         (
             'cholesterol',
@@ -133,13 +140,21 @@ _CLINICAL_PANELS = {
             r'胆固醇|[高低]密度脂蛋白|载脂蛋白|脂蛋白\s*\(?a\)?|^Apo|\b(?:LDL|HDL)(?:-?C)?\b|^TC$',
         ),
         ('cardiacMarkers', '心肌损伤相关检查', r'肌酸激酶|肌钙蛋白|乳酸脱氢酶|\b(?:CK(?:-?MB)?|LDH|cTn[IT])\b'),
-        ('cardiac', '心脏相关检查', r'心电图|心脏|心动图|心肌|心室|钠尿肽|(?:NT-pro)?BNP'),
-        ('cerebrovascular', '脑血管功能检测', r'脑血流|脑血管|颅多普勒|\bTCD\b'),
-        ('arterial', '颈动脉彩超与四肢动脉硬化', r'颈动脉|动脉硬化|腕踝|踝肱|\b(?:ABI|baPWV|PWV)\b'),
+        (
+            'cardiac',
+            '心脏相关检查',
+            r'心电图|心脏|心动图|心肌|心室|心房|左室|右室|左房|右房|瓣膜|[二三]尖瓣|主动脉瓣|肺动脉瓣|射血分数|'
+            r'钠尿肽|(?:NT-pro)?BNP|ECG|EKG',
+        ),
+        ('arterial', '颈动脉与外周动脉彩超', r'颈动脉|颈部血管|颈[总内外]动脉|椎动脉|下肢动脉彩超'),
     ),
     'organMetabolism': (
         ('stool', '粪便常规与隐血试验', r'粪便|大便|^隐血|镜检|^性状$|^颜色$|虫卵'),
-        ('abdominalImaging', '腹部影像与肝胆胰脾肾所见', r'腹部|肝胆|彩超|脂肪肝|肝囊肿|胆囊息肉|胆囊结石'),
+        (
+            'abdominalImaging',
+            '腹部影像与肝胆胰脾肾所见',
+            r'腹部|肝胆|彩超|脂肪肝|肝囊肿|肝血管瘤|肝内|胆囊|胰腺|脾|肾(?:脏)?(?:囊肿|结石|结晶)',
+        ),
         ('cholinesterase', '血清胆碱酯酶', r'胆碱酯酶|^ChE$'),
         ('aminotransferases', '转氨酶与肝脏相关指标', r'转氨酶|氨基(?:酸)?转移酶|AST|ALT|肝纤维化|FIB[- ]?4'),
         (
@@ -164,8 +179,20 @@ _CLINICAL_PANELS = {
         (
             'immuneInflammation',
             '体液免疫、风湿免疫与炎症',
-            r'免疫|类风湿因子|抗链球菌溶血素|反应蛋白|炎症|'
-            r'(?<![A-Za-z])(?:RF|ASO|Ig[AGM]|hs[- ]?CRP)(?![A-Za-z])',
+            r'免疫球蛋白|类风湿因子|抗链球菌溶血素|反应蛋白|炎症|补体|抗核抗体|抗双链|抗环瓜氨酸|血沉|红细胞沉降率|'
+            r'(?<![A-Za-z])(?:RF|ASO|Ig[AGM]|hs[- ]?CRP|ESR|ANA|ENA)(?![A-Za-z])',
+        ),
+        (
+            'infection',
+            '感染与免疫学筛查',
+            r'乙肝|乙型肝炎|丙肝|丙型肝炎|表面抗原|表面抗体|e抗原|e抗体|核心抗体|艾滋|梅毒|人类免疫缺陷|病毒|结核|'
+            r'支原体|衣原体|过敏原|变应原|IgE|乳头瘤|降钙素原|感染|'
+            r'(?<![A-Za-z])(?:HBsAg|HBsAb|HBeAg|HBeAb|HBcAb|HCV|HIV|TPPA|TRUST|RPR|HPV|EBV|CMV|T-SPOT|PCT)(?![A-Za-z])',
+        ),
+        (
+            'coagulation',
+            '凝血功能与血型',
+            r'凝血|纤维蛋白原|D-?二聚体|血型|(?<![A-Za-z])(?:APTT|INR|PT|TT|FIB|DD|ABO|Rh)(?![A-Za-z])',
         ),
     ),
     'endocrineMusculoskeletal': (
@@ -174,15 +201,46 @@ _CLINICAL_PANELS = {
             '甲状腺彩超与甲状腺功能',
             r'甲状腺|甲功|甲状原氨酸|(?<![A-Za-z])(?:TSH|FT[34]|T[34])(?![A-Za-z0-9])',
         ),
-        ('sexHormones', '性激素检查', r'性激素|孕酮|睾酮|雌二醇|泌乳素|促卵泡刺激素|促黄体生成素|\b(?:FSH|LH|PRL)\b'),
+        (
+            'sexHormones',
+            '性激素检查',
+            r'性激素|孕酮|睾酮|雌二醇|泌乳素|促卵泡刺激素|促黄体生成素|绒毛膜促性腺|\b(?:FSH|LH|PRL|[βb]?-?HCG)\b',
+        ),
         ('spinalImaging', '脊柱影像与骨关节所见', r'(?:颈|胸|腰)椎|椎间盘|脊柱|关节'),
         ('boneDensity', '骨密度测量', r'骨密度|T[- ]?Score|Z[- ]?Score'),
         ('breastImaging', '乳腺检查', r'乳腺|钼靶|双乳|左乳|右乳'),
-        ('gynecologicImaging', '妇科检查与影像', r'妇科|子宫|卵巢|宫颈|盆腔(?:超声|彩超|影像)'),
-        ('otherImaging', '胸部及其他器官影像', r'胸部|肺|前列腺'),
-        ('oralEye', '口腔与眼科查体', r'口腔|牙周|牙石|龋齿|屈光|视力|眼科'),
+        (
+            'gynecologicImaging',
+            '妇科检查与影像',
+            r'妇科|子宫|卵巢|附件|宫颈|阴道|白带|液基细胞|TCT|盆腔(?:超声|彩超|影像)',
+        ),
+        (
+            'otherImaging',
+            '胸部及其他器官影像',
+            r'胸部|肺|前列腺|纵隔|胸片|头颅|颅脑|垂体|睾丸|精索|阴囊|\b(?:CT|MRI|DR)\b',
+        ),
+        ('oralEye', '口腔与眼科查体', r'口腔|牙周|牙石|龋齿|牙|屈光|视力|眼'),
+        ('physicalExam', '耳鼻喉、皮肤与一般查体', r'耳|鼻|咽|喉|扁桃体|皮肤|淋巴结|内科|外科|查体|体格检查|一般情况'),
     ),
+    # 3.5: device studies stay in specialtyFindings; anything without a fixed system ends in "其他检查".
+    'specialty': (
+        ('arterial', '四肢动脉硬化检测', r'动脉硬化|四肢动脉|腕踝|踝肱|ABI|baPWV|PWV'),
+        ('cerebrovascular', '脑血管功能检测', r'脑血流|脑血管|颅多普勒|TCD'),
+        ('diabetesScreening', '糖尿病风险筛查', r'eZscan|糖尿病|糖代谢|外汗腺'),
+    ),
+    'otherClinical': (('otherExams', '其他检查', r''),),
 }
+_GROUP_NAMES = {
+    **{code: name for code, name, _ in _CLINICAL_GROUPS},
+    'specialty': '专项检测与筛查',
+    'otherClinical': '其他检查',
+}
+_DEVICE_STUDY = re.compile(
+    r'脑血流|脑血管(?!成像|造影)|颅多普勒|(?<![A-Za-z])(?:TCD|ABI|baPWV|PWV|eZscan)(?![A-Za-z])|动脉硬化|四肢动脉|腕踝|踝肱|'
+    r'早期糖(?:代谢|尿病)(?:风险|筛查)|糖尿病(?:早期)?风险筛查|外汗腺',
+    re.I,
+)
+_HCG = re.compile(r'人绒毛膜促性腺激素|绒毛膜促性腺|(?<![A-Za-z])(?:[βb][-\s]?)?HCG(?![A-Za-z])', re.I)
 _DIGESTIVE_GROUPS = (
     (
         'oralGastric',
@@ -206,8 +264,8 @@ _SPECIALTY = re.compile(
 )
 _SCREENING_BASELINE = re.compile(
     r'肿瘤标志物|甲胎蛋白|癌胚抗原|糖[链类]抗原|前列腺特异性抗原|细胞角蛋白片段|肿瘤细胞|肿瘤早筛|泛癌早筛|'
-    r'微小核酸|microRNA|人绒毛膜促性腺激素|'
-    r'(?<![A-Za-z])(?:AFP|CEA|CYFRA\s*21-1|NSE|SCC|TPSA|FPSA|[βb]-?HCG|'
+    r'微小核酸|microRNA|'
+    r'(?<![A-Za-z])(?:AFP|CEA|CYFRA\s*21-1|NSE|SCC|TPSA|FPSA|'
     r'CA\s*(?:19-9|125|15-3|72-4|50|242))(?![A-Za-z])',
     re.I,
 )
@@ -222,8 +280,13 @@ _NORMAL_BASELINE_ROLES = (
     ('humoral', re.compile(r'免疫球蛋白|\bIg[AGM]\b', re.I)),
     ('endocrine', re.compile(r'促甲状腺激素|游离.*甲状(?:原氨酸|腺素)|\b(?:TSH|FT[34])\b', re.I)),
     ('bone', re.compile(r'骨密度')),
-    ('organImaging', re.compile(r'前列腺|腹部.*(?:超声|彩超)|肝胆胰脾.*(?:超声|彩超)')),
+    ('organImaging', re.compile(r'腹部.*(?:超声|彩超)|肝胆胰脾.*(?:超声|彩超)|甲状腺.*(?:超声|彩超)|胸部.*CT|肺')),
 )
+# Sex-specific organ studies that also count as a confirmed baseline.
+_SEXED_ORGAN_IMAGING = {
+    'male': re.compile(r'前列腺|睾丸|精索|阴囊'),
+    'female': re.compile(r'乳腺|钼靶|双乳|左乳|右乳|妇科|子宫|卵巢|附件|宫颈|液基细胞|TCT|HPV|乳头瘤'),
+}
 _ACTUAL_SPECIALTY = re.compile(
     r'人体成分(?:分析|测定|检测)|体成分(?:分析|测定|检测)|InBody|骨密度|脑血管功能|'
     r'四肢动脉|动脉硬化|eZscan|功能医学|遗传(?:检测|易感)|生物(?:学)?年龄|'
@@ -360,7 +423,7 @@ _EXAM_RESULT_HEADING = re.compile(
     r'检测结果和建议|检测结果|结论)\s*[:：]'
 )
 _BODY_SIZE = re.compile(
-    r'身高|(?:^|成分)体重(?:[（(]|$)|体重指数|体质指数|(?<![A-Za-z])BMI(?![A-Za-z])|腰围|臀围',
+    r'身高|(?:^|成分|测量)体重(?:[（(]|$)|体重指数|体质指数|(?<![A-Za-z])BMI(?![A-Za-z])|腰围|臀围',
     re.I,
 )
 _BODY_CORE = re.compile(
@@ -766,7 +829,7 @@ def _atomic_exam_rows(row, verified_titles):
                 'unit': None,
                 'referenceRange': None,
                 'status': None,
-                'templateStatus': '原文正常所见' if normal else '有异常所见' if exact_titles else None,
+                'templateStatus': '所见正常' if normal else '有异常所见' if exact_titles else None,
                 'sourceSection': row['sourceSection'] or row['name'],
                 'interpretation': None,
                 'evidenceRefs': [],
@@ -796,7 +859,7 @@ def _atomic_exam_rows(row, verified_titles):
                     'unit': None,
                     'referenceRange': None,
                     'status': None,
-                    'templateStatus': '原文正常所见',
+                    'templateStatus': '所见正常',
                     'sourceSection': row['sourceSection'] or row['name'],
                     'interpretation': None,
                     'evidenceRefs': [],
@@ -889,12 +952,12 @@ def _clinical_rows(data, contexts, exam_findings, document, projection_index):
                 and conclusion == item.name and re.search(r'结节|息肉|囊肿|结石|钙化灶|增生|退变', conclusion)
                 and not re.search(r'未见|未发现|排除|无|疑|可能|考虑', conclusion)
             )
-            state = '原文正常所见' if normal else _source_status(item, bool(verified or positive_lesion))
+            state = '所见正常' if normal else _source_status(item, bool(verified or positive_lesion))
             if not state and is_finding:
                 state = _screening_conclusion(item.name, item.value)
                 qualified = re.fullmatch(r'[^，,；;。]{0,25}(?:总体|大致|基本)正常', str(item.value))
                 if not state and qualified:
-                    state = '原文：' + item.value
+                    state = '所见：' + item.value
             embedded_reference, embedded_status = _arterial_qualifiers(item.name, item.value)
             if embedded_status and not _has_value(item.source_status):
                 state = embedded_status
@@ -1175,7 +1238,16 @@ def _urinary_name(name):
     return bool(urine_item_label(name) or re.match(r'^尿(?!素(?:氮|呼气|\b|[（(]|$)|酸(?:\b|[（(]|$))', name))
 
 
-def _group_code(name, definitions, *, specimen=None, section=None):
+def _female(sex):
+    return str(sex or '').strip().casefold() in {'女', '女性', 'f', 'female'}
+
+
+def _tumor_marker(name, sex=None):
+    """A tumor marker; HCG is a pregnancy/hormone test in women and a germ-cell marker otherwise."""
+    return bool(_SCREENING_BASELINE.search(name or '') or _HCG.search(name or '') and not _female(sex))
+
+
+def _group_code(name, definitions, *, specimen=None, section=None, sex=None):
     if specimen == '粪便':
         if definitions is _CLINICAL_GROUPS:
             return 'organMetabolism'
@@ -1186,8 +1258,13 @@ def _group_code(name, definitions, *, specimen=None, section=None):
             return 'organMetabolism'
         if definitions is _DIGESTIVE_GROUPS:
             return None
-    if definitions is _CLINICAL_GROUPS and _SCREENING_BASELINE.search(name):
-        return None
+    if definitions is _CLINICAL_GROUPS:
+        if _tumor_marker(name, sex):
+            return None
+        if _HCG.search(name or ''):
+            return 'endocrineMusculoskeletal'
+        if _DEVICE_STUDY.search(name or '') or _DEVICE_STUDY.search(section or ''):
+            return 'specialty'
     if definitions is _BODY_GROUPS and section and definitions[1][2].search(section):
         if definitions[0][2].search(name) or definitions[1][2].search(name):
             return 'bodyComposition'
@@ -1200,13 +1277,23 @@ def _group_code(name, definitions, *, specimen=None, section=None):
     return None
 
 
-def clinical_group_for(name, *, specimen=None, section=None):
-    """The assessment system for a clinical measurement, independent of its status."""
-    return _group_code(name, _CLINICAL_GROUPS, specimen=specimen, section=section)
+def clinical_group_for(name, *, specimen=None, section=None, sex=None):
+    """The assessment system for a clinical measurement, independent of its status.
+
+    Besides the four fixed systems, ``specialty`` marks a device study (3.5) and
+    ``otherClinical`` any item without a fixed system; ``None`` is a tumor marker,
+    which is shown as an abnormal specialty finding or a normal baseline.
+    """
+    if not name and not section:
+        return None
+    code = _group_code(name, _CLINICAL_GROUPS, specimen=specimen, section=section, sex=sex)
+    if code is None and not _tumor_marker(name, sex):
+        return 'otherClinical'
+    return code
 
 
 def _measurement_state(status):
-    if status in {'参考范围内', '已检项目未见异常', '未见肿瘤细胞', '原文正常所见'}:
+    if status in {'参考范围内', '已检项目未见异常', '未见肿瘤细胞', '所见正常'}:
         return 'normal'
     if status in _BODY_FLAG_STATES or status in {'偏硬', '有异常所见'}:
         return 'abnormal'
@@ -1284,139 +1371,69 @@ def _template_status(rows):
     return '；'.join(observed)
 
 
-class _NumericTarget(BaseModel):
-    label: str
-    target: str
-
-    @field_validator('target')
-    @classmethod
-    def ordered_numeric_limit(cls, value):
-        number = r'[+-]?(?:\d+(?:\.\d*)?|\.\d+)'
-        if re.fullmatch(rf'(?:<=|>=|≤|≥|<|>){number}', value):
-            return value
-        pair = re.fullmatch(rf'({number})–({number})', value)
-        if pair and Decimal(pair[1]) <= Decimal(pair[2]):
-            return value
-        raise ValueError('Expected an ordered numeric interval or single comparison bound')
-
-
-class _TemplateTarget(_NumericTarget):
-    namePattern: Pattern[str]
-    units: list[str] = Field(min_length=1)
-    page: int = Field(ge=1)
-    sex: Literal['男', '女'] | None = None
-    calculation: str | None = None
-    targetNote: str | None = None
-
-
-class _ScreeningInterval(_NumericTarget):
-    source: str
-    url: str
-    status: str
-
-
-class _ComparisonTable(BaseModel):
-    template: str
-    version: Literal['01']
-    population: Literal['成人']
-    minimumAge: int = Field(ge=18)
-    comparisons: list[_TemplateTarget]
-    screening: list[_ScreeningInterval]
-
-
-@cache
-def _comparison_table():
-    resource = files(__package__).joinpath('assessment_template_01_comparisons.json')
-    return _ComparisonTable.model_validate_json(resource.read_bytes())
-
-
-def _template_comparisons(rows, subject):
-    """Evaluate the chosen template on matching adult observations without relabelling their clinical status."""
-    sex = str(getattr(subject, 'sex', '') or '').casefold()
-    table = _comparison_table()
-    if not str(getattr(subject, 'age', '')).isdigit() or int(subject.age) < table.minimumAge:
+def _target_comparisons(rows, context):
+    """Applicable evidence-based targets for the panel rows; the clinical status is never relabelled."""
+    if context is None:
         return []
     result = []
     for row in rows:
         if row.get('_sourceRole') not in {'derived_measurement', 'direct_measurement'}:
             continue
-        name = re.sub(r'\s+', '', unicodedata.normalize('NFKC', row['name']))
-        unit = unicodedata.normalize('NFKC', str(row['unit'] or '')).casefold().strip()
-        exact = _NUMBER.fullmatch(str(row['value']).strip())
-        if not exact or exact[2] or not Decimal(exact[1]).is_finite():
+        verdict = judge(row, context)
+        if verdict.target is None:
             continue
-        for rule in table.comparisons:
-            if not re.fullmatch(rule.namePattern.pattern, name, re.I) or unit not in rule.units:
-                continue
-            sex_labels = {'男': {'男', '男性', 'm', 'male'}, '女': {'女', '女性', 'f', 'female'}}
-            if rule.sex and sex not in sex_labels[rule.sex]:
-                continue
-            if rule.calculation and str(row.get('_calculation') or '').split('；', 1)[0] != rule.calculation:
-                continue
-            direction = _reference_direction(exact[1], rule.target)
-            relation = {'偏高': '高于', '偏低': '低于'}.get(direction, '符合')
-            reference = rule.targetNote or f'{rule.label} {rule.target} {row["unit"] or ""}'.strip()
-            message = f'{rule.label}{relation}模板目标'
-            if rule.targetNote:
-                message = rule.label + ('触及模板关注线' if direction else '未触及模板关注线')
-            owner = {'recordIds': sorted(_owned_observation_ids(row)), 'label': rule.label}
-            result.append({
-                **owner, 'authority': 'template', 'grade': direction or '正常', 'reference': rule.target,
-                'message': message, 'referenceText': reference,
-            })
-            for interval in table.screening:
-                if interval.label != rule.label or _reference_direction(exact[1], interval.target):
-                    continue
-                # This template only records sex. Without a documented
-                # pregnancy status use the reference as a conditional range.
-                applies = sex in {'男', '男性', 'm', 'male'}
-                result.append({
-                    **owner, 'authority': 'screening', 'reference': interval.target,
-                    'applicability': 'applicable' if applies else 'conditional_nonpregnant',
-                    'message': interval.status if applies else '若适用非妊娠人群标准，' + interval.status,
-                    'referenceText': f'{interval.source}：{rule.label} {interval.target}{row["unit"] or ""}',
-                })
-            break
+        target = verdict.target
+        relation = {'up': '高于', 'down': '低于'}.get(target['direction'], '在')
+        message = f'{target["label"]}{relation}目标区间' if target['direction'] else f'{target["label"]}在目标区间内'
+        result.append({
+            'recordIds': sorted(_owned_observation_ids(row)),
+            'label': target['label'],
+            'authority': 'target',
+            'grade': {'up': '偏高', 'down': '偏低'}.get(target['direction'], '正常'),
+            'reference': target['text'],
+            'message': message,
+            'referenceText': f'{target["label"]} {target["text"]}',
+            'targetId': target['id'],
+            'applicability': target['applicability'],
+            'sources': target['sources'],
+        })
     return result
 
 
-def _reader_group_status(rows, targets=()):
-    """Give every directional claim a named owner and separate its comparison from clinical follow-up."""
-    findings = defaultdict(list)
-    followups = []
+def _reader_group_status(rows, targets=(), context=None):
+    """Unified level wording (spec 1.4) with the named members behind each level."""
     short_names = {identifier: claim['label'] for claim in targets for identifier in claim['recordIds']}
+    by_level = defaultdict(list)
+    followups = []
     for row in rows:
-        status = row.get('templateStatus') or row.get('status')
-        if not status:
+        level = row.get('level')
+        if level is None and context is not None:
+            level = judge(row, context).level
+        if level is None:
             continue
         name = short_names.get(row.get('_ownRecordId')) or row['name'].rsplit(' · ', 1)[-1]
-        findings[status].append(name)
-        if _measurement_state(status) == 'abnormal':
+        by_level[level].append(name)
+        if level == 'focus':
             followups.extend(row.get('_followupAdvice', ()))
     labels = []
-    for status, names in findings.items():
-        if status.startswith(('原文：', '设备判断：')):
-            labels.append(status.split('：', 1)[1])
-        elif len(rows) == 1:
-            labels.append(status)
+    for level in ('focus', 'borderline', 'normal'):
+        names = list(dict.fromkeys(by_level.get(level, ())))
+        if not names:
+            continue
+        if len(rows) == 1:
+            labels.append(LEVEL_LABELS[level])
+        elif len(names) > 3 and len('、'.join(names)) > 16:
+            labels.append(f'{LEVEL_LABELS[level]}：{len(names)}项')
         else:
-            subjects = '、'.join(dict.fromkeys(names))
-            if len(names) > 2 and len(subjects) > 16:
-                labels.append(f'{len(names)}项{status}')
-            else:
-                labels.append(subjects + '：' + status)
+            labels.append(f'{LEVEL_LABELS[level]}：' + '、'.join(names))
     if any(re.search(r'查因|查明(?:病因|原因)|进一步(?:检查原因|明确病因)', text)
            or re.search(r'(?:^|[。；;])(?:请|建议)?(?:立即|尽快|急诊)', text) for text in followups):
-        labels.insert(0, '重点关注（需查因或及时就医）')
+        labels.insert(0, '需查因或及时就医')
     elif followups:
-        labels.insert(0, '按原医嘱复评')
-    elif findings and sum(map(len, findings.values())) == len(rows) and all(
-        _measurement_state(label) == 'normal' for label in findings
-    ) and all(claim.get('grade') == '正常' for claim in targets):
-        labels.insert(0, '稳健达标（限本次已检分项）')
+        labels.insert(0, '按医嘱复查')
     if not labels:
-        labels.append('按原件记录，未作统一分级')
-    labels.extend(dict.fromkeys(claim['message'] for claim in targets))
+        labels.append('未给出参考区间')
+    labels.extend(dict.fromkeys(claim['message'] for claim in targets if claim['grade'] != '正常'))
     return '；'.join(labels)
 
 
@@ -1455,14 +1472,24 @@ def _template_rows(code, rows):
     return result
 
 
-def _groups(rows, definitions):
-    buckets = {code: [] for code, _, _ in definitions}
+def _groups(rows, definitions, *, sex=None):
+    clinical = definitions is _CLINICAL_GROUPS
+    order = [*(code for code, _, _ in definitions), *(('otherClinical',) if clinical else ())]
+    names = _GROUP_NAMES if clinical else {code: name for code, name, _ in definitions}
+    buckets = {code: [] for code in order}
     for row in rows:
-        match = _group_code(row['name'], definitions, specimen=row['specimen'], section=row['sourceSection'])
-        if match is not None:
+        match = _group_code(
+            row['name'], definitions, specimen=row['specimen'], section=row['sourceSection'],
+            **({'sex': sex} if clinical else {}),
+        )
+        if clinical and match is None and not _tumor_marker(row['name'], sex):
+            # Every examination item keeps a home: no fixed system means "其他检查" (end of 3.5).
+            match = 'otherClinical'
+        if match in buckets:
             buckets[match].append(row)
     groups = []
-    for code, name, _ in definitions:
+    for code in order:
+        name = names[code]
         if readings := buckets[code]:
             group = {'code': code, 'name': name, 'rows': readings, 'summary': None}
             if definitions is _CLINICAL_GROUPS:
@@ -2529,7 +2556,7 @@ def select_overview_clinical_anchors(
                         values.append(rendered)
                 sources.extend(source for source in row['sources'] if source not in sources)
             if in_range:
-                values.append('、'.join(in_range) + '在各自原参考范围内')
+                values.append('、'.join(in_range) + '在各自参考范围内')
             if source_normal:
                 values.extend(source_normal)
             result.append(
@@ -2626,9 +2653,9 @@ def _direct_panel_summary(rows, targets, claims):
         if _NUMBER.fullmatch(value.strip()) and (status or row.get('_sourceNature') == 'measurement_component'):
             outcome = f'{label} {value} {row["unit"] or ""}'.strip()
             if status:
-                outcome += f'（{status}' + (f'，原参考{row["referenceRange"]}' if row['referenceRange'] else '') + '）'
+                outcome += f'（{status}' + (f'，参考{row["referenceRange"]}' if row['referenceRange'] else '') + '）'
             if row.get('observedAt') is None and row.get('sourceReportedAge') is not None:
-                outcome += f'（原页{row["sourceReportedAge"]}岁，未列检查日期）'
+                outcome += f'（{row["sourceReportedAge"]}岁时检查，未列检查日期）'
             parts.append(outcome)
             numeric = _NUMBER.fullmatch(value.strip())
             if status not in {'偏高', '偏低'} or numeric[2]:
@@ -2638,14 +2665,14 @@ def _direct_panel_summary(rows, targets, claims):
                    _key(row['name']), Decimal(numeric[1]), _key(row['unit']))
             for direction in claims.get(key, ()):
                 if (direction in {'偏高', '升高', '增高'}) != (status == '偏高'):
-                    parts.append(f'同次主检文字写“{label}{direction}”，与该检验单方向不一致，需核对原件')
+                    parts.append(f'同次体检总结写“{label}{direction}”，与该检验单方向不一致，以检验单数值为准')
         elif status and row.get('_sourceRole') in {'exam_finding', 'physical_finding'}:
             result = value.split('；', 1)[0].strip()
             if result and len(result) <= 90:
                 timing = str(row.get('observedAt') or '')[:10]
                 age = row.get('sourceReportedAge')
                 context = '、'.join(filter(None, (timing or ('日期未列' if age is not None else ''),
-                                                   f'原页{age}岁' if age is not None else '')))
+                                                   f'{age}岁时检查' if age is not None else '')))
                 parts.append(f'{label} {result}' if not context else f'{context}：{label} {result}')
     if not parts:
         return None
@@ -2656,11 +2683,11 @@ def _direct_panel_summary(rows, targets, claims):
         normal = sum(_measurement_state(row.get('templateStatus')) == 'normal' for row in rows)
         if normal != len(rows):
             return None
-        return f'本次所列{normal}个已判定分项均在原检查参考范围或原判正常，可作后续同项比较的基线。'
+        return f'本次所列{normal}个已判定分项均在参考范围内或检查结论正常，可作后续同项比较的基线。'
     return '；'.join(dict.fromkeys(parts)) + '。'
 
 
-def _reader_clinical_groups(groups, data, document, contexts, subject=None):
+def _reader_clinical_groups(groups, data, document, contexts, context=None):
     """Select the reader's table without narrowing the source planning inventory."""
     plan = getattr(data, '_assessment_content_plan', None)
     selected_ids = (
@@ -2703,7 +2730,14 @@ def _reader_clinical_groups(groups, data, document, contexts, subject=None):
                 scalar = row.get('_sourceRole') in {'direct_measurement', 'derived_measurement'}
                 explicit = _explicit_atom_witness(row, quotes)
                 nature = row.get('_sourceNature')
-                keep = state == 'abnormal' or row.get('_verifiedFinding')
+                graded = judge(row, context).level if context is not None else None
+                keep = (
+                    state == 'abnormal'
+                    or row.get('_verifiedFinding')
+                    or graded in {'focus', 'borderline'}
+                    # Items without a fixed system are listed completely in "其他检查".
+                    or group['code'] == 'otherClinical'
+                )
                 if scalar:
                     ungraded_pattern = _READER_UNGRADED_ANCHORS.get(panel['code'])
                     direct_anchor = bool(
@@ -2747,15 +2781,11 @@ def _reader_clinical_groups(groups, data, document, contexts, subject=None):
                     readings.append(row)
             if readings:
                 readings = _reader_atoms(readings, contexts)
-                targets = _template_comparisons(readings, subject)
-                references = dict.fromkeys(item['referenceText'] for item in targets if item['authority'] == 'template')
-                comparisons = (['模板比较目标（非诊断界值）：' + '；'.join(references)] if references else [])
-                comparisons.extend(dict.fromkeys(
-                    item['referenceText'] for item in targets if item['authority'] == 'screening'
-                ))
+                targets = _target_comparisons(readings, context)
+                references = list(dict.fromkeys(item['referenceText'] for item in targets))
                 template.append({
-                    **panel, 'rows': readings, 'status': _reader_group_status(readings, targets),
-                    'comparisonReference': '。'.join(comparisons) or None,
+                    **panel, 'rows': readings, 'status': _reader_group_status(readings, targets, context),
+                    'comparisonReference': ('目标区间：' + '；'.join(references)) if references else None,
                     '_comparisonClaims': targets,
                     'summary': _direct_panel_summary(readings, targets, directional_claims),
                 })
@@ -2765,17 +2795,22 @@ def _reader_clinical_groups(groups, data, document, contexts, subject=None):
     return omitted
 
 
-def _normal_baselines(rows):
+def _normal_baselines(rows, sex=None):
     """Represent tested organ functions and screening, rather than one arbitrary lab per system."""
     screening, roles = [], {code: [] for code, _ in _NORMAL_BASELINE_ROLES}
+    sexed = _SEXED_ORGAN_IMAGING.get('female' if _female(sex) else 'male' if str(sex or '').strip() else '')
     for row in rows:
         if row['sourceKind'] != 'clinical':
             continue
         state = _measurement_state(row['templateStatus'])
-        if _SCREENING_BASELINE.search(row['name']) and state != 'abnormal':
+        if _tumor_marker(row['name'], sex) and state != 'abnormal':
             screening.append(row)
             continue
         if state != 'normal':
+            continue
+        urine = row['specimen'] == '尿' or _urinary_name(row['name'])
+        if sexed is not None and sexed.search(row['name']) and not urine:
+            roles['organImaging'].append(row)
             continue
         for code, pattern in _NORMAL_BASELINE_ROLES:
             if pattern.search(row['name']):
@@ -2805,7 +2840,7 @@ def _normal_baselines(rows):
     return groups
 
 
-def _specialty_findings(rows, contexts):
+def _specialty_findings(rows, contexts, sex=None):
     """Include actual device studies and imaging without promoting minor routine labs."""
     result = []
     for row in rows:
@@ -2814,7 +2849,9 @@ def _specialty_findings(rows, contexts):
         dedicated = bool(
             _SPECIALTY.search(text)
             or re.search(r'微小核酸|microRNA', text, re.I)
-            or _SCREENING_BASELINE.search(row['name'])
+            # A device study (3.5) has no fixed system table, so it is always kept here.
+            or _DEVICE_STUDY.search(row['name'] or '') or _DEVICE_STUDY.search(row.get('sourceSection') or '')
+            or _tumor_marker(row['name'], sex)
             and state == 'abnormal'
         )
         if re.match(r'^\s*(?:未检|未做|未行|未提供|未纳入|暂无)', str(row['value'])):
@@ -2886,7 +2923,7 @@ def _reader_specialty_findings(rows, shown, contexts):
             for other in [*selected, *shown]
         )
         if differing_context:
-            qualifier = f'原报告{own_age}岁'
+            qualifier = f'{own_age}岁时检查'
             if not row.get('observedAt'):
                 qualifier += '，检查日期未注明'
             row['name'] += '（' + qualifier + '）'
@@ -2932,6 +2969,85 @@ def _link_device_followups(rows, document, contexts, projection_index):
                 row['sources'].append(reference)
 
 
+_EVIDENCE_GRADES = {'指南': 'A', '系统综述': 'A', '专家共识': 'A', '科学声明': 'A', '行业标准': 'A', '人群研究': 'B'}
+
+
+def _view_row_lists(view):
+    """Every public row list of the clinical view, including copies used by other sections."""
+    yield view.get('bodyMetrics') or ()
+    for field in ('bodyGroups', 'clinicalGroups', 'normalBaselines', 'digestiveContext'):
+        for group in view.get(field) or ():
+            yield group.get('rows') or ()
+            for panel in group.get('templateRows') or ():
+                yield panel.get('rows') or ()
+    yield view.get('specialtyFindings') or ()
+    for symptom in view.get('symptoms') or ():
+        yield symptom.get('clinicalSignals') or ()
+
+
+def _annotate_view(view, context: SubjectContext):
+    """Structured row fields (spec 2.7) and the level/anchors of each group and panel."""
+    for rows in _view_row_lists(view):
+        annotate_rows(rows, context)
+    for field in ('clinicalGroups', 'bodyGroups'):
+        for group in view.get(field) or ():
+            for panel in group.get('templateRows') or ():
+                panel['level'] = worst_level(row.get('level') for row in panel.get('rows') or ())
+            panels = group.get('templateRows')
+            members = [row for panel in panels for row in panel.get('rows') or ()] if panels else group.get('rows')
+            group.update(summarize_levels(members))
+
+
+def attach_target_references(view, data):
+    """Number the target-table literature after the report bibliography and cite it on each target.
+
+    The bibliography is final when the six-chapter projection is built, so a
+    target source either reuses an existing entry (same DOI or title) or is
+    appended with the next free number. The callback keeps every cited number.
+    """
+    appendices = getattr(data, 'appendices', None)
+    library = getattr(appendices, 'reference_literature', None)
+    if library is None:
+        return []
+    from .evaluation_schema import ReferenceLiterature
+
+    def identity(doi, title):
+        return (str(doi or '').strip().casefold() or None, re.sub(r'\W+', '', str(title or '')).casefold() or None)
+
+    numbers = {}
+    for entry in library:
+        doi_key, title_key = identity(entry.doi, entry.title)
+        for key in (doi_key, title_key):
+            if key:
+                numbers.setdefault(key, entry.number)
+    added = []
+    for rows in _view_row_lists(view):
+        for row in rows:
+            target = row.get('target') if isinstance(row, dict) else None
+            if not target:
+                continue
+            refs = []
+            for source in target.get('sources') or ():
+                doi_key, title_key = identity(source.get('doi'), source.get('title'))
+                number = numbers.get(doi_key) or numbers.get(title_key)
+                if number is None:
+                    number = max((entry.number for entry in library), default=0) + 1
+                    library.append(ReferenceLiterature(
+                        number=number, title=source.get('title'), year=str(source.get('year') or '') or None,
+                        journal=source.get('journal'), url=source.get('url'), doi=source.get('doi'),
+                        study_type=target.get('evidenceLevel'),
+                        evidence_grade=_EVIDENCE_GRADES.get(target.get('evidenceLevel') or '', 'C'),
+                        supporting_sections=['assessmentPresentation.clinical.target'],
+                    ))
+                    added.append(number)
+                    for key in (doi_key, title_key):
+                        if key:
+                            numbers[key] = number
+                refs.append(number)
+            target['evidenceRefs'] = list(dict.fromkeys(refs))
+    return added
+
+
 def build_clinical_view(request, parsed, document, data, *, reader_plan=False) -> dict:
     """Use the vetted report's source inventory and mark the role of each observation."""
     hospital = list(_hospital_rows(request, parsed))
@@ -2942,6 +3058,8 @@ def build_clinical_view(request, parsed, document, data, *, reader_plan=False) -
         contexts,
     )
     _attach_context_witnesses(rows, contexts)
+    sex = getattr(parsed.subject, 'sex', None)
+    context = subject_context(parsed.subject, document, rows)
     measurements = [
         row
         for row in rows
@@ -2951,7 +3069,7 @@ def build_clinical_view(request, parsed, document, data, *, reader_plan=False) -
     body_metrics = _body_metrics(measurements, contexts)
     if recorded_bmi := _registered_bmi(data, body_metrics):
         body_metrics.append(recorded_bmi)
-    specialty = _specialty_findings(measurements, contexts)
+    specialty = _specialty_findings(measurements, contexts, sex)
     grouped_rows = [
         row
         for row in measurements
@@ -2961,14 +3079,14 @@ def build_clinical_view(request, parsed, document, data, *, reader_plan=False) -
         and not _SOURCE_BACKGROUND_RECORD.search(row['name'])
     ]
     symptoms = _symptoms(document, rows)
-    clinical_groups = _groups(grouped_rows, _CLINICAL_GROUPS)
-    omitted = _reader_clinical_groups(clinical_groups, data, document, contexts, parsed.subject) if reader_plan else []
+    clinical_groups = _groups(grouped_rows, _CLINICAL_GROUPS, sex=sex)
+    omitted = _reader_clinical_groups(clinical_groups, data, document, contexts, context) if reader_plan else []
     source_body_groups = _groups(body_metrics, _BODY_GROUPS)
     body_groups = _reader_body_groups(body_metrics, contexts) if reader_plan else source_body_groups
     if reader_plan:
         for group in body_groups:
             if not all(row['sourceKind'] == 'recordedHistory' for row in group['rows']):
-                group['status'] = _reader_group_status(group['rows'])
+                group['status'] = _reader_group_status(group['rows'], context=context)
         shown_body_codes = {group['code'] for group in body_groups}
         omitted.extend('body.' + group['code'] for group in source_body_groups if group['code'] not in shown_body_codes)
         shown = [row for group in clinical_groups for panel in group['templateRows'] for row in panel['rows']]
@@ -2983,7 +3101,7 @@ def build_clinical_view(request, parsed, document, data, *, reader_plan=False) -
         'clinicalGroups': clinical_groups,
         'specialtyFindings': specialty,
         'trends': _trends(hospital),
-        'normalBaselines': _normal_baselines(measurements),
+        'normalBaselines': _normal_baselines(measurements, sex),
         'digestiveContext': _digestive_context(
             [row for group in clinical_groups for panel in group['templateRows'] for row in panel['rows']]
             if reader_plan
@@ -2993,7 +3111,9 @@ def build_clinical_view(request, parsed, document, data, *, reader_plan=False) -
             source_rows=grouped_rows if reader_plan else (),
         ),
     }
+    _annotate_view(result, context)
     if reader_plan:
+        attach_target_references(result, data)
         result['_readerOmittedCells'] = omitted
         result['_sourceContexts'] = contexts
     return result
