@@ -2242,7 +2242,30 @@ def _planned_systems(clinical, microbiome, clusters, data, facts, reviewed, plan
             'status': status,
             'summary': text, 'evidenceRefs': refs, 'rows': _distinct_signals(rows),
         })
-    return result
+    return _complete_systems(result, clinical, microbiome)
+
+
+def _complete_systems(result, clinical, microbiome):
+    """Give every fixed system its chart fields (spec 1.2 and 2.7); append only.
+
+    ``level`` is the most severe member level read from chapters three and four,
+    ``anchors`` lists at most six abnormal members (cell anchors first) and
+    ``moreCount`` the rest. A system without a reviewed cell is still listed so
+    that a reader sees it as measured or ``notTested``; it carries no verdict.
+    """
+    from .assessment_chart_fields import system_atoms
+    from .assessment_chart_fields import system_chart_fields
+
+    by_code = {item['code']: item for item in result}
+    complete = []
+    for code, name, group_codes in _SYSTEMS:
+        item = by_code.get(code) or {
+            'code': code, 'name': name, 'status': None, 'summary': None, 'evidenceRefs': [], 'rows': [],
+        }
+        atoms = system_atoms(code, group_codes, clinical, microbiome)
+        item.update(system_chart_fields(atoms, item['rows'], microbiome=code == 'microbiome'))
+        complete.append(item)
+    return complete
 
 
 def _assessment_clusters(data, facts, reviewed, *, subject=None, document=None, display_index=None,
@@ -3014,7 +3037,7 @@ def _systems(clinical, microbiome, clusters, editorial, reviewed):
             )]
         item['rows'] = _distinct_signals([*named, *(used or rows)])[:6]
         result.append(item)
-    return result
+    return _complete_systems(result, clinical, microbiome)
 
 
 def _put_editorial(editorial, key, item, field='summary', refs='evidenceRefs'):
@@ -3258,12 +3281,13 @@ def assessment_projection_issues(presentation, blueprint):
 
 def build_assessment_presentation(*, request, parsed, document, data, blueprint, accepted):
     from .assessment_clinical_view import build_clinical_view
+    from .assessment_microbiome_view import annotate_microbiome_chart_fields
     from .assessment_microbiome_view import build_microbiome_view
 
     clinical = build_clinical_view(request, parsed, document, data, reader_plan=True)
     data._assessment_reader_omitted_cells = list(clinical.pop('_readerOmittedCells', ()))
     blueprint.data._assessment_reader_omitted_cells = data._assessment_reader_omitted_cells
-    microbiome = build_microbiome_view(parsed, data, source_facts=document.facts)
+    microbiome = annotate_microbiome_chart_fields(build_microbiome_view(parsed, data, source_facts=document.facts))
     editorial = data._assessment_editorial
     reviewed = _reviewed_facts(blueprint, accepted)
     synthesis_targets = {
@@ -3470,6 +3494,7 @@ def build_assessment_presentation(*, request, parsed, document, data, blueprint,
     minor = age.isdecimal() and int(age) < 18
     _strip_display_metadata(clinical)
     _strip_display_metadata(microbiome)
+    _strip_display_metadata(overview)
     return AssessmentPresentation(
         overview=overview,
         clinical=clinical,

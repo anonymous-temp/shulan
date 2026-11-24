@@ -2208,6 +2208,52 @@ def build_microbiome_view(parsed, data, *, source_facts=()) -> dict:
     return view
 
 
+def _displayed_group_rows(group):
+    baseline = group.get('normalBaseline') or {}
+    yield from group.get('rows') or ()
+    yield from baseline.get('rows') or ()
+    yield from baseline.get('undetectedRows') or ()
+
+
+def annotate_microbiome_chart_fields(view: dict) -> dict:
+    """Append the spec 2.7 chart fields to every displayed microbiome row, in place.
+
+    Score rows gain ``score``/``bands``, abundance rows ``abundance``/
+    ``referenceLow``/``referenceHigh``, macro indices ``valueNumber``, reference
+    bounds and ``bands``; every row gains ``direction`` and ``level``. Original
+    fields are neither renamed nor removed, and unparsed values stay ``None``.
+    """
+    from .assessment_chart_fields import BORDERLINE
+    from .assessment_chart_fields import NORMAL
+    from .assessment_chart_fields import microbiome_chart_fields
+
+    for row in view.get('structure') or ():
+        row.update(microbiome_chart_fields(row))
+    for group in view.get('structureGroups') or ():
+        rows = list(_displayed_group_rows(group))
+        for row in rows:
+            row.update(microbiome_chart_fields(row))
+        if group.get('code') == 'overallBalance':
+            grade = next(
+                (row['level'] for row in rows if row.get('code') == 'balanceStatus' and row.get('level')), None,
+            )
+            for row in rows:
+                if row.get('code') == 'microbiomeHealthScore' and row.get('level') is None:
+                    row['level'] = grade
+        difference = group.get('gutAgeDifference')
+        if group.get('code') == 'gutAge' and isinstance(difference, (int, float)):
+            for row in rows:
+                if row.get('code') == 'gutAge':
+                    row['actualAge'] = group.get('actualAge')
+                    row['ageDifference'] = difference
+                    row['direction'] = 'up' if difference > 0 else 'down' if difference < 0 else None
+                    row['level'] = BORDERLINE if difference > 0 else NORMAL
+    for group in [*(view.get('organismGroups') or ()), *(view.get('functionalGroups') or ())]:
+        for row in _displayed_group_rows(group):
+            row.update(microbiome_chart_fields(row))
+    return view
+
+
 def source_observation_display_status(row):
     """Keep a source direction visible alongside all matching score bands."""
     state = row.get('templateStatus') or row.get('status')

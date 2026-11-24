@@ -60,6 +60,10 @@ def order_assessment_for_delivery(view: dict[str, Any], appendices: dict[str, An
                     'evidenceRefs',
                     'systems',
                     'priorityFindings',
+                    # Planning-contract rows of section 1.3, when supplied.
+                    'priorityItems',
+                    'routineFollowups',
+                    'testGaps',
                     'graphHub',
                     'graphClusterIds',
                     'graphSummary',
