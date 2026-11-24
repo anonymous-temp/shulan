@@ -15,7 +15,8 @@ from pydantic import Field
 
 ASSESSMENT_TITLE = '个体化全息健康与肠道微生态深度评估报告'
 ASSESSMENT_PREFACE = (
-    '本报告综合临床体检与检验、影像资料、健康问卷及肠道菌群宏基因组检测结果，对受检者当前的健康状态作分系统评估，'
+    '本报告依据本次提供的资料（可包括临床体检与检验、影像资料、健康问卷及肠道菌群宏基因组检测结果），'
+    '对受检者当前的健康状态作分系统评估，'
     '梳理需优先排查的事项、需协同管理的系统失衡方向和可作为今后对照的健康基线，并给出随访与干预方向。'
     '\n\n'
     '临床资料与菌群资料的采集日期、测量方法和适用范围不同，文中分别标明。'
@@ -77,6 +78,9 @@ _SYSTEMS = (
     ('hematologyImmune', '血液免疫、甲基化与氧化应激', ('hematologyImmune',)),
 )
 NO_TREND_STATEMENT = '本次资料未包含可比较的历次结果。'
+NO_BODY_SUMMARY = '本次资料未包含体格测量。'
+NO_CLINICAL_SUMMARY = '本次未提供临床体检资料，本章不作分系统评估；健康状态以第四章菌群检测结果为主要依据。'
+NO_BASELINE_SUMMARY = '本次未提供临床检验资料，暂无可确认的稳健基线。'
 NO_SYMPTOM_LEAD = '本次未记录主诉症状。'
 NO_SYMPTOM_SUMMARY = (
     '本次未记录主诉症状，本章不作症状与检查结果的对应分析；已检出的异常及其可能影响见第三章各系统评估与第五章失衡集群。'
@@ -2438,6 +2442,21 @@ def _planned_systems(clinical, microbiome, clusters, data, facts, reviewed, plan
     return _complete_systems(result, clinical, microbiome)
 
 
+def _state_missing_clinical_data(overview, clinical):
+    """Spec 1.1, 3.1–3.6: without examination data each part says so instead of staying blank."""
+    has_body = any(group.get('rows') for group in overview.get('bodyGroups') or ()) or bool(
+        clinical.get('bodyMetrics')
+    )
+    if not has_body and not overview.get('bodySummary'):
+        overview['bodySummary'] = NO_BODY_SUMMARY
+    if not clinical.get('clinicalGroups') and not clinical.get('summary'):
+        clinical['summary'] = NO_CLINICAL_SUMMARY
+    if not clinical.get('normalBaselines') and not clinical.get('baselineSummary') and not clinical.get(
+        'clinicalGroups'
+    ):
+        clinical['baselineSummary'] = NO_BASELINE_SUMMARY
+
+
 def _complete_systems(result, clinical, microbiome):
     """Give every fixed system its chart fields (spec 1.2 and 2.7); append only.
 
@@ -3978,6 +3997,7 @@ def build_assessment_presentation(*, request, parsed, document, data, blueprint,
     _strip_display_metadata(clinical)
     _strip_display_metadata(microbiome)
     _strip_display_metadata(overview)
+    _state_missing_clinical_data(overview, clinical)
     presentation = AssessmentPresentation(
         overview=overview,
         clinical=clinical,

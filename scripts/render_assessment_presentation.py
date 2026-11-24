@@ -1323,7 +1323,7 @@ class _AssessmentRenderer:
             css='as-lead',
         )
         if not blocks:
-            return lead + _note('本次资料未包含体格测量。')
+            return lead or _note('本次资料未包含体格测量。')
         return lead + ''.join(blocks)
 
     def systems(self):

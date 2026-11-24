@@ -142,7 +142,7 @@ SECTIONS = (
     ('2.2', '2.2 躯体感知背后的微生态与代谢线索', 'symptoms', ('symptoms[].interpretation', 'symptomSummary')),
     ('3.1-3.5', '3.1–3.5 分系统临床检验表', 'clinical', ('clinicalGroups', 'summary')),
     ('3.6a', '3.6 历年指标演变趋势', 'clinical', ('trends', 'trendSummary')),
-    ('3.6b', '3.6 已确认稳健安全基线', 'clinical', ('normalBaselines',)),
+    ('3.6b', '3.6 已确认稳健安全基线', 'clinical', ('normalBaselines', 'baselineSummary')),
     ('4.0', '第四章章首说明（采样与发酵耐受）', 'microbiome', ('sampleSummary', 'fermentationSummary')),
     ('4.1', '4.1 消化道器质基础与消化液微环境', 'microbiome', ('digestiveContext',)),
     ('4.2', '4.2 微生态宏观稳态指数', 'microbiome', ('structureGroups', 'structure', 'overviewSummary')),
