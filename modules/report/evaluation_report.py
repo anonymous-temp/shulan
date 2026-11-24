@@ -977,7 +977,7 @@ async def _author_chapters(state, client, subject, deadline, *, recall=None):
             row.get('targetId') for row in rows
             if row.get('targetId') in public_ids and not _summary_inputs(targets[row['targetId']])
         } - accepted_public_ids()
-        if not identifiers:
+        if not identifiers or target_deadline is not None and time.monotonic() >= target_deadline:
             return set()
 
         async def repair():
@@ -1029,7 +1029,8 @@ async def _author_chapters(state, client, subject, deadline, *, recall=None):
                                 ('body.', 'system.', 'specialtyRow.', 'symptomEvidence.'),
                             )
                         }
-                        early_deadline[0] = first_deadline
+                        early_deadline[0] = first_deadline if target_deadline is None else min(
+                            first_deadline, target_deadline)
                         if recall is None:
                             await author(public_chapters, 'public_first_pass', first_deadline,
                                          on_missing=schedule_early_repair)
@@ -1065,7 +1066,9 @@ async def _author_chapters(state, client, subject, deadline, *, recall=None):
         # in an early repair stay reserved by it and are not claimed twice.
         accepted_ids = accepted_public_ids()
         repair_ids = unfinished_ids(public_ids)
-        remaining = None if deadline is None else max(0.0, deadline - time.monotonic())
+        # Repairs end at the delivery target; what is still open then keeps
+        # its reviewed sentences or a source-only listing below.
+        remaining = None if target_deadline is None else max(0.0, target_deadline - time.monotonic())
         if repair_ids and (remaining is None or remaining > 0):
             # Review receipts are exact-text bound. Reuse accepted cells and
             # spend remaining time only on unfinished public duties; a
@@ -1073,17 +1076,22 @@ async def _author_chapters(state, client, subject, deadline, *, recall=None):
             repair_chapters = selected_chapters(public_chapters, repair_ids)
             try:
                 async with asyncio.timeout(remaining) as repair_window:
-                    await author(repair_chapters, 'public_repair', deadline)
+                    await author(repair_chapters, 'public_repair', target_deadline)
             except TimeoutError:
-                if not repair_window.expired() and (deadline is None or time.monotonic() < deadline):
+                if not repair_window.expired() and (
+                        target_deadline is None or time.monotonic() < target_deadline):
                     raise
                 state.audit['publicRepairBudgetExhausted'] = True
             accepted_ids = accepted_public_ids()
         if pending_early := [task for task in early_tasks if not task.done()]:
             # The coordinated sweep did not wait for early repairs still in
             # flight; their duties were reserved and are settled here.
-            remaining = None if deadline is None else max(0.0, deadline - time.monotonic())
+            remaining = None if target_deadline is None else max(0.0, target_deadline - time.monotonic())
             await asyncio.wait(pending_early, timeout=remaining)
+            for task in pending_early:
+                if not task.done():
+                    task.cancel()
+            await asyncio.gather(*pending_early, return_exceptions=True)
             accepted_ids = accepted_public_ids()
         if source_planned and (needed := unfinished_ids(public_ids) & required_ids):
             from statistics import median

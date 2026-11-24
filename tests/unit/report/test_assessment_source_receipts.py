@@ -545,3 +545,66 @@ def test_the_coordinated_sweep_does_not_wait_for_a_slow_early_repair(monkeypatch
     asyncio.run(evaluation_report._author_chapters(state, None, None, time.monotonic() + 60))
     assert events.index(('public_repair', 'start', ('s1',))) < events.index(('public_repair', 'end', ('d1',)))
     assert {b['targetId'] for b in state.approved_blocks['medicalAssessment']} == {'d1', 's1'}
+
+
+def test_past_the_delivery_target_open_duties_keep_their_retained_sentences(monkeypatch):
+    import dataclasses
+    import time
+
+    from modules.report import evaluation_report
+    from modules.report import evaluation_report_writer
+
+    @dataclasses.dataclass
+    class Blueprint:
+        chapters: list
+        data: object
+        facts: list = dataclasses.field(default_factory=list)
+
+    detail = {
+        'id': 'd1',
+        'path': ['_assessment_editorial', 'd1', 'text'],
+        'owner': {'contentPlanVersion': 1, 'contentScopeCode': 'clinicalRow.lipid.ldl', 'primaryFactIds': []},
+        'sourceFactIds': [],
+        'allowedRoles': ['interpretation'],
+        'required': True,
+        'publicationScope': 'assessment',
+    }
+    chapter = {'code': 'medicalAssessment', 'number': 3, 'title': '三', 'targets': [detail]}
+    blueprint = Blueprint(chapters=[chapter], data=SimpleNamespace(_assessment_content_plan={'status': 'reviewed'}))
+    # Generation started long ago: the delivery target has already passed.
+    state = SimpleNamespace(
+        blueprint=blueprint,
+        audit={},
+        approved_blocks={},
+        evidence=None,
+        stage_timings={},
+        started=time.monotonic() - 5000,
+    )
+    retained = {
+        'targetId': 'd1',
+        'completion': 'complete',
+        'sentences': [{'text': '保留句。', 'role': 'interpretation'}],
+    }
+    phases = []
+
+    async def fake_author(client, *, blueprint, authoring_scope, on_checkpoint, **_):
+        phases.append(authoring_scope['phase'])
+        on_checkpoint(
+            'medicalAssessment',
+            [],
+            [
+                {
+                    'chapterCode': 'medicalAssessment',
+                    'targetId': 'd1',
+                    'issues': [],
+                    'salvage': {'block': retained, 'removed': [], 'phase': authoring_scope['phase']},
+                }
+            ],
+        )
+        return {}
+
+    monkeypatch.setattr(evaluation_report_writer, 'author_report_chapters', fake_author)
+    asyncio.run(evaluation_report._author_chapters(state, None, None, time.monotonic() + 600))
+    assert phases == ['public_first_pass']
+    assert state.approved_blocks['medicalAssessment'] == [retained]
+    assert state.audit['sentenceRetention'][0]['targetId'] == 'd1'
