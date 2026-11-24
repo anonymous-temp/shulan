@@ -83,16 +83,16 @@ main.assessment{
 .assessment .lv-borderline{background:var(--borderline-wash);color:var(--borderline-ink)}
 .assessment .lv-normal{background:var(--normal-wash);color:var(--normal-ink)}
 .assessment .lv-notTested,.assessment .lv-none{background:var(--untested-wash);color:var(--untested-ink)}
-.assessment .pri-p0{background:var(--p0-wash);color:var(--p0-ink)}
-.assessment .pri-p1{background:var(--focus-wash);color:var(--focus-ink)}
-.assessment .pri-p2{background:var(--accent-wash);color:var(--accent)}
-.assessment .pri-p3{background:var(--untested-wash);color:var(--untested-ink)}
+.assessment .pri-p0{background:var(--p0-ink);color:#fff}
+.assessment .pri-p1{background:var(--ink-2);color:#fff}
+.assessment .pri-p2{background:var(--paper);color:var(--ink-2);box-shadow:inset 0 0 0 1px #8f9692}
+.assessment .pri-p3{background:var(--paper);color:var(--muted);box-shadow:inset 0 0 0 1px var(--line)}
 .assessment .as-when{display:inline-block;font-size:12.5px;line-height:1.75;padding:0 8px;
   border:1px solid var(--accent);
   color:var(--accent);border-radius:3px;white-space:nowrap}
 /* tags carry a measured value; the dot carries the level */
 .assessment .as-tags{display:flex;flex-wrap:wrap;gap:5px 5px;margin:2px 0}
-.assessment .as-tag{display:inline-flex;align-items:baseline;gap:5px;padding:1px 8px 1px 7px;border-radius:3px;
+.assessment .as-tag{display:inline-flex;align-items:baseline;gap:5px;padding:2px 8px 2px 7px;border-radius:3px;
   background:var(--wash);font-size:13px;line-height:1.6;color:var(--ink)}
 .assessment .as-tag i{width:7px;height:7px;border-radius:50%;background:var(--untested);flex:none;align-self:center}
 .assessment .as-tag b{font-weight:650;font-variant-numeric:tabular-nums}
@@ -102,7 +102,9 @@ main.assessment{
 .assessment .as-tag.lv-borderline i{background:var(--borderline)}
 .assessment .as-tag.lv-normal{background:var(--normal-wash)}.assessment .as-tag.lv-normal i{background:var(--normal)}
 .assessment .as-tag.lv-focus,.assessment .as-tag.lv-borderline,.assessment .as-tag.lv-normal{color:var(--ink)}
-.assessment .as-tag.plain{background:transparent;border:1px solid var(--line)}
+.assessment .as-tag.plain{background:transparent;box-shadow:inset 0 0 0 1px var(--line)}
+.assessment .as-tag.lv-none{background:transparent;box-shadow:inset 0 0 0 1px var(--line)}
+.assessment .as-tag.lv-none i{background:#fff;box-shadow:inset 0 0 0 1.5px #7d837f}
 .assessment .as-dir{display:inline-block;width:8px;height:10px;fill:currentColor;vertical-align:-1px}
 .assessment .as-more{font-size:12.5px;color:var(--muted);align-self:center}
 /* legend */
@@ -133,19 +135,22 @@ main.assessment{
 .assessment svg .trk{stroke:#dde1de;stroke-width:2;stroke-linecap:round}
 .assessment svg .band{fill:var(--band);stroke:var(--band-edge);stroke-width:1}
 .assessment svg .tgt{fill:var(--accent)}
-.assessment svg .tk{font-size:9.5px;fill:var(--muted)}
+.assessment svg .tk{font-size:11px;fill:var(--muted)}
 .assessment svg .tkl{stroke:#c9cec9;stroke-width:1}
 .assessment svg .dot{stroke:#fff;stroke-width:2}
 .assessment svg .ring{fill:none;stroke:rgba(27,31,29,.5);stroke-width:.8}
 .assessment svg .dot.lv-focus{fill:var(--focus)}.assessment svg .dot.lv-borderline{fill:var(--borderline)}
-.assessment svg .dot.lv-normal{fill:var(--normal)}.assessment svg .dot.lv-none,.assessment svg .dot.lv-notTested{
-  fill:#7d837f}
+.assessment svg .dot.lv-normal{fill:var(--normal)}.assessment svg .dot.lv-notTested{fill:#7d837f}
+.assessment svg .dot.lv-none{fill:#fff;stroke:#6b716d;stroke-width:1.8}
 .assessment svg .hollow{fill:#fff;stroke:#5b615d;stroke-width:1.6}
 .assessment svg .over{fill:#5b615d}
 .assessment svg .bn{fill:var(--normal-wash);stroke:#a9d3a4;stroke-width:.8}
-.assessment svg .bo{fill:var(--borderline-wash);stroke:#ecd28c;stroke-width:.8}
-.assessment svg .bx{fill:var(--focus-wash);stroke:#ebb59f;stroke-width:.8}
-.assessment svg .bl{font-size:9px;fill:var(--ink-2)}
+.assessment svg .blo{fill:#e5eefa;stroke:#a8c4e6;stroke-width:.8}
+.assessment svg .blx{fill:#cfe0f5;stroke:#86abd9;stroke-width:.8}
+.assessment svg .bhi{fill:#fdf0d8;stroke:#ebcf8f;stroke-width:.8}
+.assessment svg .bhx{fill:#fbe0d2;stroke:#e6ad93;stroke-width:.8}
+.assessment svg .bo{fill:#f1efe9;stroke:#cfcac0;stroke-width:.8}
+.assessment svg .bt{font-size:10px;fill:var(--ink-2)}
 /* panels of chapter three and four */
 .assessment .as-panel{margin:16px 0 20px}
 .assessment .as-panel-head{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;padding:0 0 6px;
@@ -193,10 +198,17 @@ main.assessment{
 .assessment figure.as-graph .hub-s{fill:#d9ebe5;font-size:12px}
 .assessment figure.as-graph .edge{fill:none;stroke:#a9b1ac;stroke-width:1.5}
 .assessment figure.as-graph .node{stroke-width:1.2}
-.assessment figure.as-graph .node.pri-p0{fill:var(--p0-wash);stroke:#d99a98}
-.assessment figure.as-graph .node.pri-p1{fill:var(--focus-wash);stroke:#e2aa8f}
-.assessment figure.as-graph .node.pri-p2{fill:var(--accent-wash);stroke:#9cc3b8}
-.assessment figure.as-graph .node.pri-p3{fill:var(--untested-wash);stroke:#bfc4c0}
+.assessment figure.as-graph .node{fill:#fff}
+.assessment figure.as-graph .node.pri-p0{stroke:var(--p0-ink);stroke-width:2}
+.assessment figure.as-graph .node.pri-p1{stroke:var(--ink-2);stroke-width:1.6}
+.assessment figure.as-graph .node.pri-p2{stroke:#8f9692}
+.assessment figure.as-graph .node.pri-p3{stroke:var(--line)}
+.assessment figure.as-graph .badge{rx:3}
+.assessment figure.as-graph .badge.pri-p0{fill:var(--p0-ink)}
+.assessment figure.as-graph .badge.pri-p1{fill:var(--ink-2)}
+.assessment figure.as-graph .badge.pri-p2,.assessment figure.as-graph .badge.pri-p3{fill:#8f9692}
+.assessment figure.as-graph .bid{font-size:12px;font-weight:700;fill:#fff}
+.assessment figure.as-graph .ns{font-size:11.5px;fill:var(--ink-2)}
 .assessment figure.as-graph .nid{font-size:13px;font-weight:700;fill:var(--ink)}
 .assessment figure.as-graph .nt{font-size:13px;fill:var(--ink)}
 .assessment figure.as-graph .np{font-size:11px;fill:var(--ink-2)}
@@ -235,9 +247,6 @@ main.assessment{
 .assessment .as-stage>header .t b{font-family:var(--serif);font-size:19px}
 .assessment .as-stage>header .t span{font-size:12.5px;color:var(--muted)}
 .assessment .as-stage>header h4{font-size:13.5px;color:var(--ink-2);font-weight:600;margin-top:2px}
-.assessment .as-stage.s1>header{background:var(--p0-wash)}
-.assessment .as-stage.s2>header{background:var(--focus-wash)}
-.assessment .as-stage.s3>header{background:var(--accent-wash)}
 .assessment .as-stage ul{list-style:none;margin:0;padding:6px 13px 10px}
 .assessment .as-stage li{padding:7px 0;border-bottom:1px solid var(--grid);font-size:13.5px;line-height:1.6}
 .assessment .as-stage li:last-child{border-bottom:none}
@@ -257,8 +266,17 @@ main.assessment{
 .assessment .as-bandkey i{display:inline-block;width:14px;height:9px;border-radius:2px;margin-right:5px;
   vertical-align:0}
 .assessment .as-bandkey i.bn{background:var(--normal-wash);border:1px solid #a9d3a4}
-.assessment .as-bandkey i.bo{background:var(--borderline-wash);border:1px solid #ecd28c}
-.assessment .as-bandkey i.bx{background:var(--focus-wash);border:1px solid #ebb59f}
+.assessment .as-bandkey i.blo{background:#e5eefa;border:1px solid #a8c4e6}
+.assessment .as-bandkey i.blx{background:#cfe0f5;border:1px solid #86abd9}
+.assessment .as-bandkey i.bhi{background:#fdf0d8;border:1px solid #ebcf8f}
+.assessment .as-bandkey i.bhx{background:#fbe0d2;border:1px solid #e6ad93}
+.assessment .as-bandkey i.bo{background:#f1efe9;border:1px solid #cfcac0}
+.assessment .as-systems>.as-sys:last-child:nth-child(odd){grid-column:1/-1}
+.assessment nav.as-toc{margin:18px 0 0;font-size:13.5px;line-height:1.75}
+.assessment nav.as-toc ol{columns:2;column-gap:32px;margin:0;padding:0;list-style:none}
+.assessment nav.as-toc a{color:var(--ink-2);text-decoration:none}
+.assessment .as-layers{margin:6px 0 10px}
+.assessment .as-layers h4{margin:12px 0 4px}
 .assessment h4.as-sub{margin:20px 0 8px;font-size:15px}
 .assessment ol.as-readings,.assessment ul.as-readings{list-style:none;margin:6px 0;padding:0}
 .assessment .as-readings>li{margin:0 0 12px}
@@ -783,8 +801,8 @@ def _range_svg(number, low, high, kind, level, label, target=None):
             parts.append(f'<text class="tk" x="{position:.1f}" y="31" text-anchor="{anchor}">{_e(_fmt(value))}</text>')
     if number is not None:
         cx = min(max(_x(number, lo, hi), _X0), _X1)
-        parts.append(f'<circle class="ring" cx="{cx:.1f}" cy="13" r="6.7"/>')
-        parts.append(f'<circle class="dot lv-{_level_class(level)}" cx="{cx:.1f}" cy="13" r="5.6"/>')
+        parts.append(f'<circle class="ring" cx="{cx:.1f}" cy="13" r="7.2"/>')
+        parts.append(f'<circle class="dot lv-{_level_class(level)}" cx="{cx:.1f}" cy="13" r="6.1"/>')
         if overflow == 'right':
             parts.append(f'<path class="over" d="M{_X1 + 4:.1f} 9.5 {_X1 + 8:.1f} 13 {_X1 + 4:.1f} 16.5Z"/>')
         elif overflow == 'left':
@@ -794,10 +812,19 @@ def _range_svg(number, low, high, kind, level, label, target=None):
 
 
 def _band_class(label):
+    """Normal bands are green; low bands blue and high bands warm, deeper at the extremes."""
     text = _text(label)
     if charts.is_normal_label(text):
         return 'bn'
-    return 'bx' if re.search(r'极低|极高|严重', text) else 'bo'
+    if re.search(r'极低|严重偏低', text):
+        return 'blx'
+    if re.search(r'极高|严重偏高', text):
+        return 'bhx'
+    if re.search(r'低|少|弱', text):
+        return 'blo'
+    if re.search(r'高|多|强', text):
+        return 'bhi'
+    return 'bo'
 
 
 def _bands_svg(number, bands, level, label, *, domain=None):
@@ -826,9 +853,9 @@ def _bands_svg(number, bands, level, label, *, domain=None):
             f'<rect class="{_band_class(band["label"])}" x="{x0 + 0.5:.1f}" y="6" width="{max(x1 - x0 - 1, 1):.1f}" '
             'height="14" rx="2"/>'
         )
-        if len(band['label']) * 9.2 + 6 < x1 - x0:
+        if len(band['label']) * 10.2 + 6 < x1 - x0:
             middle = (x0 + x1) / 2
-            parts.append(f'<text class="bl" x="{middle:.1f}" y="16.2" text-anchor="middle">{_e(band["label"])}</text>')
+            parts.append(f'<text class="bt" x="{middle:.1f}" y="16.6" text-anchor="middle">{_e(band["label"])}</text>')
         for value in (band.get('low'), band.get('high')):
             if value is not None and lo < value < hi:
                 edges.add(value)
@@ -837,8 +864,8 @@ def _bands_svg(number, bands, level, label, *, domain=None):
         parts.append(f'<text class="tk" x="{x:.1f}" y="31" text-anchor="middle">{_e(_fmt(value))}</text>')
     if number is not None:
         cx = min(max(_x(number, lo, hi), _X0), _X1)
-        parts.append(f'<circle class="ring" cx="{cx:.1f}" cy="13" r="6.7"/>')
-        parts.append(f'<circle class="dot lv-{_level_class(level)}" cx="{cx:.1f}" cy="13" r="5.6"/>')
+        parts.append(f'<circle class="ring" cx="{cx:.1f}" cy="13" r="7.2"/>')
+        parts.append(f'<circle class="dot lv-{_level_class(level)}" cx="{cx:.1f}" cy="13" r="6.1"/>')
     parts.append('</svg>')
     return ''.join(parts)
 
@@ -858,8 +885,8 @@ def _axis_svg(number, lo, hi, ticks, level, label, *, marker=None):
         parts.append(f'<rect class="tgt" x="{x - 1:.1f}" y="5" width="2" height="16" rx="1"/>')
     if number is not None:
         cx = min(max(_x(number, lo, hi), _X0), _X1)
-        parts.append(f'<circle class="ring" cx="{cx:.1f}" cy="13" r="6.7"/>')
-        parts.append(f'<circle class="dot lv-{_level_class(level)}" cx="{cx:.1f}" cy="13" r="5.6"/>')
+        parts.append(f'<circle class="ring" cx="{cx:.1f}" cy="13" r="7.2"/>')
+        parts.append(f'<circle class="dot lv-{_level_class(level)}" cx="{cx:.1f}" cy="13" r="6.1"/>')
     parts.append('</svg>')
     return ''.join(parts)
 
@@ -916,8 +943,8 @@ def _abundance_svg(abundance, low, high, level, label):
             parts.append(f'<circle class="hollow" cx="{_X0:.1f}" cy="13" r="5"/>')
         else:
             cx = _log_x(abundance)
-            parts.append(f'<circle class="ring" cx="{cx:.1f}" cy="13" r="6.7"/>')
-            parts.append(f'<circle class="dot lv-{_level_class(level)}" cx="{cx:.1f}" cy="13" r="5.6"/>')
+            parts.append(f'<circle class="ring" cx="{cx:.1f}" cy="13" r="7.2"/>')
+            parts.append(f'<circle class="dot lv-{_level_class(level)}" cx="{cx:.1f}" cy="13" r="6.1"/>')
     parts.append('</svg>')
     return ''.join(parts)
 
@@ -1014,6 +1041,8 @@ def _legend():
         f'<b>状态分档</b><div>{chip_row()}</div>'
         f'<b>参考范围条</b><div><span class="sw">{sample}</span>'
         '<span>绿色区段为临床参考区间，下方深色细条为有出处的目标区间，圆点为本次实测值并按状态着色</span></div>'
+        '<b>未分级</b><div><span class="as-tag lv-none"><i></i>空心圆点</span>'
+        '<span>没有可比的参考区间或分档，只列出原始数值</span></div>'
         f'<b>优先级</b><div>{"".join(_priority_chip(key) for key in ("P0", "P1", "P2"))}</div>'
         '</div>'
     )
