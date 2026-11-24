@@ -76,6 +76,7 @@ _SYSTEMS = (
     ('endocrineMusculoskeletal', '内分泌激素与骨肌系统', ('endocrineMusculoskeletal',)),
     ('hematologyImmune', '血液免疫、甲基化与氧化应激', ('hematologyImmune',)),
 )
+NO_TREND_STATEMENT = '本次资料未包含可比较的历次结果。'
 _LIFESTYLE_SECTIONS = (
     ('diet', '膳食结构与餐桌模式'),
     ('drinks', '饮酒应酬、饮水与饮品'),
@@ -3788,6 +3789,9 @@ def build_assessment_presentation(*, request, parsed, document, data, blueprint,
         clinical.setdefault(field, None)
         clinical.setdefault(field + 'EvidenceRefs', [])
         _put_editorial(editorial, field, clinical, field, field + 'EvidenceRefs')
+    if not clinical.get('trends') and not clinical.get('trendSummary'):
+        # Spec 3.6: without comparable earlier results the callback still says so.
+        clinical['trendSummary'] = NO_TREND_STATEMENT
     for row in clinical['specialtyFindings']:
         _put_editorial(editorial, 'specialtyRow.' + row['code'], row, field='interpretation')
         device_plan = row.pop('_deviceFollowup', None)

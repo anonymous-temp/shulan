@@ -1181,14 +1181,27 @@ RULES = (
         'topic': r'甲状腺',
     },
     {
-        'id': 'RF-LUNGRADS-3',
+        # Lung-RADS 4A/4B/4X call for a 3-month CT or work-up; category 3
+        # (probably benign) is a 6-month low-dose CT follow-up, not a priority.
+        'id': 'RF-LUNGRADS-4',
         'tier': 'P0',
         'group': 'lung',
-        'title': '肺结节 Lung-RADS 3 类及以上',
-        'trigger': {'type': 'grade', 'system': 'lungrads', 'min': 3},
+        'title': '肺结节 Lung-RADS 4 类及以上',
+        'trigger': {'type': 'grade', 'system': 'lungrads', 'min': 4},
         'timeframe': _ONE_MONTH,
         'department': '呼吸内科或胸外科',
-        'checks': ['呼吸或胸外科评估', '按分类安排胸部 CT 复查或进一步检查'],
+        'checks': ['呼吸或胸外科评估', '按分类安排 3 个月胸部 CT 复查或进一步检查'],
+        'sources': ['acr_lungrads2022'],
+        'topic': r'肺',
+    },
+    {
+        'id': 'RT-LUNGRADS-3',
+        'tier': 'routine',
+        'group': 'lung',
+        'title': '肺结节 Lung-RADS 3 类',
+        'trigger': {'type': 'grade', 'system': 'lungrads', 'min': 3, 'max': 3},
+        'interval': {'text': '6 个月复查低剂量胸部 CT', 'days': 180},
+        'department': '呼吸内科',
         'sources': ['acr_lungrads2022'],
         'topic': r'肺',
     },
@@ -1203,6 +1216,8 @@ RULES = (
             'finding': r'结节',
             'min_mm': 8.0,
             'exclude': r'钙化|磨玻璃|亚实性|部分实性',
+            # A recorded Lung-RADS category already decides the follow-up.
+            'graded': r'Lung\s*-?\s*RADS',
         },
         'timeframe': _ONE_MONTH,
         'department': '呼吸内科或胸外科',
@@ -1730,6 +1745,8 @@ def _finding(trigger, rows, evidence):
         name = _norm(_get(row, 'name'))
         text = f'{name}：{_norm(_get(row, "value"))}' if _SUMMARY_NAME.search(name) else _norm(_get(row, 'value'))
         record_qualified = exclude is not None and bool(exclude.search(text))
+        if trigger.get('graded') and re.search(trigger['graded'], text, re.IGNORECASE):
+            continue
         for sentence in re.split(r'[。；;\n]', text):
             if not organ.search(sentence) or not finding.search(sentence):
                 continue

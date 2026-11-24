@@ -1693,10 +1693,12 @@ class _AssessmentRenderer:
                 f'<div class="as-trend"><h4>{_e(item.get("name"))} <small class="as-muted">{_e(item.get("direction"))}'
                 f'</small></h4>{chart}{reading}</div>'
             )
-        trend = f'<div class="as-trends">{"".join(cards)}</div>' if cards else _note('本次资料未包含可比较的历次结果。')
-        trend += self.paragraph(
-            clinical.get('trendSummary'), {'evidenceRefs': clinical.get('trendSummaryEvidenceRefs')}
-        )
+        no_trend = '本次资料未包含可比较的历次结果。'
+        trend = f'<div class="as-trends">{"".join(cards)}</div>' if cards else _note(no_trend)
+        if (clinical.get('trendSummary') or '').strip() != no_trend:
+            trend += self.paragraph(
+                clinical.get('trendSummary'), {'evidenceRefs': clinical.get('trendSummaryEvidenceRefs')}
+            )
         baselines = self.paragraph(clinical.get('baselineSummary'), {
             'evidenceRefs': clinical.get('baselineSummaryEvidenceRefs')
         })
