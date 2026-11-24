@@ -1889,7 +1889,7 @@ def evaluate_red_flags(facts, subject=None, problems=()):
             'checks': list(rule['checks']),
             'factIds': fact_ids,
             'problemCodes': [problem['code'] for problem in links if problem.get('code')],
-            'triggeredBy': list(evidence.notes),
+            'evidenceText': list(evidence.notes),
             'sources': [*_source_list(rule['sources']), {'key': 'program_default', **PROGRAM_DEFAULT}],
             'origin': 'red_flag_rule',
         }
@@ -1919,7 +1919,7 @@ def evaluate_red_flags(facts, subject=None, problems=()):
                 'checks': [_norm(line) for line in urgent],
                 'factIds': _prefer_direct(clinical, facts_by_id),
                 'problemCodes': [problem['code']] if problem.get('code') else [],
-                'triggeredBy': [_norm(line) for line in urgent],
+                'evidenceText': [_norm(line) for line in urgent],
                 'sources': [{'key': 'original_advice', 'title': '原检查建议', 'quote': _norm(urgent[0])}],
                 'origin': 'original_advice',
             }
@@ -1951,7 +1951,7 @@ def evaluate_red_flags(facts, subject=None, problems=()):
                 'factIds': _prefer_direct(evidence.fact_ids, facts_by_id),
                 'problemCodes': [problem['code'] for problem in links if problem.get('code')],
                 'originalAdvice': list(dict.fromkeys(_norm(line) for line in advice)),
-                'triggeredBy': list(evidence.notes),
+                'evidenceText': list(evidence.notes),
                 'sources': _source_list(rule['sources']),
                 'origin': 'routine_rule',
             }
@@ -1991,7 +1991,7 @@ def advice_followups(problems, facts, *, exclude_problem_codes=()):
                 'factIds': _prefer_direct(clinical, facts_by_id),
                 'problemCodes': [code] if code else [],
                 'originalAdvice': list(dict.fromkeys(advice)),
-                'triggeredBy': [],
+                'evidenceText': [],
                 'sources': [{'key': 'original_advice', 'title': '原检查建议', 'quote': advice[0]}],
                 'origin': 'original_advice',
             }
