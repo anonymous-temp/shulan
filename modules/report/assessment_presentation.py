@@ -77,6 +77,11 @@ _SYSTEMS = (
     ('hematologyImmune', '血液免疫、甲基化与氧化应激', ('hematologyImmune',)),
 )
 NO_TREND_STATEMENT = '本次资料未包含可比较的历次结果。'
+NO_SYMPTOM_LEAD = '本次未记录主诉症状。'
+NO_SYMPTOM_SUMMARY = (
+    '本次未记录主诉症状，本章不作症状与检查结果的对应分析；已检出的异常及其可能影响见第三章各系统评估与第五章失衡集群。'
+)
+NO_LIFESTYLE_SUMMARY = '本次未提供家族史、既往病史、用药及生活方式资料，健康诱因暂无法复盘；补充问卷资料后可完善本节。'
 NO_DIGESTIVE_STATEMENT = '本次资料未包含口腔、胃肠与肝胆胰的相关检查，本节仅依据菌群检测结果评估。'
 _LIFESTYLE_SECTIONS = (
     ('diet', '膳食结构与餐桌模式'),
@@ -3784,12 +3789,16 @@ def build_assessment_presentation(*, request, parsed, document, data, blueprint,
         clinical['symptomsLead'] = '本次记录的主诉包括' + '、'.join(names) + '。' if names else None
     if plan is None and clinical['clinicalGroups']:
         clinical['summary'] = (
-            '下文按系统对照实际检查结果、原参考范围和有依据的临床关注界值，说明不同发现对后续评估的影响。'
+            '下文按系统对照实际检查结果、参考区间和有依据的临床关注界值，说明不同发现对后续评估的影响。'
         )
     _put_editorial(editorial, 'clinicalLead', clinical)
     clinical.setdefault('symptomSummary', None)
     clinical.setdefault('symptomSummaryEvidenceRefs', [])
     _put_editorial(editorial, 'symptomSummary', clinical, 'symptomSummary', 'symptomSummaryEvidenceRefs')
+    if not clinical['symptoms']:
+        # Spec chapter 2: no recorded complaint is stated, never left blank or invented.
+        clinical['symptomsLead'] = NO_SYMPTOM_LEAD
+        clinical['symptomSummary'] = clinical.get('symptomSummary') or NO_SYMPTOM_SUMMARY
     for field in ('specialtySummary', 'trendSummary', 'baselineSummary'):
         clinical.setdefault(field, None)
         clinical.setdefault(field + 'EvidenceRefs', [])
@@ -3945,6 +3954,8 @@ def build_assessment_presentation(*, request, parsed, document, data, blueprint,
         )
     lifestyle = {}
     _put_editorial(editorial, 'lifestyleSummary', lifestyle)
+    if not lifestyle.get('summary') and not _plan_list(plan, 'lifestyleFactors'):
+        lifestyle['summary'] = NO_LIFESTYLE_SUMMARY
     cluster_summary = {}
     if items:
         _put_editorial(editorial, 'clusterSummary', cluster_summary)
