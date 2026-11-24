@@ -3943,6 +3943,31 @@ async def author_report_chapters(
     # At most one complete publication chain per batch slot. Interleaving
     # chapters prevents all initial slots going to a single long chapter.
     jobs = [item for row in zip_longest(*chapter_batches) for item in row if item is not None]
+    if dossier.planned and len(jobs) > 1:
+        # A batch whose reviewed cells feed later summaries takes a slot
+        # first; otherwise a long summary chain can start after the slots
+        # were spent on cells nothing waits for.
+        owner_job = {target['id']: position for position, (_, batch, _) in enumerate(jobs) for target in batch}
+        dependents = {position: set() for position in range(len(jobs))}
+        for position, (_, batch, _) in enumerate(jobs):
+            for target in batch:
+                for identifier in contributor_ids.get(target['id'], ()):
+                    source = owner_job.get(identifier)
+                    if source is not None and source != position:
+                        dependents[source].add(position)
+        depth = {}
+
+        def chain_depth(position, visiting=()):
+            if position not in depth:
+                depth[position] = 1 + max(
+                    (chain_depth(child, (*visiting, position)) for child in dependents[position]
+                     if child not in visiting),
+                    default=0,
+                )
+            return depth[position]
+
+        order = sorted(range(len(jobs)), key=lambda position: (-chain_depth(position), position))
+        jobs = [jobs[position] for position in order]
     complete.update((target['id'], asyncio.Event()) for _, batch, _ in jobs for target in batch)
     work = [run_batch(chapter, batch, index, monotonic()) for chapter, batch, index in jobs]
     if work:

@@ -370,3 +370,43 @@ def test_leaked_passage_handles_are_removed_from_paragraphs(text):
     from modules.report.evaluation_report_writer import _paragraphs
 
     assert 'E' not in _paragraphs({'paragraphs': [{'text': text}]}, clean_prose=False)[0]['text']
+
+
+_STOOL = {
+    'sourceQuote': '建议复查大便常规+"OB"，消化内科就诊；若复查后仍阳性，请进一步检查原因。',
+    'sourceAdviceScopes': [],
+}
+_STOOL_CONDITION = {'sourceQuote': '若复查后仍阳性，请进一步检查原因。', 'sourceAdviceScopes': []}
+
+
+@pytest.mark.parametrize(
+    ('term', 'advice', 'accepted'),
+    [
+        ('复查大便常规及隐血，并至消化内科就诊', [_STOOL], True),
+        ('按体检结论复查大便常规+OB并消化内科就诊，仍阳性进一步查因', [_STOOL, _STOOL_CONDITION], True),
+        ('复查大便常规并至内分泌科就诊', [_STOOL], False),
+        ('复查大便常规，仍阳性再至消化内科就诊', [_STOOL], False),
+    ],
+)
+def test_a_retelling_may_join_sibling_actions_of_the_selected_order_but_not_change_them(term, advice, accepted):
+    from modules.report.assessment_measurement_claims import advice_authority_issue
+
+    issue = advice_authority_issue({'term': term, 'statement': term}, advice)
+    assert (issue is None) is accepted, issue
+
+
+def test_source_only_text_separates_alphanumeric_names_and_never_stacks_punctuation():
+    facts = [
+        {'name': '糖链抗原CA125', 'value': '6.3', 'unit': 'U/mL', 'referenceRange': '<35.0'},
+        {'name': '糖链抗原CA19-9', 'value': '6.6', 'unit': 'U/mL'},
+        {'name': '宫颈细胞学', 'value': '未见肿瘤细胞。'},
+    ]
+    assert (
+        source_only_text(facts)
+        == '糖链抗原CA125 6.3 U/mL（参考<35.0）；糖链抗原CA19-9 6.6 U/mL；宫颈细胞学未见肿瘤细胞。'
+    )
+
+
+def test_a_condition_left_without_its_removed_action_is_removed_too():
+    text = '按检查建议复查大便常规及隐血，并至消化内科就诊；复查后仍为阳性时进一步检查原因。体重需复评。'
+    assert trim_rejected_clauses(text, ['并至消化内科就诊']) == '体重需复评。'

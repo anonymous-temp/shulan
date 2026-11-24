@@ -44,6 +44,10 @@ _PID = re.compile(r'^\s*P0*(\d+)\s*$')
 _CLAIM_DETAIL = re.compile(r'^(?P<pid>P\d{2})/K\d{2}(?:（(?P<term>.+?)）)?：')
 _LITERAL_DETAIL = re.compile(r'^(?P<pid>P\d{2})：(?:.*?「(?P<label>[^」]+)」)?')
 _DIGIT = re.compile(r'\d')
+_DEPENDENT_START = re.compile(
+    r'^\s*(?:若|如果|如(?!何)|一旦|当|必要时|否则|则|仍|复查后|此后|随后|之后|届时|并|且|同时|另外|此外|其余|其中|'
+    r'该|此|这|上述|前述|以上|因此|故|所以|但|而)'
+)
 
 
 def claim_issue_code(problem):
@@ -463,6 +467,11 @@ def trim_rejected_clauses(text, spans):
         if start < 0:
             return None
         removed.update(_statement_indexes(statements, start, len(span)))
+    # A statement that continues or conditions a removed one ("复查后仍阳性时……",
+    # "该结果……") cannot stand alone; it goes with its antecedent.
+    for index in range(1, len(statements)):
+        if index - 1 in removed and _DEPENDENT_START.match(statements[index]):
+            removed.add(index)
     kept = ''.join(statement for index, statement in enumerate(statements) if index not in removed)
     kept = _close(kept)
     return kept if re.sub(r'[\W_]+', '', kept) else ''
@@ -532,30 +541,40 @@ def has_number(paragraphs):
     return any(_DIGIT.search(part['text']) for part in paragraphs)
 
 
+_TRAILING_PUNCTUATION = re.compile(r'[\s。．.！？!?；;，,、：:]+$')
+_NAME_END = re.compile(r'[A-Za-z0-9）)\]%＋+\-]$')
+_VALUE_START = re.compile(r'^[A-Za-z0-9<>≤≥＜＞+\-−.]')
+
+
 def _fact_value(fact):
-    value = str(fact.get('value') or '').strip()
+    value = _TRAILING_PUNCTUATION.sub('', str(fact.get('value') or '').strip())
     unit = str(fact.get('unit') or '').strip()
     if value and unit and not value.endswith(unit):
         value = f'{value} {unit}'
     return value
 
 
+def _joined_name_value(name, value):
+    """Keep a name ending in letters or digits apart from a value starting with them (CA125 6.3)."""
+    return f'{name} {value}' if _NAME_END.search(name) and _VALUE_START.match(value) else f'{name}{value}'
+
+
 def source_only_text(facts, *, limit=8):
     """A reader sentence listing recorded values, references and source states only."""
     pieces = []
     for fact in facts:
-        name = re.sub(r'\s+', ' ', str(fact.get('name') or '')).strip()
+        name = _TRAILING_PUNCTUATION.sub('', re.sub(r'\s+', ' ', str(fact.get('name') or '')).strip())
         value = _fact_value(fact)
         if not name or not value:
             continue
         details = []
-        reference = str(fact.get('referenceRange') or fact.get('reference_range') or '').strip()
-        if reference:
-            details.append(f'参考{reference}')
-        status = str(fact.get('status') or '').strip()
+        reference = _TRAILING_PUNCTUATION.sub('', str(fact.get('referenceRange') or fact.get('reference_range') or ''))
+        if reference.strip():
+            details.append(f'参考{reference.strip()}')
+        status = _TRAILING_PUNCTUATION.sub('', str(fact.get('status') or '').strip())
         if status and status not in value:
             details.append(status)
-        pieces.append(f'{name}{value}' + (f'（{"，".join(details)}）' if details else ''))
+        pieces.append(_joined_name_value(name, value) + (f'（{"，".join(details)}）' if details else ''))
         if len(pieces) >= limit:
             break
     if not pieces:
