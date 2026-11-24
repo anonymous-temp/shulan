@@ -64,6 +64,8 @@ FORBIDDEN_TERMS = (
 # Need a human look: "模型" is allowed for a microbiome risk model.
 ADVISORY_TERMS = ('模型', '绝非', '必然', '彻底', '全军覆没', '引擎', '为什么')
 PLACEHOLDER_TERMS = ('暂无可展示', '暂无解读', '暂无内容', '待补充')
+# Ordinary words that contain a forbidden term ("检测方法" is not "检测方").
+TERM_EXCEPTIONS = {'检测方': r'检测方(?=法|式|案|面|向)', '模板': r'模板(?=化)'}
 
 # Keys that carry identifiers or rendering metadata, never reader text.
 HIDDEN_KEYS = frozenset(
@@ -437,7 +439,10 @@ def check_words(chapters: dict[str, dict]) -> dict:
         for path, _, text in visible_strings(content, chapter):
             for terms, sink in ((FORBIDDEN_TERMS, hits), (ADVISORY_TERMS, advisory), (PLACEHOLDER_TERMS, placeholders)):
                 for term in terms:
+                    exception = TERM_EXCEPTIONS.get(term)
                     for match in re.finditer(re.escape(term), text):
+                        if exception and re.match(exception, text[match.start() :]):
+                            continue
                         sink.append({'term': term, 'path': path, 'excerpt': _excerpt(text, match.start(), match.end())})
 
     def by_term(rows):
@@ -680,12 +685,28 @@ def _microbiome_numbers(chapters: dict[str, dict]) -> set[str]:
     return _numbers('\n'.join(texts))
 
 
+def _rule_numbers() -> set:
+    """Thresholds quoted from the red-flag and test-gap rule tables (not patient data)."""
+    texts = []
+    for module_name, attribute in (
+        ('modules.report.assessment_test_gaps', 'GAP_RULES'),
+        ('modules.report.assessment_red_flags', 'RULES'),
+    ):
+        try:
+            rules = getattr(importlib.import_module(module_name), attribute, ())
+        except Exception:  # an optional rule table must not break the check
+            continue
+        texts.append(json.dumps(list(rules), ensure_ascii=False, default=str))
+    return _numbers('\n'.join(texts))
+
+
 def check_numbers(request: dict, chapters: dict[str, dict]) -> dict:
     pools = {
         'request': _numbers('\n'.join(_all_texts(request))),
         'microbiome': _microbiome_numbers(chapters),
         'derived': _derived_numbers(chapters),
         'target': _target_numbers(chapters),
+        'rule': _rule_numbers(),
     }
     checked, by_pool, missing, seen = 0, dict.fromkeys(pools, 0), [], set()
     for chapter, content in chapters.items():
