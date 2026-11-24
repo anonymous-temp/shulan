@@ -89,7 +89,7 @@ main.assessment{
 .assessment .pri-p3{background:var(--paper);color:var(--muted);box-shadow:inset 0 0 0 1px var(--line)}
 .assessment .as-when{display:inline-block;font-size:12.5px;line-height:1.75;padding:0 8px;
   border:1px solid var(--accent);
-  color:var(--accent);border-radius:3px;white-space:nowrap}
+  color:var(--accent);border-radius:3px;white-space:normal;max-width:100%;overflow-wrap:anywhere}
 /* tags carry a measured value; the dot carries the level */
 .assessment .as-tags{display:flex;flex-wrap:wrap;gap:5px 5px;margin:2px 0}
 .assessment .as-tag{display:inline-flex;align-items:baseline;gap:5px;padding:2px 8px 2px 7px;border-radius:3px;
