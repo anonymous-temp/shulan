@@ -742,7 +742,11 @@ def source_only_fallback_block(target, facts):
     primary = [fid for fid in owner.get('primaryFactIds') or () if fid in allowed and fid in facts]
     if not primary:
         return None
-    rows = [facts[fid] for fid in primary]
+    # Only recorded measurements and findings are listed: a questionnaire
+    # item is a question plus an answer, and long device narratives do not
+    # read as a value.
+    rows = [facts[fid] for fid in primary if facts[fid].get('kind') not in {'self_reported', 'context'}
+            and len(str(facts[fid].get('value') or '')) <= 80]
     # Values outside the printed reference come first; the listing is bounded.
     rows.sort(key=lambda row: 0 if row.get('abnormal') is True
               or re.search(r'偏|高|低|异常|阳性|升|降', str(row.get('status') or '')) else 1)

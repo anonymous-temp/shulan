@@ -259,8 +259,8 @@ def _target(target_id, **owner):
     return {
         'id': target_id,
         'path': ['_assessment_editorial', target_id, 'text'],
-        'owner': {'primaryFactIds': ['f1', 'f2'], **owner},
-        'sourceFactIds': ['f1', 'f2'],
+        'owner': {'primaryFactIds': ['f3', 'f1', 'f2'], **owner},
+        'sourceFactIds': ['f1', 'f2', 'f3'],
         'allowedRoles': ['observation', 'interpretation'],
         'cellContract': {},
         'required': True,
@@ -274,6 +274,7 @@ def test_unfinished_duties_keep_retained_sentences_or_a_source_only_listing():
     facts = {
         'f1': {'factId': 'f1', 'name': '甘油三酯', 'value': '3.34', 'unit': 'mmol/L', 'status': '偏高'},
         'f2': {'factId': 'f2', 'name': '总胆固醇', 'value': '4.1', 'unit': 'mmol/L', 'status': '正常'},
+        'f3': {'factId': 'f3', 'kind': 'self_reported', 'name': '还有哪些想改善的健康问题', 'value': '血糖控制'},
     }
     targets = {
         't1': _target('t1'),
@@ -299,7 +300,7 @@ def test_unfinished_duties_keep_retained_sentences_or_a_source_only_listing():
     by_target = {block['targetId']: block for _, block in published}
     assert by_target['t1'] == retained_block
     assert by_target['t2']['completion'] == 'source_only'
-    assert by_target['t2']['sentences'][0]['text'].startswith('甘油三酯3.34 mmol/L（偏高）')
+    assert by_target['t2']['sentences'][0]['text'] == '甘油三酯3.34 mmol/L（偏高）；总胆固醇4.1 mmol/L（正常）。'
     assert 't3' not in by_target  # an action duty is never filled with a value list
     assert state.audit['sentenceRetention'][0]['targetId'] == 't1'
     assert source_only_fallback_block({**targets['t2'], 'sourceFallback': {'targetId': 't2'}}, facts) is None
