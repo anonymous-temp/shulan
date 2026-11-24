@@ -238,3 +238,12 @@ def test_veterinary_hosts_are_excluded_even_for_gene_topics():
 
     assert veterinary_host('Aeromonas veronii tolC modulates the immune response of freshwater pearl mussels')
     assert not veterinary_host('Toxin genes of Clostridioides difficile isolated from adults')
+
+
+def test_bare_ying_yi_count_as_directive_only_before_an_action():
+    from modules.report.evaluation_evidence_recall import _DIRECTIVE
+
+    assert _DIRECTIVE.search('粪便隐血阳性者应在规定时间内完成结肠镜检查')
+    assert _DIRECTIVE.search('血脂异常者宜定期复查血脂')
+    for text in ('药物不良反应发生率较低', '对应的检测方法', '适宜人群为成人', '相应指标未见异常', '效应量较小'):
+        assert not _DIRECTIVE.search(text), text

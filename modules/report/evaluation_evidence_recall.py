@@ -130,7 +130,11 @@ _NOT_EVIDENCE = re.compile(
 )
 _DIRECTIVE = re.compile(
     r'\b(?:recommend\w*|should|suggest\w*|advis\w*|is indicated|are indicated|must|'
-    r'requires? follow[- ]?up)\b|建议|推荐|应当|应予|需要',
+    r'requires? follow[- ]?up)\b|建议|推荐|应当|应予|需要|'
+    # A bare 应/宜 counts only before an action, never inside 反应/对应/适宜 and similar words.
+    r'(?<![反对相响供效适顺呼感])应(?=在|及时|尽快|尽早|定期|立即|进行|完成|接受|行|做|复查|随访|避免|控制|限制|减少|'
+    r'增加|戒|保持|每|至少|于|根据|结合|由|首选|选择|采用|考虑|评估|筛查)|'
+    r'(?<![适便权])宜(?=在|进行|选择|采用|控制|限制|减少|增加|避免|保持|每|至少|首选|定期)',
     re.I,
 )
 _UNFINISHED = re.compile(r'\b(?:study protocol|preprint|we hypothesi[sz]e|trial design)\b|研究方案|预印本', re.I)
