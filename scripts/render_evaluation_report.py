@@ -999,41 +999,6 @@ def _meters(domains) -> str:
 def _cover(body, data, assessment=None) -> str:
     subject = body.get('subject') or {}
     title = (data.get('introduction') or {}).get('title') or '整体健康评估报告'
-    if assessment is not None:
-        timing = (assessment.get('overview') or {}).get('dataTiming') or {}
-        sample = body.get('sample') or {}
-        age = subject.get('age')
-        profile = ' · '.join(str(value) for value in (subject.get('gender'), f'{age} 岁' if age is not None else None)
-                             if value)
-        clinical_date = timing.get('clinicalDate')
-        if clinical_date and timing.get('clinicalInstitution'):
-            clinical_date += f'（{timing["clinicalInstitution"]}）'
-        sampling = timing.get('microbiomeSampleDate') or sample.get('sampleDate')
-        received = timing.get('microbiomeReceivedDate')
-        reported = timing.get('microbiomeReportDate') or sample.get('reportDate')
-        gut_date = (
-            ('肠道宏基因组采样日', sampling) if sampling else
-            ('肠道菌群收样与报告日', reported) if received and received == reported else
-            ('肠道菌群报告日', reported) if reported else
-            ('肠道菌群收样日', received)
-        )
-        if gut_date[1] and sample.get('method'):
-            gut_date = (gut_date[0], f'{gut_date[1]}（{sample["method"]}）')
-        cells = (
-            ('identity', '受检人姓名', subject.get('name')),
-            ('identity', '性别 / 年龄', profile),
-            ('identity', '菌群样本编号', sample.get('sampleId')),
-            ('identity', '菌群原件登记标识', (assessment.get('microbiome') or {}).get('sampleContext', {})
-             .get('reportedSubjectLabel')),
-            ('dates', '临床体检基准日', clinical_date),
-            ('dates', *gut_date),
-            ('timing', '多源数据时效核验', f'体检与菌群采样间隔 {timing["daysBetween"]} 天'
-             if timing.get('daysBetween') is not None else None),
-        )
-        rows = ''.join(f'<div class="{style}"><dt>{_e(label)}</dt><dd>{_e(value)}</dd></div>'
-                       for style, label, value in cells if value)
-        title = assessment.get('title') or '个体化全息健康与肠道微生态深度评估报告'
-        return f'<header class="cover"><h1>{_e(title)}</h1><dl class="idcard">{rows}</dl></header>'
     scope = [
         name
         for name, present in (
@@ -1682,14 +1647,19 @@ def render_evaluation_html(body: dict) -> str:
         if __package__:
             from .render_assessment_presentation import ASSESSMENT_CSS
             from .render_assessment_presentation import assessment_chapters
+            from .render_assessment_presentation import assessment_cover
         else:
             from render_assessment_presentation import ASSESSMENT_CSS
             from render_assessment_presentation import assessment_chapters
+            from render_assessment_presentation import assessment_cover
 
         chapters = assessment_chapters(
             data, assessment, status=body.get('status'), partial_reasons=body.get('partialReasons') or (),
         )
-        return _render_document(body, data, chapters, assessment=assessment, extra_css=ASSESSMENT_CSS)
+        return _render_document(
+            body, data, chapters, assessment=assessment, extra_css=ASSESSMENT_CSS,
+            cover=assessment_cover(body, assessment),
+        )
 
     model, cap = _model(data), _Captions()
     # The integrated assessment and its plan come first; topical detail follows.
@@ -1720,12 +1690,12 @@ def render_evaluation_html(body: dict) -> str:
     return _render_document(body, data, chapters, sub=sub)
 
 
-def _render_document(body, data, chapters, *, sub='', assessment=None, extra_css='') -> str:
+def _render_document(body, data, chapters, *, sub='', assessment=None, extra_css='', cover=None) -> str:
     subject = body.get('subject') or {}
     title = (data.get('introduction') or {}).get('title') or '整体健康评估报告'
     if assessment is not None:
         title = assessment.get('title') or '个体化全息健康与肠道微生态深度评估报告'
-        main = _cover(body, data, assessment) + ''.join(html_ for _, _, html_ in chapters)
+        main = (cover or '') + ''.join(html_ for _, _, html_ in chapters)
         return (
             '<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">'
             '<meta name="viewport" content="width=device-width,initial-scale=1">'

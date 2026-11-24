@@ -788,7 +788,7 @@ def _reported_assessment_rows(parsed, data):
             '_sourceAssessmentFile': parsed.source_name,
             '_sourceSemantics': {
                 **semantics,
-                'reportedObject': semantics['assessmentDefinition']['label'] + '（原报告菌群关联评估）',
+                'reportedObject': semantics['assessmentDefinition']['label'] + '（菌群关联评估）',
                 'originalValue': item.test_result_value,
                 'originalStatus': item.result_status_name,
                 'displayStatus': item.result_status_name,
@@ -830,7 +830,7 @@ def _reported_assessment_rows(parsed, data):
                 '_sourceAssessmentFile': parsed.source_name,
                 '_sourceSemantics': {
                     **semantics,
-                    'reportedObject': item.name + '（原报告菌群模型评估）',
+                    'reportedObject': item.name + '（菌群模型评估）',
                     'originalValue': item.source_score,
                     'originalStatus': item.source_level,
                     'displayStatus': item.source_level,
@@ -1198,7 +1198,7 @@ def _structure_groups(rows, parsed, microbiome):
                 )
                 if bound and _number_key(row['value']) == Decimal(bound[1]):
                     measurements[index] = {**row, 'templateStatus': (
-                        f'{row["name"]}原判{row["status"]}；{row["value"]}在分界值，未满足原件严格界值{row["referenceRange"]}'
+                        f'{row["name"]}报告判为{row["status"]}；{row["value"]}处于分界值，未达到严格界值{row["referenceRange"]}'
                     )}
         if semantics := _group_source_semantics(measurements):
             group['_sourceSemantics'] = semantics
@@ -2205,6 +2205,52 @@ def build_microbiome_view(parsed, data, *, source_facts=()) -> dict:
     _annotate_source_assays(view, parsed, source_facts, data=data)
     view['_functionCellDuties'] = function_cell_duties()
     view['_sourceSemanticsByFactId'] = source_semantics_by_fact_id(view)
+    return view
+
+
+def _displayed_group_rows(group):
+    baseline = group.get('normalBaseline') or {}
+    yield from group.get('rows') or ()
+    yield from baseline.get('rows') or ()
+    yield from baseline.get('undetectedRows') or ()
+
+
+def annotate_microbiome_chart_fields(view: dict) -> dict:
+    """Append the spec 2.7 chart fields to every displayed microbiome row, in place.
+
+    Score rows gain ``score``/``bands``, abundance rows ``abundance``/
+    ``referenceLow``/``referenceHigh``, macro indices ``valueNumber``, reference
+    bounds and ``bands``; every row gains ``direction`` and ``level``. Original
+    fields are neither renamed nor removed, and unparsed values stay ``None``.
+    """
+    from .assessment_chart_fields import BORDERLINE
+    from .assessment_chart_fields import NORMAL
+    from .assessment_chart_fields import microbiome_chart_fields
+
+    for row in view.get('structure') or ():
+        row.update(microbiome_chart_fields(row))
+    for group in view.get('structureGroups') or ():
+        rows = list(_displayed_group_rows(group))
+        for row in rows:
+            row.update(microbiome_chart_fields(row))
+        if group.get('code') == 'overallBalance':
+            grade = next(
+                (row['level'] for row in rows if row.get('code') == 'balanceStatus' and row.get('level')), None,
+            )
+            for row in rows:
+                if row.get('code') == 'microbiomeHealthScore' and row.get('level') is None:
+                    row['level'] = grade
+        difference = group.get('gutAgeDifference')
+        if group.get('code') == 'gutAge' and isinstance(difference, (int, float)):
+            for row in rows:
+                if row.get('code') == 'gutAge':
+                    row['actualAge'] = group.get('actualAge')
+                    row['ageDifference'] = difference
+                    row['direction'] = 'up' if difference > 0 else 'down' if difference < 0 else None
+                    row['level'] = BORDERLINE if difference > 0 else NORMAL
+    for group in [*(view.get('organismGroups') or ()), *(view.get('functionalGroups') or ())]:
+        for row in _displayed_group_rows(group):
+            row.update(microbiome_chart_fields(row))
     return view
 
 

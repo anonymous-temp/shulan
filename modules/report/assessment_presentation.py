@@ -164,7 +164,9 @@ _NO_URGENT = '本次未发现需优先就医排查的结果。'
 _NO_ROUTINE = '本次未发现需定期专科复查的发现。'
 _NO_CLUSTERS = '本次未形成需集中干预的失衡集群。'
 _NO_GRAPH = '本次各系统未形成需集中干预的失衡方向。'
-_ADVICE_STATUS = '原报告医嘱'
+_ADVICE_STATUS = '检查建议'
+# Recorded advice is marked by ``kind: 'advice'``; the older status marker is still read on input.
+_ADVICE_STATUSES = frozenset({_ADVICE_STATUS, '原报告医嘱'})
 _SELF_REPORTED_STATUS = '本人自述'
 _BASIS_FIELDS = ('name', 'value', 'unit', 'referenceRange', 'status', 'observedAt')
 _NOT_PERFORMED = re.compile(r'未做|未查|未检测|未进行|拒检|弃检')
@@ -2175,8 +2177,9 @@ def _planned_cluster_advice(problem_codes, allowed, facts, advice_by_code):
                 refs.extend(ref for ref in sources if ref not in refs)
                 continue
             signal = {
-                'name': '原报告医嘱' + (' · ' + '、'.join(labels) if labels else ''),
-                'value': scope['quote'], 'unit': None, 'referenceRange': None, 'status': '原报告医嘱',
+                # ``kind`` identifies recorded examination advice; the status stays a legacy marker.
+                'name': '检查建议' + (' · ' + '、'.join(labels) if labels else ''), 'kind': 'advice',
+                'value': scope['quote'], 'unit': None, 'referenceRange': None, 'status': _ADVICE_STATUS,
                 'observedAt': None, 'sources': sources, 'evidenceRefs': [],
             }
             same_instruction[quote_key] = signal
@@ -2232,11 +2235,11 @@ def _planned_clusters(data, facts, reviewed, plan, *, display_index=None, review
             # right. Preserve the original label and conditions. Publication
             # here does not promote a missing author block to a reviewed one.
             signal = advice[0]
-            label = signal['name'].removeprefix('原报告医嘱').strip(' ·')
+            label = signal['name'].removeprefix('检查建议').strip(' ·')
             quote = signal['value'].strip()
             if label and not quote.startswith(label):
                 quote = label + '：' + quote
-            action = '原报告建议：' + quote
+            action = '检查建议：' + quote
             action_refs = []
             action_ids = {source['recordId'] for signal in advice for source in signal['sources']}
         result.append(({
@@ -2425,7 +2428,30 @@ def _planned_systems(clinical, microbiome, clusters, data, facts, reviewed, plan
             'status': status,
             'summary': text, 'evidenceRefs': refs, 'rows': _distinct_signals(rows),
         })
-    return result
+    return _complete_systems(result, clinical, microbiome)
+
+
+def _complete_systems(result, clinical, microbiome):
+    """Give every fixed system its chart fields (spec 1.2 and 2.7); append only.
+
+    ``level`` is the most severe member level read from chapters three and four,
+    ``anchors`` lists at most six abnormal members (cell anchors first) and
+    ``moreCount`` the rest. A system without a reviewed cell is still listed so
+    that a reader sees it as measured or ``notTested``; it carries no verdict.
+    """
+    from .assessment_chart_fields import system_atoms
+    from .assessment_chart_fields import system_chart_fields
+
+    by_code = {item['code']: item for item in result}
+    complete = []
+    for code, name, group_codes in _SYSTEMS:
+        item = by_code.get(code) or {
+            'code': code, 'name': name, 'status': None, 'summary': None, 'evidenceRefs': [], 'rows': [],
+        }
+        atoms = system_atoms(code, group_codes, clinical, microbiome)
+        item.update(system_chart_fields(atoms, item['rows'], microbiome=code == 'microbiome'))
+        complete.append(item)
+    return complete
 
 
 def _assessment_clusters(data, facts, reviewed, *, subject=None, document=None, display_index=None,
@@ -3197,7 +3223,7 @@ def _systems(clinical, microbiome, clusters, editorial, reviewed):
             )]
         item['rows'] = _distinct_signals([*named, *(used or rows)])[:6]
         result.append(item)
-    return result
+    return _complete_systems(result, clinical, microbiome)
 
 
 def _put_editorial(editorial, key, item, field='summary', refs='evidenceRefs'):
@@ -3367,14 +3393,14 @@ def _signal_basis(item, *, limit=4):
     rows = [{**{field: signal.get(field) for field in _BASIS_FIELDS},
              'sources': [dict(source) for source in signal.get('sources') or ()]}
             for signal in item.get('clinicalSignals') or ()
-            if signal.get('status') not in {_ADVICE_STATUS, _SELF_REPORTED_STATUS}
+            if signal.get('status') not in {*_ADVICE_STATUSES, _SELF_REPORTED_STATUS}
             and not _NOT_PERFORMED.search(f'{signal.get("name") or ""} {signal.get("value") or ""}')]
     return _rank_basis(rows, item.get('name'), limit)
 
 
 def _recorded_advice_quotes(item):
     return _unique(str(signal['value']).strip() for signal in item.get('clinicalSignals') or ()
-                   if signal.get('status') == _ADVICE_STATUS and str(signal.get('value') or '').strip())
+                   if signal.get('status') in _ADVICE_STATUSES and str(signal.get('value') or '').strip())
 
 
 def _sentence(text):
@@ -3690,12 +3716,13 @@ def assessment_projection_issues(presentation, blueprint):
 
 def build_assessment_presentation(*, request, parsed, document, data, blueprint, accepted):
     from .assessment_clinical_view import build_clinical_view
+    from .assessment_microbiome_view import annotate_microbiome_chart_fields
     from .assessment_microbiome_view import build_microbiome_view
 
     clinical = build_clinical_view(request, parsed, document, data, reader_plan=True)
     data._assessment_reader_omitted_cells = list(clinical.pop('_readerOmittedCells', ()))
     blueprint.data._assessment_reader_omitted_cells = data._assessment_reader_omitted_cells
-    microbiome = build_microbiome_view(parsed, data, source_facts=document.facts)
+    microbiome = annotate_microbiome_chart_fields(build_microbiome_view(parsed, data, source_facts=document.facts))
     editorial = data._assessment_editorial
     reviewed = _reviewed_facts(blueprint, accepted)
     synthesis_targets = {
@@ -3808,7 +3835,7 @@ def build_assessment_presentation(*, request, parsed, document, data, blueprint,
             'evidenceRefs': item['_actionRefs'],
         }
         for item in ([*items, *routine] if plan is not None else published)
-        if item['action'] or any(signal.get('status') == '原报告医嘱' for signal in item['clinicalSignals'])
+        if item['action'] or any(signal.get('status') in _ADVICE_STATUSES for signal in item['clinicalSignals'])
     ]
     _synchronize_actions(data, published, reviewed=reviewed, facts=facts)
     urgent = [item for item in priorities if item['priority'] == 'P0']
@@ -3911,6 +3938,7 @@ def build_assessment_presentation(*, request, parsed, document, data, blueprint,
     minor = age.isdecimal() and int(age) < 18
     _strip_display_metadata(clinical)
     _strip_display_metadata(microbiome)
+    _strip_display_metadata(overview)
     presentation = AssessmentPresentation(
         overview=overview,
         clinical=clinical,
