@@ -410,3 +410,71 @@ def test_source_only_text_separates_alphanumeric_names_and_never_stacks_punctuat
 def test_a_condition_left_without_its_removed_action_is_removed_too():
     text = '按检查建议复查大便常规及隐血，并至消化内科就诊；复查后仍为阳性时进一步检查原因。体重需复评。'
     assert trim_rejected_clauses(text, ['并至消化内科就诊']) == '体重需复评。'
+
+
+def test_unresolved_detail_cells_are_repaired_while_the_first_pass_is_still_running(monkeypatch):
+    import dataclasses
+    import time
+
+    from modules.report import evaluation_report
+    from modules.report import evaluation_report_writer
+
+    def target(identifier, code):
+        return {
+            'id': identifier,
+            'path': ['_assessment_editorial', identifier, 'text'],
+            'owner': {'contentPlanVersion': 1, 'contentScopeCode': code, 'primaryFactIds': []},
+            'sourceFactIds': [],
+            'allowedRoles': ['interpretation'],
+            'required': True,
+            'publicationScope': 'assessment',
+        }
+
+    @dataclasses.dataclass
+    class Blueprint:
+        chapters: list
+        data: object
+        facts: list = dataclasses.field(default_factory=list)
+
+    chapter = {
+        'code': 'medicalAssessment',
+        'number': 3,
+        'title': '三',
+        'targets': [
+            target('d1', 'clinicalRow.lipid.ldl'),
+            target('d2', 'clinicalRow.lipid.tg'),
+            target('s1', 'clinicalLead'),
+        ],
+    }
+    blueprint = Blueprint(chapters=[chapter], data=SimpleNamespace(_assessment_content_plan={'status': 'reviewed'}))
+    state = SimpleNamespace(
+        blueprint=blueprint, audit={}, approved_blocks={}, evidence=None, stage_timings={}, started=time.monotonic()
+    )
+    events = []
+
+    def block(identifier):
+        return {'targetId': identifier, 'completion': 'complete', 'sentences': [{'text': identifier}]}
+
+    async def fake_author(client, *, blueprint, authoring_scope, on_checkpoint, **_):
+        phase = authoring_scope['phase']
+        ids = [t['id'] for c in blueprint.chapters for t in c['targets']]
+        events.append((phase, 'start', tuple(ids)))
+        if phase == 'public_first_pass':
+            on_checkpoint(
+                'medicalAssessment',
+                [block('d2')],
+                [{'chapterCode': 'medicalAssessment', 'targetId': 'd1', 'issues': []}],
+            )
+            await asyncio.sleep(0.05)  # the summary batch is still running
+            events.append((phase, 'end', tuple(ids)))
+            return {'medicalAssessment': [block('d2'), block('s1')]}
+        events.append((phase, 'end', tuple(ids)))
+        return {'medicalAssessment': [block(i) for i in ids]}
+
+    monkeypatch.setattr(evaluation_report_writer, 'author_report_chapters', fake_author)
+    asyncio.run(evaluation_report._author_chapters(state, None, None, time.monotonic() + 60))
+    repair_start = events.index(('public_repair', 'start', ('d1',)))
+    first_end = next(i for i, row in enumerate(events) if row[:2] == ('public_first_pass', 'end'))
+    assert repair_start < first_end
+    assert {b['targetId'] for b in state.approved_blocks['medicalAssessment']} == {'d1', 'd2', 's1'}
+    assert sum(1 for row in events if row[0] == 'public_repair' and row[1] == 'start') == 1

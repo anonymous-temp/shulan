@@ -680,6 +680,32 @@ def _authoring_mode():
     return REPORT_AUTHORING_MODE
 
 
+# Early repairs of finished first-pass batches share the report's model slots
+# but never take more than this many, so first-pass batches keep priority.
+EARLY_REPAIR_MODEL_CONCURRENCY = 4
+
+
+class _NestedGate:
+    """Hold an outer limit and the shared model slot for one call."""
+
+    def __init__(self, outer, inner):
+        self._outer, self._inner = outer, inner
+
+    async def __aenter__(self):
+        await self._outer.acquire()
+        try:
+            await self._inner.acquire()
+        except BaseException:
+            self._outer.release()
+            raise
+        return self
+
+    async def __aexit__(self, *exc_info):
+        self._inner.release()
+        self._outer.release()
+        return False
+
+
 # Legacy seven-chapter paths that the reviewed follow-up projections
 # (evaluation_report_followups, evaluation_report_bridge) read by name.
 _FOLLOWUP_PATH_PREFIXES = (
@@ -795,7 +821,14 @@ async def _author_chapters(state, client, subject, deadline, *, recall=None):
     source_planned = isinstance(getattr(state.blueprint.data, '_assessment_content_plan', None), dict)
     unresolved = {(row.get('chapterCode'), row.get('targetId')): row for row in state.audit.get('writerUnresolved', [])}
     salvage = {}
-    active_target_ids = set()
+    # Each running invocation reserves its targets. A first-pass batch that
+    # finished with unresolved detail cells releases them to an early repair.
+    reservations = {}
+    early_tasks = []
+    early_gate = _NestedGate(asyncio.Semaphore(EARLY_REPAIR_MODEL_CONCURRENCY), model_gate)
+
+    def reserved():
+        return set().union(*reservations.values()) if reservations else set()
     invocation_count = 0
 
     def accepted_public_ids():
@@ -830,11 +863,12 @@ async def _author_chapters(state, client, subject, deadline, *, recall=None):
         state.audit['writerUnresolved'] = list(unresolved.values())
         state.audit['reviewedBlocks'] = deepcopy(state.approved_blocks)
 
-    async def author(chapters, scope, phase_deadline, *, evidence=None):
+    async def author(chapters, scope, phase_deadline, *, evidence=None, on_missing=None, gate=None, label=None):
         nonlocal invocation_count
         accepted = accepted_public_ids()
+        busy = reserved()
         chapters = [{**chapter, 'targets': [target for target in chapter['targets']
-                     if target['id'] not in accepted and target['id'] not in active_target_ids]}
+                     if target['id'] not in accepted and target['id'] not in busy]}
                     for chapter in chapters]
         chapters = [chapter for chapter in chapters if chapter['targets']]
         if not chapters:
@@ -843,7 +877,17 @@ async def _author_chapters(state, client, subject, deadline, *, recall=None):
         # Admission, reservation and the startup snapshot occur without an
         # await. Concurrent invocations cannot claim the same target, and a
         # writer never mistakes the live checkpoint for a startup snapshot.
-        active_target_ids.update(invocation_ids)
+        token = object()
+        reservations[token] = set(invocation_ids)
+        released = set()
+
+        def local_checkpoint(code, blocks, missing):
+            checkpoint(code, blocks, missing)
+            if on_missing is not None and missing:
+                handed = on_missing(missing)
+                released.update(handed)
+                reservations[token].difference_update(handed)
+
         previous_reviewed = deepcopy(state.approved_blocks)
         invocation_count += 1
         authoring_scope = {
@@ -865,8 +909,8 @@ async def _author_chapters(state, client, subject, deadline, *, recall=None):
                 previous_reviewed=previous_reviewed,
                 authoring_scope=authoring_scope,
                 context_targets=targets,
-                model_gate=model_gate,
-                on_checkpoint=checkpoint,
+                model_gate=model_gate if gate is None else gate,
+                on_checkpoint=local_checkpoint,
                 prior_review_findings=deepcopy(state.audit.get('writer', [])),
                 prior_unresolved=[deepcopy(row) for (_, tid), row in unresolved.items() if tid in invocation_ids],
                 defer_content_repairs=source_planned and scope.startswith('public_'),
@@ -876,7 +920,7 @@ async def _author_chapters(state, client, subject, deadline, *, recall=None):
                 checkpoint(code, result.get(code, []), [])
             status = 'completed'
         finally:
-            active_target_ids.difference_update(invocation_ids)
+            reservations.pop(token, None)
             # Local writer journals never overwrite another node's accepted
             # blocks. Preserve accepted partial batches before timeout recovery.
             for chapter in chapters:
@@ -884,6 +928,9 @@ async def _author_chapters(state, client, subject, deadline, *, recall=None):
                 checkpoint(code, local_audit.get('reviewedBlocks', {}).get(code, []), [])
             for row in local_audit.get('writerUnresolved', []):
                 code, target_id = row.get('chapterCode'), row.get('targetId')
+                if target_id in released:
+                    # Its early repair owns the newer outcome.
+                    continue
                 if row.get('salvage'):
                     salvage[target_id] = (code, row['salvage'])
                 accepted = {block['targetId'] for block in state.approved_blocks.get(code, ())}
@@ -893,7 +940,13 @@ async def _author_chapters(state, client, subject, deadline, *, recall=None):
                 state.audit.setdefault(key, []).extend(local_audit.get(key, []))
             elapsed = round((time.monotonic() - node_started) * 1000, 3)
             codes = [chapter['code'] for chapter in chapters]
-            state.stage_timings[f'authoring.{"+".join(codes)}.{scope}'] = elapsed
+            key = label or f'authoring.{"+".join(codes)}.{scope}'
+            if label:
+                # Several early repairs overlap; keep the span of all of them.
+                first = state.stage_timings.setdefault(key + '.startedMs', round((node_started - started) * 1000, 3))
+                state.stage_timings[key] = round((time.monotonic() - started) * 1000 - first, 3)
+            else:
+                state.stage_timings[key] = elapsed
             state.audit.setdefault('authoringSchedule', []).append(
                 {
                     'chapters': codes,
@@ -907,6 +960,35 @@ async def _author_chapters(state, client, subject, deadline, *, recall=None):
             )
             state.audit['writerUnresolved'] = list(unresolved.values())
             state.audit['medicalUnresolved'] = list(unresolved.values())
+
+    def schedule_early_repair(rows):
+        """Repair unresolved detail cells of a finished first-pass batch right away.
+
+        Summaries keep waiting for the coordinated sweep, where their own
+        contributors are final. Returns the target ids handed over.
+        """
+        from .evaluation_report_writer import _summary_inputs
+
+        identifiers = {
+            row.get('targetId') for row in rows
+            if row.get('targetId') in public_ids and not _summary_inputs(targets[row['targetId']])
+        } - accepted_public_ids()
+        if not identifiers:
+            return set()
+
+        async def repair():
+            try:
+                await author(selected_chapters(public_chapters, identifiers), 'public_repair', early_deadline[0],
+                             gate=early_gate, label='authoring.early_repair')
+            except asyncio.CancelledError:
+                raise
+            except Exception as error:  # optional overlap; the coordinated sweep retries
+                state.audit['earlyRepairFailure'] = type(error).__name__
+
+        early_tasks.append(asyncio.create_task(repair()))
+        return identifiers
+
+    early_deadline = [deadline]
 
     async def author_body(chapter):
         def aggregate(target):
@@ -943,8 +1025,10 @@ async def _author_chapters(state, client, subject, deadline, *, recall=None):
                                 ('body.', 'system.', 'specialtyRow.', 'symptomEvidence.'),
                             )
                         }
+                        early_deadline[0] = first_deadline
                         if recall is None:
-                            await author(public_chapters, 'public_first_pass', first_deadline)
+                            await author(public_chapters, 'public_first_pass', first_deadline,
+                                         on_missing=schedule_early_repair)
                         else:
                             from .evaluation_report_evidence import ReportEvidenceBundle
 
@@ -956,7 +1040,10 @@ async def _author_chapters(state, client, subject, deadline, *, recall=None):
                                         'public_originals', first_deadline, evidence=ReportEvidenceBundle(),
                                     ))
                                 await recalled
-                                ready.create_task(author(public_chapters, 'public_first_pass', first_deadline))
+                                ready.create_task(author(public_chapters, 'public_first_pass', first_deadline,
+                                                         on_missing=schedule_early_repair))
+                        while early_tasks and not all(task.done() for task in early_tasks):
+                            await asyncio.gather(*early_tasks)
                     else:
                         if recall is not None:
                             await recall()
@@ -967,10 +1054,10 @@ async def _author_chapters(state, client, subject, deadline, *, recall=None):
                 if not public_window.expired() and (first_deadline is None or time.monotonic() < first_deadline):
                     raise
                 state.audit['concurrentPublicAuthoringBudgetExhausted'] = True
-                for task in tasks:
+                for task in [*tasks, *early_tasks]:
                     if not task.done():
                         task.cancel()
-                await asyncio.gather(*tasks, return_exceptions=True)
+                await asyncio.gather(*tasks, *early_tasks, return_exceptions=True)
         # The first repair sweep reaches every unresolved duty before
         # spending another review on any one troublesome batch.
         accepted_ids = accepted_public_ids()
@@ -1050,11 +1137,11 @@ async def _author_chapters(state, client, subject, deadline, *, recall=None):
                     'reason': 'insufficient_window' if minimum_pass is not None else 'no_duration_estimate',
                 }
     finally:
-        for task in tasks:
+        for task in [*tasks, *early_tasks]:
             if not task.done():
                 task.cancel()
-        if tasks:
-            await asyncio.gather(*tasks, return_exceptions=True)
+        if tasks or early_tasks:
+            await asyncio.gather(*tasks, *early_tasks, return_exceptions=True)
         state.audit['medicalUnresolved'] = list(unresolved.values())
 
 
