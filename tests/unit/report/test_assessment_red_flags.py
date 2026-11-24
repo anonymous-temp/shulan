@@ -161,7 +161,8 @@ def test_imaging_grades_drive_p0_and_routine_tiers():
 
     result = evaluate_red_flags(facts, {'sex': '女', 'age': 52})
 
-    assert {'RF-BIRADS-4', 'RF-LUNGRADS-3'} <= p0_ids(result)
+    assert 'RF-BIRADS-4' in p0_ids(result)
+    assert 'RF-LUNGRADS-4' not in p0_ids(result)  # Lung-RADS 3 is a 6-month follow-up
     assert 'RT-THYROID-NODULE' in routine_ids(result)
     assert 'RT-BREAST-NODULE' not in routine_ids(result)
 
@@ -252,3 +253,16 @@ def test_interval_parser_handles_chinese_numerals():
     assert interval_from_advice(['六个月后复查，建议OGTT。'])['days'] == 180
     assert interval_from_advice(['建议1年后复查。'])['days'] == 365
     assert interval_from_advice(['定期检查甲状腺B超。']) is None
+
+
+def test_lung_rads_category_governs_priority_over_nodule_size():
+    category3 = [text('l', '胸部低剂量CT', '右肺下叶实性结节，大小约8mm×7mm，Lung-RADS 3类')]
+    result = evaluate_red_flags(category3, subject={'sex': '男', 'age': 57})
+    assert not any(item['ruleId'].startswith('RF-LUNG') for item in result['priorityItems'])
+    assert any(item['ruleId'] == 'RT-LUNGRADS-3' for item in result['routineFollowups'])
+    category4 = [text('l', '胸部低剂量CT', '左肺上叶实性结节12mm，Lung-RADS 4A类')]
+    result = evaluate_red_flags(category4, subject={'sex': '男', 'age': 57})
+    assert any(item['ruleId'] == 'RF-LUNGRADS-4' for item in result['priorityItems'])
+    ungraded = [text('l', '胸部CT', '右肺上叶实性结节，大小约9mm')]
+    result = evaluate_red_flags(ungraded, subject={'sex': '男', 'age': 57})
+    assert any(item['ruleId'] == 'RF-LUNG-NODULE-8MM' for item in result['priorityItems'])
