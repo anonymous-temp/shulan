@@ -88,7 +88,7 @@ def _seed_original_action(target):
             # verified. Keep the quote intact, including any conditions.
             labels = scope.get('objectLabels') or scope.get('sourceRecordLabels') or ()
             label = '、'.join(labels)
-            text = f'针对{label}，原报告记录“{quote}”' if label else f'原报告记录“{quote}”'
+            text = f'针对{label}，检查建议为“{quote}”' if label else f'检查建议为“{quote}”'
             if code == 'digestive.lowerDigestive' and not set(identifiers).intersection(owner['primaryFactIds']):
                 continue
             by_text.setdefault(text, {}).update(dict.fromkeys(identifiers))
@@ -894,7 +894,8 @@ def build_report_blueprint(request, parsed, document, health_assessment=None, *,
             named = {
                 'bodySummary': 'overview.bodySummary', 'clinicalLead': 'clinical.summary',
                 'symptomSummary': 'clinical.symptomSummary', 'specialtySummary': 'clinical.specialtySummary',
-                'trendSummary': 'clinical.trendSummary', 'microbiomeLead': 'microbiome.overviewSummary',
+                'trendSummary': 'clinical.trendSummary', 'baselineSummary': 'clinical.baselineSummary',
+                'microbiomeLead': 'microbiome.overviewSummary',
                 'sampleSummary': 'microbiome.sampleSummary', 'fermentationSummary': 'microbiome.fermentationSummary',
                 'riskSummary': 'microbiome.riskSummary', 'graphSummary': 'overview.graphSummary',
                 'clusterSummary': 'clusterSummary', 'lifestyleSummary': 'lifestyleSummary',
@@ -1157,7 +1158,12 @@ def build_report_blueprint(request, parsed, document, health_assessment=None, *,
                 bound = list(dict.fromkeys([*primary, *context]))
                 own['contextFactIds'] = context
                 own['contentPlanVersion'] = content_plan.get('version')
-                own['contextPurpose'] = scoped.get('contextPurpose') or None
+                # A planner scope keeps its own purpose; program-decided content
+                # of the same slot (1.3 items, body-type elements) is appended.
+                program_purpose = planned_bindings.get(scope_code, {}).get('contextPurpose')
+                own['contextPurpose'] = '\n'.join(dict.fromkeys(filter(None, (
+                    scoped.get('contextPurpose'), program_purpose,
+                )))) or None
                 own['cellRelations'] = deepcopy(scoped.get('relations') or [])
                 if scope_code == 'digestive.lowerDigestive':
                     measured = [fid for fid in primary if facts[fid]['kind'] == 'clinical']
@@ -1427,7 +1433,7 @@ def build_report_blueprint(request, parsed, document, health_assessment=None, *,
                     'lifestyle.', 'recognition.', 'layer.', 'priority.', 'management.'))
                 or key in {'clinicalLead', 'bodySummary', 'symptomSummary', 'microbiomeLead', 'riskSummary',
                     'clusterSummary', 'graphSummary', 'lifestyleSummary', 'specialtySummary',
-                    'trendSummary', 'sampleSummary', 'fermentationSummary'}
+                    'trendSummary', 'baselineSummary', 'sampleSummary', 'fermentationSummary'}
             )
             add(['_assessment_editorial', key, 'text'],
                 {'kind': 'assessment_editorial', 'code': key, 'name': name, 'aggregate': True}, ids,
