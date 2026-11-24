@@ -44,10 +44,12 @@ def test_indices_follow_their_formulas():
     assert facts['肝纤维化指数 FIB-4（计算值）'].value == '0.93'
     bmi = facts['体重指数 BMI 及中国成人分级（计算值）']
     assert (bmi.value, bmi.status, bmi.abnormal) == ('29.3', '肥胖', True)
-    assert facts['腰围及中心型肥胖判定（计算值）'].status == '中心型肥胖'
+    assert facts['腰围及中心型肥胖判定'].status == '中心型肥胖'  # a measured value with a criterion, not a calculation
     mets = facts['代谢综合征组分计数（计算值）']
     assert mets.value == '2/5' and mets.abnormal is False
-    assert all(fact.source.startswith(DERIVED_SOURCE) and fact.kind == 'clinical' for fact in facts.values())
+    measured = {'腰围及中心型肥胖判定'}  # a measured value graded by a criterion
+    assert all(fact.source.startswith(DERIVED_SOURCE) and fact.kind == 'clinical'
+               for name, fact in facts.items() if name not in measured)
 
 
 def test_missing_or_conflicting_inputs_produce_no_index():
