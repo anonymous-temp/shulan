@@ -416,6 +416,11 @@ def test_source_findings_are_graded(text, level):
         ('糖尿病早期风险筛查(EZSCAN)', 'specialty'),
         ('颈动脉彩超', 'cardiometabolic'),
         ('外院新增指标XYZ', 'otherClinical'),
+        ('抗甲状腺球蛋白抗体(TgAb)', 'endocrineMusculoskeletal'),
+        ('抗缪勒管激素(AMH)', 'endocrineMusculoskeletal'),
+        ('钾(K)', 'organMetabolism'),
+        ('血清钠', 'organMetabolism'),
+        ('球蛋白(GLB)', 'organMetabolism'),
     ],
 )
 def test_items_are_assigned_by_the_chapter_rules(name, group):
