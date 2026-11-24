@@ -200,16 +200,30 @@ def _view_memberships(view):
         for group in view.get(field, ()):
             add(parent + '.' + group['code'], group['name'], parent, name, group['rows'])
     if view.get('specialtyFindings'):
-        add('clinical.specialty', '专项检查', 'clinical', '完整临床来源', view['specialtyFindings'])
+        from .assessment_clinical_view import _CLINICAL_PANELS
+        from .assessment_clinical_view import _clinical_panel
+
+        # Device studies of 3.5 keep their own examination domain (e.g. arterial, cerebrovascular).
+        panels = _CLINICAL_PANELS['specialty']
+        by_panel = defaultdict(list)
+        for row in view['specialtyFindings']:
+            by_panel[_clinical_panel(row, panels)].append(row)
+        for panel, rows in by_panel.items():
+            name = next((label for code, label, _ in panels if code == panel), None)
+            if name is None:
+                add('clinical.specialty', '专项检查', 'clinical', '完整临床来源', rows)
+            else:
+                add('specialty.' + panel, name, 'specialty', '专项检测与筛查', rows)
     return groups, codes, spans
 
 
 def _fallback_group(row):
     from .assessment_clinical_view import _BODY_GROUPS
-    from .assessment_clinical_view import _CLINICAL_GROUPS
     from .assessment_clinical_view import _CLINICAL_PANELS
+    from .assessment_clinical_view import _GROUP_NAMES
     from .assessment_clinical_view import _clinical_panel
     from .assessment_clinical_view import _group_code
+    from .assessment_clinical_view import clinical_group_for
 
     role = row.get('_sourceRole')
     if role == 'summary_patient_claim':
@@ -230,13 +244,13 @@ def _fallback_group(row):
     if group is not None:
         label = next(name for code, name, _ in _BODY_GROUPS if code == group)
         return {'code': 'body.' + group, 'name': label, 'parentCode': 'body', 'parentName': '体格与人体成分'}
-    group = _group_code(row['name'], _CLINICAL_GROUPS, specimen=row.get('specimen'), section=row.get('sourceSection'))
+    # Device studies (3.5) and items without a fixed system ("其他检查") have their own groups.
+    group = clinical_group_for(row['name'], specimen=row.get('specimen'), section=row.get('sourceSection'))
     if group is not None:
         panels = _CLINICAL_PANELS[group]
         panel = _clinical_panel(row, panels)
         label = next((name for code, name, _ in panels if code == panel), '其他相关检查')
-        parent = next(name for code, name, _ in _CLINICAL_GROUPS if code == group)
-        return {'code': group + '.' + panel, 'name': label, 'parentCode': group, 'parentName': parent}
+        return {'code': group + '.' + panel, 'name': label, 'parentCode': group, 'parentName': _GROUP_NAMES[group]}
     return {
         'code': 'clinical.related',
         'name': '其他已提供的临床观察',
