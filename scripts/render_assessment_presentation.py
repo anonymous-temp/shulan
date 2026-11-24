@@ -1764,7 +1764,7 @@ class _AssessmentRenderer:
                 f'{_prompt(row.get("name"))}：{_text(row.get("value"))}' for row in group.get('symptomContext') or ()
                 if row.get('value')
             )
-            extra = f'<p class="as-small as-muted">本人报告：{_e(context)}</p>' if context else ''
+            extra = f'<p class="as-small as-muted">自述：{_e(context)}</p>' if context else ''
             blocks.append(self.panel(group.get('name'), _digestive_measurements(group), group,
                                      summary=group.get('summary'), extra=extra))
         content = ''.join(block for block in blocks if block)

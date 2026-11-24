@@ -77,6 +77,7 @@ _SYSTEMS = (
     ('hematologyImmune', '血液免疫、甲基化与氧化应激', ('hematologyImmune',)),
 )
 NO_TREND_STATEMENT = '本次资料未包含可比较的历次结果。'
+NO_DIGESTIVE_STATEMENT = '本次资料未包含口腔、胃肠与肝胆胰的相关检查，本节仅依据菌群检测结果评估。'
 _LIFESTYLE_SECTIONS = (
     ('diet', '膳食结构与餐桌模式'),
     ('drinks', '饮酒应酬、饮水与饮品'),
@@ -3830,6 +3831,12 @@ def build_assessment_presentation(*, request, parsed, document, data, blueprint,
     for group in clinical['clinicalGroups']:
         for row in group.get('templateRows', ()):
             _put_editorial(editorial, 'clinicalRow.' + group['code'] + '.' + row['code'], row)
+    if not clinical['digestiveContext']:
+        # Spec 4.1: say that no digestive examination was provided instead of an empty section.
+        clinical['digestiveContext'] = [{
+            'code': 'digestiveNotRecorded', 'name': '消化道相关检查', 'rows': [],
+            'summary': NO_DIGESTIVE_STATEMENT, 'evidenceRefs': [],
+        }]
     core_clusters = list(clusters) if plan is not None else [
         entry for entry in clusters if entry[0]['priority'] != 'P3' and (
             entry[0]['priority'] == 'P0' or entry[0]['interpretation'] or entry[0]['action']
