@@ -46,6 +46,13 @@ def replay(run_dir: Path, output: Path) -> dict:
     body['data']['assessmentPresentation'] = (
         view.model_dump(mode='json', by_alias=True) if hasattr(view, 'model_dump') else view
     )
+    # The projection numbers target-table sources after the bibliography; carry
+    # the extended bibliography so those citations resolve in the replay.
+    library = getattr(getattr(kwargs.get('data'), 'appendices', None), 'reference_literature', None)
+    if library is not None:
+        body['data'].setdefault('appendices', {})['referenceLiterature'] = [
+            entry.model_dump(mode='json', by_alias=True) for entry in library
+        ]
     output.mkdir(parents=True, exist_ok=True)
     (output / 'callback.json').write_text(json.dumps(body, ensure_ascii=False, indent=1), encoding='utf-8')
     frontend = build_frontend_evaluation_callback(body)
