@@ -15,7 +15,7 @@
 
 ## 现在的流程
 
-入口仍是 `modules/report/evaluation_report.py` 的 `generate_evaluation_report()`。`SHULAN_REPORT_AUTHORING_MODE=chapter`（默认）走下面的流程；设为 `cell` 时走原逐格路径并使用原提示词 `prompts/report/narrative_cell.txt`。
+入口仍是 `modules/report/evaluation_report.py` 的 `generate_evaluation_report()`。默认值现为 `SHULAN_REPORT_AUTHORING_MODE=case`（整案成稿，见 [评估报告六章内容规格](report-assessment-v2.md)）；整案分析不可用时回退到本文的流程，也可用 `SHULAN_REPORT_AUTHORING_MODE=chapter` 直接指定。设为 `cell` 时走原逐格路径并使用原提示词 `prompts/report/narrative_cell.txt`。
 
 1. **计算指标**（`evaluation_derived_indices.py`）。HOMA-IR、HOMA-β、non-HDL-C、残余胆固醇、TG/HDL-C、FIB-4、BMI 中国分级、腰围判定、代谢综合征组分计数由程序按公式计算，作为普通事实加入记录。每项只在输入齐全且唯一、单位符合时产生；名称带“（计算值）”，来源字段写明公式和所用数值。判读界值不在这里给出。
 2. **整理与分组**（原有步骤）。修复了三处会让正确分组整体作废的校验：成员里混入管理目标地址、关注等级写成“高/中/低”、同一成员被后一组重复引用。
@@ -51,7 +51,7 @@
 
 | 配置 | 默认 | 说明 |
 |---|---|---|
-| `SHULAN_REPORT_AUTHORING_MODE` | `chapter` | `cell` 为原逐格路径 |
+| `SHULAN_REPORT_AUTHORING_MODE` | `case` | `case` 为整案成稿（失败时回退到 `chapter`）；`chapter` 为本文的整章成稿；`cell` 为原逐格路径 |
 | `SHULAN_REPORT_NARRATIVE_THINKING` | `true` | 仅整章成稿和整章审核两类任务开启思考；其余结构化任务不开 |
 | `SHULAN_REPORT_NARRATIVE_REASONING_EFFORT` | `high` | `low` / `high` / `max` |
 | `SHULAN_REPORT_WEB_EVIDENCE_ENABLED` | `true` | 无工具密钥时自动不启用 |

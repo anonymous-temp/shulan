@@ -143,6 +143,7 @@ shulan/
 │   │   ├── durable.py                            # DurableReportService、生成恢复与回调 Worker
 │   │   ├── delegation.py                          # Report 公开持久后续任务与固定输入契约
 │   │   ├── reports.py                            # 后续报告生成、确定性拼装及降级
+│   │   ├── assessment_case_report.py             # 评估报告整案成稿入口：事实表、整案分析、分节成文、复核与装配
 │   │   ├── document_projection.py                # Report 自有文档投影及缓存契约
 │   │   ├── document_dispatch.py                  # 按任务固定版本选择新旧文档消费者
 │   │   ├── research.py                           # 可选有界研究子 Agent，代码默认关闭

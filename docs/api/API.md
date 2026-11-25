@@ -2,7 +2,7 @@
 
 > **Version**: 0.27.0（develop，待发布）
 >
-> **Last Updated**: 2026年11月24日
+> **Last Updated**: 2026年11月25日
 >
 > *status*: Updated, pending deployment.
 >
@@ -4177,25 +4177,38 @@ curl -X POST http://host:port/api/v1/chat/history \
 
 | `level` 取值 | 含义 |
 | :--- | :--- |
-| `focus` | 重点关注：超出参考区间且需要关注，或命中优先排查规则。菌群结果中只用于失衡分度为“失调”的总评价。 |
-| `borderline` | 亚临床边界：轻度越出参考区间、分档不在正常档，或影像有需随访的所见。 |
+| `focus` | 重点关注：超出参考区间且有临床意义，或影像、定性结果明确异常，或属于优先排查事项。菌群结果中只用于失衡分度为“失调”的总评价。 |
+| `borderline` | 亚临床边界：轻度越出参考区间、分档不在正常档，或影像有需随访的所见；也用于在参考区间内但偏离理想目标的结果（`status` 为“高于理想值”或“低于理想值”）。 |
 | `normal` | 稳健达标：在参考区间内或处于正常分档。 |
 | `notTested` | 未检测：本次资料没有该系统的检查项目。 |
 
+体格行（`bodyGroups[]`）、系统（`systems[]`）、分系统（`clinicalGroups[]`）和表格行（`templateRows[]`）的 `status` 是展示用的状态文字，取值为“重点关注”“亚临床边界”“高于理想值”“低于理想值”“稳健达标”“未检测”之一；`level` 是与之对应的四档取值，供着色使用。
+
 | 正文路径 | 类型 | 内容 |
 | :--- | :--- | :--- |
-| `chapters[code=overview].content.systems[]` | array | 固定返回五个系统，`code` 依次为 `cardiometabolic`、`digestiveRenal`、`microbiome`、`endocrineMusculoskeletal`、`hematologyImmune`。没有资料的系统 `level` 为 `notTested`，`summary` 为 `null`，`rows` 为 `[]`。 |
+| `chapters[code=overview].content.systems[]` | array | 先返回五个系统，`code` 依次为 `cardiometabolic`、`digestiveRenal`、`microbiome`、`endocrineMusculoskeletal`、`hematologyImmune`。没有资料的系统 `level` 为 `notTested`，`summary` 为 `null`，`rows` 为 `[]`。受检者在这五个系统之外有需要呈现的发现时，其后追加一项，`code` 为 `otherClinical`，`name` 为该项的名称；第三章相应增加一个 `code` 为 `otherClinical` 的分系统。 |
 | `systems[].level` | string / null | 系统分档，取成员检查中最重的一档；成员都无法分档时为 `null`。 |
 | `systems[].anchors[]` | array | 最多 6 项需关注的成员，每项包含 `name`（string）、`value`（string / null，原始结果）、`unit`（string / null）、`direction`（`up` / `down` / `null`）和 `level`（`focus` / `borderline`）。 |
 | `systems[].moreCount` | integer | 未列入 `anchors` 的需关注成员数量，没有时为 `0`。 |
 | `chapters[code=overview].content.priorityFindings[]` | array | 1.3 节按顺序返回 `code` 为 `urgent`（优先排查）、`routine`（常规专科随访）、`gaps`（检测盲区）的三部分；没有检测盲区时不返回 `gaps`。每部分包含 `name`、`priority`（`urgent` 有事项时为 `P0`，其余为 `null`）、`text`（本部分的说明，无事项时为缺失说明句）、`evidenceRefs` 和 `items`。 |
-| `priorityFindings[].items[]` | array | 行动事项。包含 `code`、`name`、`priority`（`P0` / `null`）、`timeframe`（object / null，含 `text` 与 `days`）、`department`（string / null）、`checks`（string 数组）、`basisRows`（依据的检测记录，结构同检测记录）、`text`（由上述字段组成的一句说明）。检测盲区事项另含 `reason`；按规则得出的事项另含 `ruleId`；与第五章集群对应时另含 `clusterId`。 |
+| `priorityFindings[].items[]` | array | 行动事项。包含 `code`、`name`、`priority`（`P0` / `null`）、`timeframe`（object / null，含 `text` 与 `days`）、`department`（string / null）、`checks`（string 数组）、`basisRows`（依据的检测记录，结构同检测记录）、`text`（由上述字段组成的一句说明）。检测盲区事项另含 `reason`；优先排查事项另含 `origin`（`model`：整体评估得出；`safety_net`：危险信号核查补充；`review`：复核补充），有对应的危险信号规则时另含 `ruleId`；与第五章集群对应时另含 `clusterId`。 |
 | `chapters[code=clinical].content.baselineSummary` | string / null | 3.6 节稳健基线说明，汇总在参考区间内的肿瘤标志物与核心器官功能。引用见 `baselineSummaryEvidenceRefs`。 |
 | `chapters[code=conclusion].content.layers[]` | array | 固定三层，`code` 依次为 `clinical`（首月）、`core`（90 天）、`maintenance`（持续），每层包含 `name`、`text`、`evidenceRefs` 和 `clusterIds`（本层对应的第五章集群 `id` 数组）。 |
 | `clusters[].clinicalSignals[].kind` | string | 检查记录中的原检查建议为 `advice`；其他记录不返回该字段。 |
 | 第四章各菌群记录的 `level`、`direction` | string / null | 菌群记录统一分档与方向（`up` / `down` / `null`）。适用于 `structureGroups[].rows[]`、`organismGroups[].rows[]`、`functionalGroups[].rows[]` 及其 `normalBaseline.rows[]`。 |
 | 菌群评分记录的 `score`、`bands` | number / null、array / null | 0–100 评分及分档区间。`bands[]` 包含 `label`、`low`、`high`，取自检测报告的分档说明，开放端为 `null`。 |
 | 菌群丰度记录的 `abundance`、`referenceLow`、`referenceHigh` | number / null | 相对丰度百分比数值及参考区间上下限。 |
+| `chapters[code=overview].content.phenotype` | string / null | 对整体健康状态的一句话概括，与 `bodySummary` 开头的判断一致。 |
+| `chapters[code=overview].content.dataNotes[]` | array | 资料核对说明，每项包含 `kind`（`timing`：资料日期与间隔；`calibration`：读数或结论的校准；`missing`：未做的常规检查）、`name`（string / null）和 `text`。没有时为 `[]`。 |
+| `bodyGroups[].comparisonReference` | string / null | 体格行的理想目标。 |
+| `systems[].keyFindings` | string / null | 该系统的核心异常与关键实测值的文字摘要；未检测的系统为 `null`。 |
+| `symptoms[].clinicalEvidence`、`symptoms[].microbiomeEvidence` | string / null | 该主诉相关的临床检验与影像信号、菌群与功能代谢证据的文字；没有相关记录时为 `null`（请求未含菌群报告时 `microbiomeEvidence` 均为 `null`）。`clinicalSignals`、`microbiomeSignals` 保留对应的检测记录。 |
+| `symptoms[].interpretationTitle` | string / null | 该主诉成因解析的小标题，正文在 `interpretation`。 |
+| `clinicalGroups[].status`、`clinicalGroups[].calibrationNote` | string / null | 分系统的状态文字；体检结论与检验数值不一致或同一指标多个读数不一致时的校准说明，没有时为 `null`。 |
+| `templateRows[].recordedConclusions` | array | 该行对应的体检结论名称（string 数组），没有时为 `[]`。 |
+| `templateRows[].anchors`、`templateRows[].moreCount` | array、integer | 该行需关注的成员（结构同 `systems[].anchors[]`）及未列出的数量。 |
+| `templateRows[].completion` | string | `complete`：解读完整；`source_only`：解读未完成，`summary` 只列出检测值，此时回调为 `partial_success`。 |
+| `clusters[].clinicalEvidence`、`clusters[].microbiomeEvidence` | string / null | 集群的临床与影像证据、菌群与代谢证据的文字；没有相关记录时为 `null`。`clinicalSignals`、`microbiomeSignals` 保留对应的检测记录，`reportedSignals` 为相关的自述记录。 |
 | 菌群宏观指数的 `valueNumber`、`referenceLow`、`referenceHigh`、`referenceKind`、`bands` | number / null、string / null、array / null | 指数数值、参考上下限、参考类型（`range` / `upper` / `lower` / `qualitative`）及分档区间。肠道年龄另含 `actualAge`（integer）与 `ageDifference`（number，肠龄减实足年龄）。 |
 
 `evaluate.v2.0` 回调顶层新增 `reportDate`（string，格式 `YYYY-MM-DD`），表示本次评估报告生成日期，使用北京时间（Asia/Shanghai），例如 `"reportDate": "2026-11-16"`。成功、部分成功和失败回调均包含此字段；重投已生成的回调时保留原日期。`generatedAt` 保持原时间戳格式，`sample.reportDate` 仍表示原检测报告日期。
@@ -4486,6 +4499,8 @@ curl -X POST http://host:port/api/v1/report \
                 "title": "第一章　全息健康图景概览",
                 "content": {
                     "bodyGroups": [],
+                    "phenotype": "示例表型",
+                    "dataNotes": [],
                     "summary": "示例健康问题的总览。",
                     "evidenceRefs": [
                         1
@@ -4494,7 +4509,8 @@ curl -X POST http://host:port/api/v1/report \
                         {
                             "code": "cardiometabolic",
                             "name": "糖脂代谢与心脑血管系统",
-                            "status": "分项异常：示例指标",
+                            "status": "重点关注",
+                            "keyFindings": "示例指标 3.34 mmol/L。",
                             "summary": "示例指标高于参考区间。",
                             "evidenceRefs": [],
                             "rows": [],
@@ -4533,6 +4549,7 @@ curl -X POST http://host:port/api/v1/report \
                                     ],
                                     "basisRows": [],
                                     "text": "示例检查复查：建议2 周内至消化内科就诊，完成示例复查项目。",
+                                    "origin": "model",
                                     "ruleId": "demo-rule"
                                 }
                             ],
