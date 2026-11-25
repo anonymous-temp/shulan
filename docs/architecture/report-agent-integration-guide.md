@@ -382,6 +382,8 @@ python -m pytest -q tests/unit/agents tests/unit/health_profile tests/unit/boots
 
 | 配置项 | 默认值 | 含义与范围 |
 | --- | --- | --- |
+| `SHULAN_REPORT_CALLBACK_URL` | 部署配置 | 后续报告和肠道屏障报告的公共接收地址。 |
+| `SHULAN_REPORT_EVALUATE_CALLBACK_URL` | 从公共地址确定 | 仅指定 `evaluate` 的接收地址。留空且公共路径为 `/api/basic-health-assessment/ai-full-back/callback` 时，使用同域的 `/api/basic-health-assessment/ai-full-back-2026-11/callback`。自定义公共路径按原地址接收。新批次在受理时保存各自目标，重试使用批次快照。 |
 | `SHULAN_REPORT_CALLBACK_RETRY_DELAYS_SECONDS` | `30,120,600,3600` | 第 1、2、3、4 次失败后的基础等待秒数；超过序列后始终重复最后一项。逗号分隔、非递减、正整数，每项最多 31536000 秒；单值如 `600` 表示固定间隔 |
 | `SHULAN_REPORT_CALLBACK_POLL_INTERVAL_SECONDS` | `5` | 到期任务扫描周期，1—3600 秒；首次入队和服务启动也会触发扫描 |
 | `SHULAN_REPORT_CALLBACK_CONCURRENCY` | `4` | 每个进程的回调并发数及 HTTP 连接池上限，1—64 |
@@ -400,9 +402,9 @@ python -m pytest -q tests/unit/agents tests/unit/health_profile tests/unit/boots
 
 `scripts.report_callbacks` 提供按用户和批次查询、补投和修正未确认目标的命令。操作意图及操作人、原因先保存，目标版本只前进，旧在途请求的确认不能覆盖新目标。历史批次没有 `durableVersion`，不自动生成任务；显式补投只读取既有正文，要求提供目标地址，不伪造缺失的历史报告。
 
-服务整体切换回调地址时，修改 `SHULAN_REPORT_CALLBACK_URL` 并重启相关服务实例，再执行 `python -m scripts.report_callbacks migrate-pending`，即可把当前数据库中已启用回调、尚有未确认结果或未入队类型的批次迁移到当前配置地址。无需逐个指定用户或报告 ID，也不接受这些过滤条件或 `--target-url`；`--reason` 可选且有默认值。可使用 `--dry-run` 只读预览范围。已确认结果不重发、相同目标不重复重置、未主动启用投递的历史报告不纳入。
+只切换评估接收端时设置 `SHULAN_REPORT_EVALUATE_CALLBACK_URL`，公共接收端由 `SHULAN_REPORT_CALLBACK_URL` 配置。重启相关服务实例后，新批次采用当前配置。对于已经启用回调、尚有未确认结果或有类型未入队的 Report 批次，`python -m scripts.report_callbacks migrate-pending --dry-run` 可预览范围，去掉 `--dry-run` 则按类型更新目标。该命令扫描普通 Report 队列，`--reason` 可选。已确认结果不重发，相同目标不重复重置，历史批次需已启用投递才纳入迁移。单批 `retry` 默认沿用各自地址，显式 `--target-url` 会把该批所有未确认类型统一改投该地址。
 
-迁移按命令开始时间和 `_id` 上界限定扫描范围，分页读取批次及投递元数据，避免一次加载全部历史或报告正文。每个匹配批次复用持久化 `redrivePending`、递增目标版本和令牌撤销机制；更新批次快照，使正在生成的后续类型也继承新地址。批次审计用统一 `operationId` 关联。命令不直接发送 HTTP，只使变更目标的未确认任务立即到期；Worker 继续使用持久化正文和原幂等标识投递。
+迁移按命令开始时间和 `_id` 上界限定扫描范围，分页读取批次及投递元数据，避免一次加载全部历史或报告正文。每个匹配批次复用持久化 `redrivePending`、递增目标版本和令牌撤销机制。正在生成的报告类型从更新后的批次快照取对应地址。批次审计用统一 `operationId` 关联。命令只使变更目标的未确认任务立即到期，Worker 继续使用持久化正文和原幂等标识投递。
 
 批次级失败不阻断其余批次，输出匹配、迁移和失败计数，错误只含批次 ID 与异常类型；部分失败以非零状态退出。没有全库事务：中断前已保存的批次意图可由补偿修复，尚未处理的批次通过重跑命令继续迁移。扫描与投递并行，因此预览数量不是锁定快照，已在迁移更新前确认成功的任务也会保持成功。新受理批次依赖重启后的配置，不依赖迁移命令持续监听。
 

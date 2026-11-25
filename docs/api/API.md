@@ -4136,7 +4136,7 @@ curl -X POST http://host:port/api/v1/chat/history \
 - 接口校验并受理任务后立即返回 `processing`，不等待报告生成。
 - `evaluate` 评估报告的解析与生成硬上限为 30 分钟；干预方案、临床医嘱、诊断意见和报告解读不与它共享一个总时限。
 - 生成成功、部分成功或失败都向回调接口地址发送 JSON。
-- 测试环境回调地址为 `https://test.slmc.top/api/basic-health-assessment/ai-full-back/callback`。
+- 标准接收端按环境使用测试域名 `test.slmc.top` 或正式域名 `m.slmc.top`。仅 `type=evaluate` 使用 `/api/basic-health-assessment/ai-full-back-2026-11/callback`，其他报告回调使用 `/api/basic-health-assessment/ai-full-back/callback`。
 
 `evaluate.v2.0` 以 `data.version = "assessment.v2"` 标识按 PDF 阅读顺序编排的正文。前端先展示 `data.introduction`，再按数组顺序展示 `data.chapters`，最后展示 `data.appendices`。历史回调和旧格式降级结果仍按各自结构读取。
 
@@ -4389,7 +4389,7 @@ curl -X POST http://host:port/api/v1/report \
 
 #### 回调接口
 
-回调使用 `POST` 方法和 `application/json` 请求体。测试环境回调地址为 `https://test.slmc.top/api/basic-health-assessment/ai-full-back/callback`。接收方应以任意 `2xx` 状态码表示已接收；响应体不参与确认判断，重定向响应不视为成功。各类结果保存后独立回调，不保证五类回调的到达顺序。
+回调通过 `POST` 发送 `application/json` 请求体。评估报告优先使用部署方配置的评估专用地址。仅配置标准公共地址时，评估回调使用同一环境的新版评估路径。仅配置自定义接收端时，评估回调也发送到该接收端。`intervene`、`instruction`、`opinion` 和 `explain` 均使用公共地址。接收方应以任意 `2xx` 状态码表示已接收。发送端只依据状态码确认，收到重定向响应时保留任务等待重试。各类结果保存后独立回调，到达顺序取决于各项的完成与投递时间。
 
 请求受理成功后，五类报告分别返回 `success`、`partial_success` 或 `failed` 终态。服务中断后，已保存的结果继续保留；尚未开始的批次在服务恢复后继续处理，生成已中断且尚未保存的类型返回失败结果并回调，不覆盖同批次中已保存的报告。
 

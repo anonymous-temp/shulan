@@ -554,6 +554,7 @@ def build_container(
         from config.env import REPORT_CALLBACK_RETRY_JITTER_RATIO
         from config.env import REPORT_CALLBACK_TIMEOUT_SECONDS
         from config.env import REPORT_CALLBACK_URL
+        from config.env import REPORT_EVALUATE_CALLBACK_URL
         from modules.report.durable import DurableReportService
         from modules.report.durable import ReportCallbackWorker
 
@@ -566,6 +567,7 @@ def build_container(
             artifact_store=report_artifact_store,
             pipeline=report_pipeline,
             callback_url=REPORT_CALLBACK_URL,
+            evaluate_callback_url=REPORT_EVALUATE_CALLBACK_URL,
         )
         if report_callback_worker is None:
             transport = ReportCallbackTransport(
