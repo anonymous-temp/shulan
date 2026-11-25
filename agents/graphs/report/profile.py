@@ -15,6 +15,8 @@ REPORT_NARRATIVE_PROFILE = 'report.narrative'
 REPORT_THINKING_TASKS = frozenset({
     'write_report_chapter', 'review_report_chapter',
     'plan_source_bound_assessment_content', 'review_source_bound_assessment_content',
+    # Whole-case assessment: analysis, section writing and independent review.
+    'analyze_assessment_case', 'write_assessment_case_section', 'review_assessment_case',
 })
 
 

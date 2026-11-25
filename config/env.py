@@ -334,9 +334,11 @@ REPORT_RESEARCH_TIMEOUT_SECONDS: int = _env.get_int(
 REPORT_RESEARCH_EVALUATION_REFERENCE: str = _env.optional('REPORT_RESEARCH_EVALUATION_REFERENCE', default='')
 REPORT_RESEARCH_MODEL: str = _env.optional('REPORT_RESEARCH_MODEL', default='')
 
-# Evaluate report authoring. 'chapter' writes and reviews related cells
-# together with the full record and evidence; 'cell' is the former per-cell path.
-REPORT_AUTHORING_MODE: str = _env.get_choice('REPORT_AUTHORING_MODE', ('chapter', 'cell'), default='chapter')
+# Evaluate report authoring. 'case' (default) lets the model analyse the whole
+# case once and write the six chapters by section, with the per-chapter path
+# as its fallback. 'chapter' writes and reviews related cells together with
+# the full record and evidence; 'cell' is the former per-cell path.
+REPORT_AUTHORING_MODE: str = _env.get_choice('REPORT_AUTHORING_MODE', ('case', 'chapter', 'cell'), default='case')
 # Thinking mode for chapter writing and review (other report tasks stay non-thinking).
 REPORT_NARRATIVE_THINKING: bool = _env.get_bool('REPORT_NARRATIVE_THINKING', default=True)
 REPORT_NARRATIVE_REASONING_EFFORT: str = _env.get_choice(

@@ -19,6 +19,15 @@ review_report_chapter
 humanize_report_chapter
 按 humanizeGuide 只改文风，不改医学内容。逐段返回改写后的完整段落，index 与输入一致，段首的“小标题：”原样保留；数值、单位、检查名称、建议和确定程度用词原样保留，不增删事实。读起来已经自然的段落原样返回。
 
+analyze_assessment_case
+读完 caseSheet 中受检者的全部资料后，按 method 做整体分析，按 outputSchema 返回判断结果：表型、各系统的状态和表格行、主诉、失衡集群、优先排查事项、常规随访、检测盲区、生活诱因和认知校准。只引用 caseSheet 里存在的编号，只做判断和归类，不写报告正文。资料少的受检者如实给出较少的内容，不为凑数量拔高或编造。
+
+write_assessment_case_section
+按 writingGuide 和 sectionGuide 写出 cells 中各格的正文。analysis 是已经确定的整体判断，各格与它保持一致；每格用到的数值到 caseSheet 中按编号查对后照抄。正文不出现任何编号。只返回 {"cells": {id: 正文}}。
+
+review_assessment_case
+作为独立复核医师，对照 caseSheet 逐格检查 cells 中的成稿，按 reviewGuide 只报告真实问题并给出改正后的完整文字。
+
 plan_report_evidence_queries
 把报告里的问题分组名还原成规范的医学概念，为每个问题给出中文和英文检索式，以及该问题在文献标题和正文中实际会出现的名称与同义词。不新增病名，不把风险写成确诊。
 

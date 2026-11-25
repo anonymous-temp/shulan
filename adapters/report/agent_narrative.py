@@ -34,6 +34,8 @@ CHAPTER_ATTEMPT_TIMEOUT_SECONDS = 420
 _CHAPTER_TASKS = frozenset({
     'write_report_chapter', 'review_report_chapter', 'humanize_report_chapter',
     'plan_source_bound_assessment_content', 'review_source_bound_assessment_content',
+    # 整案分析、分节成稿与复核都读入完整的受检者资料并以思考模式运行。
+    'analyze_assessment_case', 'write_assessment_case_section', 'review_assessment_case',
 })
 
 # Application-wide pool, with a separate per-report execution pool below.

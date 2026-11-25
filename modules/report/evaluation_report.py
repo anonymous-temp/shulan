@@ -153,6 +153,10 @@ class EvaluationReportState:
     audit: dict[str, Any] = field(default_factory=dict)
     incomplete: list[str] = field(default_factory=list)
     withheld_diseases: list[Any] = field(default_factory=list)
+    # Model-authored whole-case result (plan, cells, inputs); None on the per-chapter path.
+    case: Any = None
+    # Fact sheet and views of the whole-case path, kept for the rule-only fallback.
+    case_inputs: Any = None
 
 
 def _facts(blueprint):
@@ -570,16 +574,47 @@ def _payload(state, *, extra_reasons=()):
 
         phase = time.monotonic()
         try:
-            data.assessment_presentation = build_assessment_presentation(
-                request=state.request, parsed=state.parsed, document=state.document,
-                data=data, blueprint=state.blueprint, accepted=state.accepted_blocks,
-            )
-            gaps = assessment_projection_issues(data.assessment_presentation, state.blueprint)
-            if gaps:
-                state.audit['assessmentProjectionIssues'] = gaps
-                if 'REPORT_LAYOUT_INCOMPLETE' not in reasons:
-                    reasons.append('REPORT_LAYOUT_INCOMPLETE')
-        except (ValueError, TypeError, KeyError) as error:
+            case_view = None
+            if state.case is not None:
+                from . import assessment_case_report
+
+                try:
+                    case_view = assessment_case_report.build_report_case_presentation(
+                        request=state.request, parsed=state.parsed, document=state.document,
+                        data=data, blueprint=state.blueprint, accepted=state.accepted_blocks, case=state.case,
+                    )
+                except Exception as error:
+                    # The recorded values are still delivered through the former projection.
+                    state.audit['caseProjectionError'] = type(error).__name__
+                    logger.exception('whole-case projection failed')
+                    if 'REPORT_CONTENT_INCOMPLETE' not in reasons:
+                        reasons.append('REPORT_CONTENT_INCOMPLETE')
+            if case_view is not None:
+                data.assessment_presentation = case_view
+                state.audit['caseAuthoring'] = assessment_case_report.case_audit_summary(state.case)
+                incomplete = assessment_case_report.case_incomplete(state.case)
+                if incomplete:
+                    state.audit['caseIncomplete'] = incomplete
+                    if 'REPORT_CONTENT_INCOMPLETE' not in reasons:
+                        reasons.append('REPORT_CONTENT_INCOMPLETE')
+                # Gaps of the former problem-organisation steps only affect
+                # legacy fields; the six chapters were written from the
+                # complete fact sheet, so they do not make this report partial.
+                former = [reason for reason in reasons if reason in assessment_case_report.FORMER_PATH_REASONS]
+                if former:
+                    state.audit['formerPathReasons'] = former
+                    reasons[:] = [reason for reason in reasons if reason not in former]
+            else:
+                data.assessment_presentation = build_assessment_presentation(
+                    request=state.request, parsed=state.parsed, document=state.document,
+                    data=data, blueprint=state.blueprint, accepted=state.accepted_blocks,
+                )
+                gaps = assessment_projection_issues(data.assessment_presentation, state.blueprint)
+                if gaps:
+                    state.audit['assessmentProjectionIssues'] = gaps
+                    if 'REPORT_LAYOUT_INCOMPLETE' not in reasons:
+                        reasons.append('REPORT_LAYOUT_INCOMPLETE')
+        except (ValueError, TypeError, KeyError, AttributeError, IndexError) as error:
             if 'REPORT_LAYOUT_INCOMPLETE' not in reasons:
                 reasons.append('REPORT_LAYOUT_INCOMPLETE')
             state.audit['assessmentPresentationError'] = type(error).__name__
@@ -600,7 +635,7 @@ def _payload(state, *, extra_reasons=()):
             setattr(block, field_name, {str(remap[int(number)]): value
                 for number, value in original.items() if int(number) in remap})
     document.background['reportGeneration'] = {
-        'mainline': 'template-cell-seven-chapters-v2',
+        'mainline': 'assessment-case-v1' if state.case is not None else 'template-cell-seven-chapters-v2',
         'audit': deepcopy(state.audit),
         'publicationNumberMap': remap,
     }
@@ -672,7 +707,7 @@ def content_plan_degraded_sections(content_plan):
 
 
 def _authoring_mode():
-    """'chapter' (default) writes and reviews by chapter; 'cell' is the former path."""
+    """'case' (default) analyses the whole case and writes by section; 'chapter' and 'cell' are the former paths."""
     try:
         from config.env import REPORT_AUTHORING_MODE
     except Exception:
@@ -1216,8 +1251,12 @@ async def generate_evaluation_report(*, pipeline, request, parsed, document,
         'authoringDeadline': deadline,
         'completionReserveSeconds': completion_reserve,
     }
-    chapter_mode = _authoring_mode() == 'chapter'
-    state.audit['authoringMode'] = 'chapter' if chapter_mode else 'cell'
+    mode = _authoring_mode()
+    case_mode = mode == 'case'
+    # The whole-case path shares every source step with the per-chapter path
+    # and falls back to it when the case analysis is unavailable.
+    chapter_mode = mode in {'chapter', 'case'}
+    state.audit['authoringMode'] = mode
     if chapter_mode:
         # Arithmetic on laboratory values is done once by formula, before the
         # clinical problems are organised, so every chapter cites one number.
@@ -1263,7 +1302,55 @@ async def generate_evaluation_report(*, pipeline, request, parsed, document,
     def build_source_checkpoint():
         state.blueprint = build_report_blueprint(request, parsed, document, health_assessment, prepared_data=data)
     await _project(build_source_checkpoint)
-    if chapter_mode:
+    async def score_dimensions():
+        score_started = time.monotonic()
+        try:
+            await score_template_dimensions(client, score_input, document, parsed.subject, deadline, state.audit)
+        except Exception as error:
+            state.audit['templateDimensionScoringError'] = type(error).__name__
+            return False
+        finally:
+            stage_timings['report_template_dimension_scoring'] = round((time.monotonic() - score_started) * 1000, 3)
+        return True
+
+    def merge_scores():
+        data.health_overview.assessment_chart = score_input.health_overview.assessment_chart
+        data.health_overview.overall_score.score = score_input.health_overview.overall_score.score
+        data.disease_risk_assessment.overview_matrix = score_input.disease_risk_assessment.overview_matrix
+        score_receipt = getattr(score_input, '_template_dimension_scores', None)
+        if score_receipt is not None:
+            object.__setattr__(data, '_template_dimension_scores', score_receipt)
+
+    scores_merged = False
+    if case_mode:
+        from .assessment_case_report import CHAPTER_FALLBACK_MIN_SECONDS
+        from .assessment_case_report import author_report_case
+
+        # The model reads the whole case once and decides the content of the
+        # six chapters; Explain still needs the dimension scores, so they are
+        # calculated alongside on a copy.
+        async with asyncio.TaskGroup() as preparation:
+            authored = preparation.create_task(author_report_case(state, client, deadline=deadline))
+            scored = preparation.create_task(score_dimensions())
+        state.case = authored.result()
+        if scored.result():
+            merge_scores()
+            await _project(build_source_checkpoint)
+        scores_merged = True
+        if state.case is None:
+            state.audit['caseAuthoringFallback'] = 'chapter'
+            if deadline - time.monotonic() < CHAPTER_FALLBACK_MIN_SECONDS:
+                # Too late for the per-chapter path: deliver the recorded
+                # values as a partial report instead of running out of time.
+                state.audit['caseAuthoringFallback'] = 'source_only'
+                state.incomplete.append('REPORT_CONTENT_INCOMPLETE')
+                if state.case_inputs is not None:
+                    from .assessment_case_report import rule_only_case
+
+                    # Recorded values and danger-signal items still reach the reader.
+                    state.case = await _project(rule_only_case, state.case_inputs)
+    case_authored = state.case is not None and not state.case.get('degraded')
+    if chapter_mode and not case_authored and state.audit.get('caseAuthoringFallback') != 'source_only':
         from .evaluation_content_plan import plan_assessment_content
 
         async def plan_content():
@@ -1274,31 +1361,18 @@ async def generate_evaluation_report(*, pipeline, request, parsed, document,
             stage_timings['report_content_plan'] = round((time.monotonic() - plan_started) * 1000, 3)
             return planned
 
-        async def score_dimensions():
-            score_started = time.monotonic()
-            try:
-                await score_template_dimensions(client, score_input, document, parsed.subject, deadline, state.audit)
-            except Exception as error:
-                state.audit['templateDimensionScoringError'] = type(error).__name__
-                return False
-            finally:
-                stage_timings['report_template_dimension_scoring'] = round((time.monotonic() - score_started) * 1000, 3)
-            return True
+        async def scores_ready():
+            return False
 
         # The public six-chapter plan does not read scores. Explain still
         # consumes the approved score rows, so calculate them independently
         # on a copy and merge only those rows before rebuilding the blueprint.
         async with asyncio.TaskGroup() as preparation:
             planned = preparation.create_task(plan_content())
-            scored = preparation.create_task(score_dimensions())
+            scored = preparation.create_task(scores_ready() if scores_merged else score_dimensions())
         content_plan = planned.result()
         if scored.result():
-            data.health_overview.assessment_chart = score_input.health_overview.assessment_chart
-            data.health_overview.overall_score.score = score_input.health_overview.overall_score.score
-            data.disease_risk_assessment.overview_matrix = score_input.disease_risk_assessment.overview_matrix
-            score_receipt = getattr(score_input, '_template_dimension_scores', None)
-            if score_receipt is not None:
-                object.__setattr__(data, '_template_dimension_scores', score_receipt)
+            merge_scores()
         logger.info('report content plan: status=%s clusters=%s symptoms=%s reason=%s',
             content_plan['status'], len(content_plan['clusters']), len(content_plan['symptoms']),
             state.audit.get('contentPlan', {}).get('reason'))
@@ -1335,7 +1409,22 @@ async def generate_evaluation_report(*, pipeline, request, parsed, document,
             progress.references = list(state.evidence.references)
             progress.query_audits = list(state.evidence.query_audits)
 
-    if chapter_mode:
+    if state.case is not None or state.audit.get('caseAuthoringFallback') == 'source_only':
+        from .evaluation_report_evidence import ReportEvidenceBundle
+
+        # The whole-case path cites the checked target sources and guideline
+        # sources during projection; there is no per-cell literature recall.
+        state.evidence = ReportEvidenceBundle()
+        record_evidence()
+        if state.case is not None:
+            from .assessment_case_report import legacy_case_blocks
+
+            present = {block['targetId'] for blocks in state.approved_blocks.values() for block in blocks}
+            for code, blocks in legacy_case_blocks(state.blueprint, state.case).items():
+                state.approved_blocks.setdefault(code, []).extend(
+                    block for block in blocks if block['targetId'] not in present)
+            state.audit['reviewedBlocks'] = deepcopy(state.approved_blocks)
+    elif chapter_mode:
         from .evaluation_evidence_recall import recall_report_evidence_sources
 
         async def recall():
@@ -1439,13 +1528,18 @@ async def generate_evaluation_report(*, pipeline, request, parsed, document,
     state.accepted_blocks = accepted
     state.audit['acceptedTargets'] = [block['targetId'] for block in accepted]
     state.audit['publicationRejections'] = rejected
-    if _record_content_gaps(state.blueprint, accepted, rejected, state.audit):
+    content_gaps = _record_content_gaps(state.blueprint, accepted, rejected, state.audit)
+    if state.case is not None:
+        # The six chapters come from the authored case; the per-cell targets
+        # of the former path are not written, so their gaps are not failures.
+        state.audit['formerPathTargetsNotWritten'] = len(state.audit.pop('missingRequiredTargets', ()))
+    elif content_gaps and 'REPORT_CONTENT_INCOMPLETE' not in state.incomplete:
         state.incomplete.append('REPORT_CONTENT_INCOMPLETE')
     if not any(state.blueprint.facts):
         state.incomplete.append('ASSESSMENT_DATA_UNAVAILABLE')
     document.sections = _document_sections(state.blueprint, accepted)
     stage_timings['report_assembly'] = round((time.monotonic() - phase) * 1000, 3)
-    if chapter_mode:
+    if chapter_mode and state.case is None:
         cited_numbers = {number for block in accepted for number in block['evidenceRefs']}
         web_client = getattr(pipeline, 'web_evidence_client', None)
         metadata_started = time.monotonic()
