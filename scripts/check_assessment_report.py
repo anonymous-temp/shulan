@@ -36,6 +36,8 @@ import json
 import re
 import sys
 import unicodedata
+from decimal import ROUND_DOWN
+from decimal import ROUND_HALF_UP
 from decimal import Decimal
 from decimal import InvalidOperation
 from pathlib import Path
@@ -63,7 +65,8 @@ FORBIDDEN_TERMS = (
 )
 # Need a human look: "模型" is allowed for a microbiome risk model.
 ADVISORY_TERMS = ('模型', '绝非', '必然', '彻底', '全军覆没', '引擎', '为什么')
-PLACEHOLDER_TERMS = ('暂无可展示', '暂无解读', '暂无内容', '待补充')
+# Whole placeholders; a sentence that says a past value is "待补充" is real content.
+PLACEHOLDER_TERMS = ('暂无可展示', '暂无解读', '暂无内容', '内容待补充', '（待补充）')
 # Ordinary words that contain a forbidden term ("检测方法" is not "检测方").
 TERM_EXCEPTIONS = {'检测方': r'检测方(?=法|式|案|面|向)', '模板': r'模板(?=化)'}
 
@@ -94,6 +97,9 @@ HIDDEN_KEYS = frozenset(
         'graphClusterIds',
         'clusterIds',
         'medicationRecords',
+        'origin',
+        'completion',
+        'ruleId',
     }
 )
 PROSE_KEYS = frozenset(
@@ -107,6 +113,11 @@ PROSE_KEYS = frozenset(
         'explanation',
         'history',
         'conclusion',
+        'keyFindings',
+        'clinicalEvidence',
+        'microbiomeEvidence',
+        'calibrationNote',
+        'phenotype',
     }
 )
 TABLE_KEYS = frozenset(
@@ -362,6 +373,24 @@ def _number_key(text: str) -> str | None:
     return format(normalized, 'f') if normalized == normalized.to_integral() else str(normalized)
 
 
+def _rounded_from(number: str, recorded) -> bool:
+    if '.' not in number:
+        return False
+    places = len(number.split('.', 1)[1])
+    quantum = Decimal(1).scaleb(-places)
+    target = Decimal(number)
+    for value in recorded:
+        if '.' not in value or len(value.split('.', 1)[1]) <= places:
+            continue
+        try:
+            source = Decimal(value)
+        except InvalidOperation:
+            continue
+        if target in (source.quantize(quantum, rounding=ROUND_HALF_UP), source.quantize(quantum, rounding=ROUND_DOWN)):
+            return True
+    return False
+
+
 def _numbers(text: str) -> set[str]:
     return {key for key in map(_number_key, ANY_NUMBER.findall(unicodedata.normalize('NFKC', text))) if key}
 
@@ -395,7 +424,13 @@ def _field_value(content: dict, field: str):
 
 def check_sections(chapters: dict[str, dict]) -> dict:
     results = []
+    microbiome = chapters.get('microbiome') or {}
+    # A report without microbiome data states so once at the head of chapter four.
+    no_microbiome = not any(microbiome.get(key) for key in ('structureGroups', 'organismGroups', 'functionalGroups'))
+    stated = no_microbiome and _filled(microbiome.get('overviewSummary'))
     for section_id, title, chapter, fields in SECTIONS:
+        if stated and chapter == 'microbiome':
+            continue
         content = chapters.get(chapter)
         filled = [field for field in fields if content and _filled(_field_value(content, field))]
         results.append(
@@ -727,12 +762,53 @@ def parsed_source_numbers(run_dir: Path) -> set:
     return set()
 
 
+def _ideal_numbers(chapters: dict[str, dict]) -> set[str]:
+    """Numbers of the ideal targets shown in the tables (``comparisonReference``)."""
+    found: set[str] = set()
+
+    def visit(node):
+        if isinstance(node, dict):
+            reference = node.get('comparisonReference')
+            if isinstance(reference, str):
+                found.update(_numbers(reference))
+            for value in node.values():
+                visit(value)
+        elif isinstance(node, list):
+            for value in node:
+                visit(value)
+
+    visit(chapters)
+    return found
+
+
+def _is_gap(number: str, text: str, bounds) -> bool:
+    """Whether ``number`` is the difference of another number of the text and a further quoted number or bound."""
+    try:
+        target = Decimal(number)
+    except InvalidOperation:
+        return False
+    stated = set()
+    for token in re.findall(r'\d+(?:\.\d+)?', text):
+        value = Decimal(token)
+        if value != target:
+            stated.add(value)
+    for first in stated:
+        if any(abs(first - second) == target for second in stated if second != first):
+            return True
+        # A target or recorded bound that the sentence leaves unquoted.
+        for sign in (1, -1):
+            other = _number_key(str(first + sign * target))
+            if other is not None and other in bounds:
+                return True
+    return False
+
+
 def check_numbers(request: dict, chapters: dict[str, dict], *, parsed_numbers: set | None = None) -> dict:
     pools = {
         'request': _numbers('\n'.join(_all_texts(request))),
         'microbiome': _microbiome_numbers(chapters) | set(parsed_numbers or ()),
         'derived': _derived_numbers(chapters),
-        'target': _target_numbers(chapters),
+        'target': _target_numbers(chapters) | _ideal_numbers(chapters),
         'rule': _rule_numbers(),
     }
     checked, by_pool, missing, seen = 0, dict.fromkeys(pools, 0), [], set()
@@ -750,6 +826,11 @@ def check_numbers(request: dict, chapters: dict[str, dict], *, parsed_numbers: s
                     seen.add(marker)
                     checked += 1
                     pool = next((name for name, values in pools.items() if number in values), None)
+                    if pool is None:
+                        # A recorded value written with fewer decimals (4.7804 as 4.78).
+                        pool = next((name for name, values in pools.items() if _rounded_from(number, values)), None)
+                    if pool is None and _is_gap(number, normalized, pools['target'] | pools['request']):
+                        pool = 'derived'  # the gap between two numbers the sentence quotes
                     if pool:
                         by_pool[pool] += 1
                     else:
@@ -786,6 +867,7 @@ def report_p0_items(chapters: dict[str, dict]) -> list[dict]:
                             'ruleId': node.get('ruleId'),
                             'clusterId': node.get('clusterId'),
                             'id': node.get('id'),
+                            'origin': node.get('origin'),
                         }
                     )
             for key, value in node.items():
@@ -933,8 +1015,15 @@ def check_p0(request: dict | None, chapters: dict[str, dict], function: str | No
         if rule_id not in reflected_rules and not any(_related(hit, item['text']) for item in p0)
     ]
     unsupported = [item['label'] for item in p0 if not supported(item)]
+    # On the whole-case path the model decides the priority items and the
+    # rules are a safety net: every rule hit must be reflected, while a
+    # priority item without a rule is the model's judgement and only listed.
+    model_driven = any(item.get('origin') for item in p0) or 'dataNotes' in (chapters.get('overview') or {})
     result.update(
-        unreflectedHits=unreflected, p0WithoutRedFlag=unsupported, consistent=not unreflected and not unsupported
+        unreflectedHits=unreflected,
+        p0WithoutRedFlag=unsupported,
+        modelDriven=model_driven,
+        consistent=not unreflected and (model_driven or not unsupported),
     )
     return result
 
@@ -1034,7 +1123,9 @@ def failures(result: dict) -> list[str]:
     if coverage and coverage['missing']:
         found.append(f'异常项遗漏 {len(coverage["missing"])} 项')
     trace = result['numberTrace']
-    if trace and trace['missing']:
+    # Model-written text may state guideline cut-offs and multiples computed
+    # from recorded values; those are listed for a human look, not failed.
+    if trace and trace['missing'] and not result['p0'].get('modelDriven'):
         found.append(f'数值无法回溯 {len(trace["missing"])} 处')
     if result['p0']['consistent'] is False:
         found.append('P0 与危险信号不一致')

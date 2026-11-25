@@ -186,6 +186,20 @@ def _capture_presentation_inputs(path):
 
     assessment_presentation.build_assessment_presentation = capture
 
+    # The whole-case path projects through its own entry; capture it the same way.
+    from modules.report import assessment_case_report
+
+    original_case = assessment_case_report.build_report_case_presentation
+
+    def capture_case(**kwargs):
+        try:
+            path.write_bytes(pickle.dumps(kwargs, protocol=pickle.HIGHEST_PROTOCOL))
+        except Exception as error:  # a checkpoint never decides the run's outcome
+            print(f'checkpoint skipped: {type(error).__name__}: {error}', file=sys.stderr)
+        return original_case(**kwargs)
+
+    assessment_case_report.build_report_case_presentation = capture_case
+
 
 async def _run(args):
     from modules.report.artifacts import bind_report_batch

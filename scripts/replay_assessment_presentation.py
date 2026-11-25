@@ -40,8 +40,19 @@ def replay(run_dir: Path, output: Path) -> dict:
     from scripts.render_evaluation_report import render_evaluation_html
 
     kwargs = pickle.loads((run_dir / 'presentation_inputs.pkl').read_bytes())
-    view = build_assessment_presentation(**kwargs)
-    issues = assessment_projection_issues(view, kwargs['blueprint'])
+    if kwargs.get('case') is not None:
+        # A whole-case run: the authored plan and cells are replayed as they were reviewed.
+        from modules.report.assessment_case_report import build_report_case_presentation
+        from modules.report.assessment_case_report import case_incomplete
+
+        library = getattr(getattr(kwargs.get('data'), 'appendices', None), 'reference_literature', None)
+        if library is not None:
+            library.clear()
+        view = build_report_case_presentation(**kwargs)
+        issues = case_incomplete(kwargs['case'])
+    else:
+        view = build_assessment_presentation(**kwargs)
+        issues = assessment_projection_issues(view, kwargs['blueprint'])
     body = json.loads((run_dir / 'callback.json').read_text(encoding='utf-8'))
     body['data']['assessmentPresentation'] = (
         view.model_dump(mode='json', by_alias=True) if hasattr(view, 'model_dump') else view
