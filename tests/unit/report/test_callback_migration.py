@@ -206,6 +206,8 @@ async def test_command_reads_current_config_and_closes_client_without_sending_ca
         patch.dict('sys.modules', {'db.mongodb': database}),
         patch('adapters.report.factory.create_application_report_artifact_store', return_value=env.archive),
         patch('config.env.REPORT_CALLBACK_URL', TARGET + '?token=private'),
+        # No evaluate-specific address is configured: evaluate reports follow the shared one.
+        patch('config.env.REPORT_EVALUATE_CALLBACK_URL', ''),
     ):
         result = await report_callbacks.run(args)
     database.client.close.assert_awaited_once()
