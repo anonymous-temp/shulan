@@ -46,6 +46,12 @@ def _iso(value):
     return as_utc(value).isoformat() if isinstance(value, datetime) else None
 
 
+def _callback_target(batch: dict, report_type: str) -> str:
+    if report_type == 'evaluate' and batch.get('evaluateCallbackUrl'):
+        return batch['evaluateCallbackUrl']
+    return batch['callbackUrl']
+
+
 class MongoReportWorkflowStore:
     def __init__(
         self,
@@ -103,7 +109,8 @@ class MongoReportWorkflowStore:
             )
             self._indexes_ready = True
 
-    async def admit(self, request: dict, fingerprint: str, callback_url: str, *, execution_manifest=None) -> dict:
+    async def admit(self, request: dict, fingerprint: str, callback_url: str, *,
+                    evaluate_callback_url: str | None = None, execution_manifest=None) -> dict:
         request, execution_manifest = deepcopy(request), deepcopy(execution_manifest)
         await self.ensure_indexes()
         for _ in range(5):
@@ -145,6 +152,8 @@ class MongoReportWorkflowStore:
                 'createdAt': now,
                 'updatedAt': now,
             }
+            if evaluate_callback_url and evaluate_callback_url != callback_url:
+                document['evaluateCallbackUrl'] = evaluate_callback_url
             try:
                 result = await self.batches.insert_one(document)
                 if not result.acknowledged:
@@ -314,7 +323,7 @@ class MongoReportWorkflowStore:
                     'reportType': report_type,
                     'userId': batch['userId'],
                     'sessionId': batch.get('sessionId', ''),
-                    'targetUrl': batch['callbackUrl'],
+                    'targetUrl': _callback_target(batch, report_type),
                     'contentHash': artifact['contentHash'],
                     'targetRevision': batch.get('deliveryRevision', 0),
                     'status': 'pending',
@@ -330,24 +339,31 @@ class MongoReportWorkflowStore:
         # Read the latest revision and only move an unsent task forward.
         latest = await self.batches.find_one({'_id': final_report_id})
         if latest and latest.get('deliveryRevision', 0):
-            await self.deliveries.update_one(
-                {
-                    '_id': key,
-                    'status': {'$ne': 'delivered'},
-                    'targetRevision': {'$lt': latest['deliveryRevision']},
-                },
-                {
-                    '$set': {
-                        'targetUrl': latest['callbackUrl'],
-                        'targetRevision': latest['deliveryRevision'],
-                        'status': 'pending',
-                        'nextRetryAt': self.clock(),
-                    },
-                    '$unset': {'leaseToken': '', 'leaseOwner': '', 'leaseExpiresAt': ''},
-                },
-            )
+            await self._apply_delivery_revision(latest, key, report_type)
         if result.upserted_id is not None and self.on_delivery_ready is not None:
             self.on_delivery_ready()
+
+    async def _apply_delivery_revision(self, batch: dict, key: str, report_type: str) -> None:
+        revision = batch['deliveryRevision']
+        target = _callback_target(batch, report_type)
+        intent = batch.get('redrivePending') or {}
+        manual_retry = bool(intent) and not intent.get('operationId')
+        query = {
+            '_id': key, 'status': {'$ne': 'delivered'},
+            '$or': [{'targetRevision': {'$lt': revision}}, {'targetRevision': {'$exists': False}}],
+        }
+        # Fence older retargets even if this type keeps its address. A config
+        # migration must preserve the backoff or live lease at an unchanged URL.
+        while row := await self.deliveries.find_one(query, {'targetUrl': 1}):
+            old_target = row.get('targetUrl')
+            update = {'$set': {'targetRevision': revision}}
+            if old_target != target or manual_retry:
+                update['$set'].update(targetUrl=target, status='pending', nextRetryAt=self.clock(),
+                                      updatedAt=self.clock())
+                update['$unset'] = {'leaseToken': '', 'leaseOwner': '', 'leaseExpiresAt': ''}
+            result = await self.deliveries.update_one({**query, 'targetUrl': old_target}, update)
+            if result.matched_count:
+                break
 
     async def claim_delivery(self, owner: str) -> dict | None:
         await self.ensure_indexes()
@@ -454,6 +470,7 @@ class MongoReportWorkflowStore:
         operator: str,
         reason: str,
         operation_id: str | None = None,
+        evaluate_callback_url: str | None = None,
     ) -> dict:
         batch = await self.batches.find_one({'_id': final_report_id, 'userId': user_id})
         if batch is None:
@@ -471,28 +488,40 @@ class MongoReportWorkflowStore:
         }
         if operation_id is not None:
             audit['operationId'] = operation_id
+        evaluate_target = evaluate_callback_url if target_url else batch.get('evaluateCallbackUrl')
+        if evaluate_target and evaluate_target != target:
+            audit['evaluateCallbackUrl'] = evaluate_target
+        fields = {
+            'deliveryEnabled': True,
+            'reconcileNeeded': True,
+            'redrivePending': audit,
+            'updatedAt': self.clock(),
+        }
+        update = {
+            '$set': fields,
+            '$push': {'deliveryOperations': audit},
+            '$inc': {'deliveryRevision': 1},
+        }
+        if target_url:
+            fields['callbackUrl'] = target_url
+            if evaluate_callback_url and evaluate_callback_url != target_url:
+                fields['evaluateCallbackUrl'] = evaluate_callback_url
+            else:
+                # A single explicit operator override applies to every type.
+                update['$unset'] = {'evaluateCallbackUrl': ''}
         # Persist the intent before touching individual deliveries. Re-running
         # the command or the reconciler repairs interruption halfway through.
         batch = await self.batches.find_one_and_update(
             {'_id': final_report_id},
-            {
-                '$set': {
-                    'callbackUrl': target,
-                    'deliveryEnabled': True,
-                    'reconcileNeeded': True,
-                    'redrivePending': audit,
-                    'updatedAt': self.clock(),
-                },
-                '$push': {'deliveryOperations': audit},
-                '$inc': {'deliveryRevision': 1},
-            },
+            update,
             return_document=ReturnDocument.AFTER,
         )
         await self.apply_redrive(batch)
         return {'finalReportId': final_report_id, 'status': 'scheduled'}
 
     async def migrate_pending(
-        self, *, target_url: str, operator: str, reason: str, dry_run: bool = False, page_size: int = 100
+        self, *, target_url: str, operator: str, reason: str, dry_run: bool = False, page_size: int = 100,
+        evaluate_callback_url: str | None = None,
     ) -> dict:
         """Move outstanding opted-in batches, without re-generating or replaying confirmed results.
 
@@ -505,6 +534,7 @@ class MongoReportWorkflowStore:
         started_at = self.clock()
         operation_id = f'callback_migration_{uuid4().hex}'
         target = urlsplit(target_url)
+        targets = {'callbackUrl': target_url, 'evaluateCallbackUrl': evaluate_callback_url}
         result = {
             'operationId': operation_id,
             'status': 'preview' if dry_run else 'scheduled',
@@ -517,6 +547,9 @@ class MongoReportWorkflowStore:
             'failedBatches': 0,
             'errors': [],
         }
+        if evaluate_callback_url and evaluate_callback_url != target_url:
+            evaluate_target = urlsplit(evaluate_callback_url)
+            result['evaluateTargetOrigin'] = f'{evaluate_target.scheme}://{evaluate_target.netloc}'
         # Historical records without explicit delivery opt-in remain untouched.
         # Bound both admission time and the final key so ongoing generation and
         # new admissions cannot make this maintenance command loop forever.
@@ -542,6 +575,7 @@ class MongoReportWorkflowStore:
                         '_id': 1,
                         'userId': 1,
                         'callbackUrl': 1,
+                        'evaluateCallbackUrl': 1,
                         'durableVersion': 1,
                     },
                 )
@@ -566,22 +600,27 @@ class MongoReportWorkflowStore:
                     pending = [row for row in deliveries if row.get('status') in {'pending', 'retry_wait', 'sending'}]
                     # Include accepted generations whose remaining types have
                     # not entered the outbox, including a save/enqueue crash.
-                    missing_types = batch.get('durableVersion') == 1 and not set(EVALUATE_REPORT_TYPES).issubset(
-                        {row['reportType'] for row in deliveries}
-                    )
-                    if not pending and not missing_types:
-                        continue
-                    if batch.get('callbackUrl') == target_url and all(
-                        row.get('targetUrl') == target_url for row in pending
+                    missing_types = set()
+                    if batch.get('durableVersion') == 1:
+                        missing_types = set(self.expected_report_types).difference(
+                            row['reportType'] for row in deliveries
+                        )
+                    mismatched = [row for row in pending
+                                  if row.get('targetUrl') != _callback_target(targets, row['reportType'])]
+                    outstanding = missing_types.union(row['reportType'] for row in pending)
+                    if not mismatched and all(
+                        batch.get('callbackUrl') and _callback_target(batch, kind) == _callback_target(targets, kind)
+                        for kind in outstanding
                     ):
                         continue
                     result['matchedBatches'] += 1
-                    result['pendingDeliveries'] += len(pending)
+                    result['pendingDeliveries'] += len(mismatched)
                     if not dry_run:
                         await self.redrive(
                             user_id=batch['userId'],
                             final_report_id=batch['_id'],
                             target_url=target_url,
+                            evaluate_callback_url=evaluate_callback_url,
                             operator=operator,
                             reason=reason,
                             operation_id=operation_id,
@@ -604,25 +643,14 @@ class MongoReportWorkflowStore:
         artifacts = await self.artifacts.find({'finalReportId': batch['_id']}, {'reportType': 1}).to_list(length=5)
         for artifact in artifacts:
             await self.ensure_delivery(batch['_id'], artifact['reportType'])
-        # A lease token is revoked as part of retargeting. An old in-flight
-        # acknowledgement must not overwrite the newly scheduled destination.
-        await self.deliveries.update_many(
-            {
-                'finalReportId': batch['_id'],
-                'status': {'$ne': 'delivered'},
-                '$or': [{'targetRevision': {'$lt': batch['deliveryRevision']}}, {'targetRevision': {'$exists': False}}],
-            },
-            {
-                '$set': {
-                    'targetUrl': intent['targetUrl'],
-                    'status': 'pending',
-                    'targetRevision': batch['deliveryRevision'],
-                    'nextRetryAt': self.clock(),
-                    'updatedAt': self.clock(),
-                },
-                '$unset': {'leaseToken': '', 'leaseOwner': '', 'leaseExpiresAt': ''},
-            },
-        )
+        # An older outbox row can also predate the current artifact projection.
+        # Use its own type when applying the intent, just like a new enqueue.
+        remaining = await self.deliveries.find({
+            'finalReportId': batch['_id'], 'status': {'$ne': 'delivered'},
+            '$or': [{'targetRevision': {'$lt': batch['deliveryRevision']}}, {'targetRevision': {'$exists': False}}],
+        }, {'reportType': 1}).to_list(length=None)
+        for row in remaining:
+            await self._apply_delivery_revision(batch, row['_id'], row['reportType'])
         await self.batches.update_one(
             {'_id': batch['_id'], 'redrivePending': intent},
             {'$unset': {'redrivePending': ''}},

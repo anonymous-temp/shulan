@@ -17,17 +17,17 @@ DEFAULT_MIGRATION_REASON = '积压报告迁移到当前服务回调配置'
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('action', choices=['status', 'retry', 'migrate-pending'],
-                        help='migrate-pending 将积压任务迁移到当前 SHULAN_REPORT_CALLBACK_URL')
+                        help='migrate-pending 按报告类型迁移到当前配置的评估回调地址或公共回调地址')
     parser.add_argument('--user-id')
     parser.add_argument('--final-report-id')
-    parser.add_argument('--target-url', help='修正未确认任务的目标；历史批次补投时必填')
+    parser.add_argument('--target-url', help='retry 时将该批全部未确认类型统一改投到此地址，历史批次补投时必填')
     parser.add_argument('--reason', help='retry 必填；migrate-pending 可选，默认记录配置迁移原因')
     parser.add_argument('--operator', default=getpass.getuser())
     parser.add_argument('--dry-run', action='store_true', help='仅预览 migrate-pending 的范围，不修改任务')
     args = parser.parse_args(argv)
     if args.action == 'migrate-pending':
         if any(value is not None for value in (args.user_id, args.final_report_id, args.target_url)):
-            parser.error('migrate-pending uses the configured URL and does not accept user/report/target filters')
+            parser.error('migrate-pending uses configured URLs and does not accept user/report/target filters')
         args.reason = (args.reason or '').strip() or DEFAULT_MIGRATION_REASON
     else:
         if not args.user_id or not args.final_report_id:
@@ -57,11 +57,13 @@ async def run(args):
     try:
         if args.action == 'migrate-pending':
             from config.env import REPORT_CALLBACK_URL
+            from config.env import REPORT_EVALUATE_CALLBACK_URL
             from modules.report.durable import validate_callback_url
 
-            target = validate_callback_url(REPORT_CALLBACK_URL)
             result = await workflow.migrate_pending(
-                target_url=target, operator=args.operator, reason=args.reason, dry_run=args.dry_run,
+                target_url=validate_callback_url(REPORT_CALLBACK_URL),
+                evaluate_callback_url=validate_callback_url(REPORT_EVALUATE_CALLBACK_URL or REPORT_CALLBACK_URL),
+                operator=args.operator, reason=args.reason, dry_run=args.dry_run,
             )
         elif args.action == 'retry':
             result = await workflow.redrive(

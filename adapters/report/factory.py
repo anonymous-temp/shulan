@@ -148,6 +148,7 @@ def build_report_pipeline(
     from config.env import NCBI_API_KEY
     from config.env import NCBI_CONTACT_EMAIL
     from config.env import REPORT_CALLBACK_URL
+    from config.env import REPORT_EVALUATE_CALLBACK_URL
     from config.env import REPORT_GENERATION_TIMEOUT_SECONDS
     from config.env import REPORT_PRODUCT_URL
     from db.mongodb import collection_document_index
@@ -231,7 +232,7 @@ def build_report_pipeline(
             contact_email=NCBI_CONTACT_EMAIL,
             crossref_mailto=CROSSREF_MAILTO,
         ),
-        callback_client=CallbackClient(url=REPORT_CALLBACK_URL, policy=policy),
+        callback_client=CallbackClient(url=REPORT_EVALUATE_CALLBACK_URL, policy=policy),
         session_loader=load_session,
         narrative_client=None,
         narrative_client_factory=narrative_client_factory,

@@ -83,6 +83,7 @@ class DurableReportService:
         artifact_store,
         pipeline,
         callback_url: str,
+        evaluate_callback_url: str | None = None,
         heartbeat_seconds: float = 30,
         concurrency: int = REPORT_GENERATION_CONCURRENCY,
         main_agent=None,
@@ -94,6 +95,7 @@ class DurableReportService:
         self.pipeline = pipeline
         self.main_agent = main_agent
         self.callback_url = callback_url
+        self.evaluate_callback_url = evaluate_callback_url
         self.heartbeat_seconds = heartbeat_seconds
         self.concurrency = concurrency
         self.owner = f'report_generation_{uuid4().hex}'
@@ -112,6 +114,8 @@ class DurableReportService:
             request.model_dump(mode='json', by_alias=True, exclude_none=False),
             report_request_fingerprint(request),
             validate_callback_url(self.callback_url),
+            evaluate_callback_url=validate_callback_url(self.evaluate_callback_url)
+            if self.evaluate_callback_url else None,
             **({'execution_manifest': self.main_agent.execution_manifest()} if self.main_agent is not None else {}),
         )
 

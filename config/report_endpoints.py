@@ -7,6 +7,14 @@ from socket import inet_aton
 from urllib.parse import urlsplit
 
 
+def default_evaluate_callback_url(shared_url: str) -> str:
+    """Use the deployment's own origin for the versioned assessment callback."""
+    endpoint = urlsplit(shared_url)
+    if endpoint.path.removesuffix('/') == '/api/basic-health-assessment/ai-full-back/callback':
+        return endpoint._replace(path='/api/basic-health-assessment/ai-full-back-2026-11/callback').geturl()
+    return shared_url
+
+
 def validate_report_endpoint(
     value: str,
     *,

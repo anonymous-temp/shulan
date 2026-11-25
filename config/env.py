@@ -16,6 +16,7 @@ from pathlib import Path
 from loongspears.utils.env import EnvReader
 from loongspears.utils.env import load_env
 
+from config.report_endpoints import default_evaluate_callback_url
 from config.report_endpoints import validate_report_endpoint
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -270,6 +271,16 @@ REPORT_CALLBACK_URL: str = (
     )
     or ''
 )
+REPORT_EVALUATE_CALLBACK_URL: str = _env.get(
+    'REPORT_EVALUATE_CALLBACK_URL',
+    parser=lambda value: validate_report_endpoint(
+        value,
+        setting='REPORT_EVALUATE_CALLBACK_URL',
+        environment=ENVIRONMENT,
+    ),
+    default='',
+    sensitive=True,
+) or default_evaluate_callback_url(REPORT_CALLBACK_URL)
 REPORT_CALLBACK_RETRY_DELAYS_SECONDS: tuple[int, ...] = _env.get(
     'REPORT_CALLBACK_RETRY_DELAYS_SECONDS',
     parser=_parse_report_callback_delays,

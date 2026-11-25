@@ -424,11 +424,14 @@ check-env --example .env.example.production --env .env.production
 
 健康分析内部追溯使用 `SHULAN_MONGODB_COLL_HEALTH_ANALYSIS_RUNS`（默认 `health_analysis_runs`），与问卷、报告及画像事实集合隔离，无自动TTL。存储访问权限、保留与清理由部署维护方管理。MongoDB 持久确认与回读校验是成功响应的前置条件。开发期容量和120秒总期限见API及实施计划，不代表真实服务延迟承诺；本机合成客户端见 [测试规范](tests/README.md#5-真实-api-页面)。
 
-评估报告、肠道屏障报告及其后续解读共用 `SHULAN_REPORT_CALLBACK_URL`，推荐产品接口使用 `SHULAN_REPORT_PRODUCT_URL`；两个地址均须显式配置，代码不提供测试地址兜底。生产部署使用以下配置（具体地址以正式接收方确认为准）：
+部署时须配置公共回调地址 `SHULAN_REPORT_CALLBACK_URL` 和推荐产品地址 `SHULAN_REPORT_PRODUCT_URL`。评估报告（`type=evaluate`）优先使用 `SHULAN_REPORT_EVALUATE_CALLBACK_URL`。旧部署仅配置公共地址时，若公共路径为 `/api/basic-health-assessment/ai-full-back/callback`，评估回调沿用该域名、端口和查询参数，路径切换为 `/api/basic-health-assessment/ai-full-back-2026-11/callback`。自定义公共路径及本地模拟接收端继续使用各自的原地址。干预方案、临床医嘱、诊断意见、报告解读和肠道屏障均使用公共地址。
+
+生产环境配置示例（具体地址以接收方确认为准）
 
 ```dotenv
 SHULAN_ENVIRONMENT=production
 SHULAN_REPORT_CALLBACK_URL=https://m.slmc.top/api/basic-health-assessment/ai-full-back/callback
+SHULAN_REPORT_EVALUATE_CALLBACK_URL=https://m.slmc.top/api/basic-health-assessment/ai-full-back-2026-11/callback
 SHULAN_REPORT_PRODUCT_URL=https://m.slmc.top/api/gut-product/catalog
 ```
 
