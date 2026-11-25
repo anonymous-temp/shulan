@@ -19,53 +19,51 @@ python scripts/replay_assessment_presentation.py RUN_DIR --output OUT_DIR
 
 ## 2. 通用约定
 
+版式跟随甲方示例报告：每一节是一张固定列的表格，一行回答一个问题；我们只在单元格里加小图（范围条、分档刻度、评分条、丰度条）并保留集群关系图和三阶段路线图。
+
 ### 2.1 字段路径写法
 
-`data.chapters[]` 按 `code` 取各章：`overview`、`symptoms`、`clinical`、`microbiome`、`clusters`、`conclusion`。下文 `overview.systems[]` 指 `code=overview` 那一章的 `content.systems[]`；`introduction.*`、`appendices.*` 指 `data` 下的同名对象；`subject.*`、`sample.*` 指回调顶层。
+`data.chapters[]` 按 `code` 取各章：`overview`、`symptoms`、`clinical`、`microbiome`、`clusters`、`conclusion`。下文 `overview.systems[]` 指 `code=overview` 那一章的 `content.systems[]`；`introduction.*`、`appendices.*` 指 `data` 下的同名对象。
 
-### 2.2 状态分档 `level`（全报告统一）
+### 2.2 状态与优先级标签
 
-| `level` | 显示 | 圆点/色块 | 标签底色 / 文字 | 图标 |
-|---|---|---|---|---|
-| `focus` | 重点关注 | `#ec835a` | `#fbe7dc` / `#8a3413` | 实心圆内感叹号 |
-| `borderline` | 亚临床边界 | `#fab219` | `#fdf2d6` / `#6a4500` | 圆环加中心点 |
-| `normal` | 稳健达标 | `#0ca30c` | `#e6f3e4` / `#1c5c1c` | 对勾 |
-| `notTested` | 未检测 | `#9aa09c` | `#eceeec` / `#3f423f` | 短横 |
-| `null` | 不分级 | `#7d837f` | 同未检测 | 不显示标签 |
+体格行、系统、分系统和表格行的 `status` 是五档文字之一（或“未检测”），`level` 是对应的四档取值。标签按 `status` 画，颜色永远与图标和文字同时出现。
 
-- 颜色永远与图标和文字同时出现，不单靠颜色区分（色盲与黑白打印可读）。
-- 优先级标签：P0 优先医疗排查（`#f9e1e0` / `#9a2121`，三角图标）、P1 核心干预（同 `focus` 配色）、P2 协同调理（`#e7f0ed` / `#0d5f52`）、P3 随访巩固（同 `notTested`）。
-- 前言末尾放一次图例：四档状态、参考范围条样例、优先级。
-
-### 2.3 新字段与退化
-
-规格 2.7 节的字段只追加、可为 `null`。前端读到字段就用；字段缺失（旧回调或解析不了）时，可按 `modules/report/assessment_chart_fields.py` 的同一规则从 `value`、`unit`、`referenceRange`、状态文字解析；解析不了就不画图，只显示原文数值和文字。
-
-| 对象 | 字段 | 说明 |
+| `status` | `level` | 标签 |
 |---|---|---|
-| 检测行（临床） | `valueNumber`、`referenceLow`、`referenceHigh`、`referenceKind`（`range`/`upper`/`lower`/`qualitative`）、`level`、`direction`（`up`/`down`/`null`）、`target{low, high, text, evidenceRefs}` | 由临床视图给出；`target` 只在目标表条目适用时出现 |
-| 菌群评分行 | `score`、`bands[{label, low, high}]`、`level`、`direction` | `bands` 取自报告说明（如 偏低 0–25、正常 25–75、偏高 75–100）；开放端为 `null` |
-| 菌群丰度行 | `abundance`、`referenceLow`、`referenceHigh`、`level`、`direction` | 百分比数值 |
-| 菌群宏观指数 | `valueNumber`、`referenceLow`、`referenceHigh`、`referenceKind`、`bands`、`level`、`direction`；肠龄另有 `actualAge`、`ageDifference` | 总分的 `level` 随其失衡分度 |
-| 系统 | `level`、`anchors[{name, value, unit, direction, level}]`（最多 6 项）、`moreCount` | 五个固定系统总是列出 |
-| 优先事项（1.3） | `overview.priorityFindings[]{code, name, priority, text, evidenceRefs, items[]}`，`code` 固定为 `urgent`/`routine`/`gaps`；`items[]{code, name, priority, timeframe{text, days}, department, checks[], basisRows[], text, reason?, ruleId?, clusterId?}` | 无检测盲区时不返回 `gaps` |
-| 分层（6.1） | `conclusion.layers[]{code, name, text, evidenceRefs, clusterIds[]}`，`code` 固定为 `clinical`/`core`/`maintenance` | |
-| 稳健基线（3.6） | `clinical.baselineSummary`、`baselineSummaryEvidenceRefs` | |
-| 检查建议 | `clusters[].clinicalSignals[].kind = 'advice'` | 旧回调用状态标记识别，显示文字统一为“检查建议” |
-| 趋势 | `trends[].points[{date, value}]` | 已有 |
+| 重点关注 | `focus` | 橙红底（`#fbe7dc` / `#8a3413`），圆内感叹号 |
+| 亚临床边界 | `borderline` | 黄底（`#fdf2d6` / `#6a4500`），圆环加中心点 |
+| 高于理想值 | `borderline` | 橙色描边，上三角 |
+| 低于理想值 | `borderline` | 蓝色描边，下三角 |
+| 稳健达标 | `normal` | 绿底（`#e6f3e4` / `#1c5c1c`），对勾 |
+| 未检测 | `notTested` | 灰底（`#eceeec` / `#3f423f`），短横 |
+
+`status` 是其他文字时（如菌群报告的“I 度失调”“低于实足年龄”），画 `level` 对应的标签，原文字放在标签下。旧回调里“重点关注：项目……”这类状态只取开头的档名。优先级标签：P0 优先医疗排查、P1 核心干预、P2 协同调理。
+
+### 2.3 追加字段与退化
+
+追加字段见内容规格第 7 节和 API 文档。读到字段就用；旧回调没有这些字段时按下表退化。
+
+| 位置 | 优先使用 | 没有时 |
+|---|---|---|
+| 1.1、第三章的“理想目标” | 行组的 `comparisonReference`，显示为“理想：……” | 各成员的 `target.text` |
+| 1.2 核心异常与关键实测值 | `systems[].keyFindings` | `anchors[]` 画成值标签 |
+| 2.1 两栏证据 | `symptoms[].clinicalEvidence`、`microbiomeEvidence` | `clinicalSignals[]`、`microbiomeSignals[]` 画成值标签 |
+| 2.2 小标题 | `symptoms[].interpretationTitle` | 主诉名称 |
+| 5.1 两类证据 | `clusters[].clinicalEvidence`、`microbiomeEvidence` | 对应的信号值标签 |
 
 ### 2.4 不显示的内容
 
 - 不显示“部分报告”提示，完整性由回调 `status` 与 `partialReasons` 表达。
-- 报告末尾不加免责声明；不显示“未形成解读”“暂无可展示的解读”这类内部状态，缺内容时显示本文各节的缺失说明或直接省略该格。
-- 表头和标签不出现“您的”。问卷原题作标签时去掉“您”，并改成短语（如“平时运动频率”）。
-- 程序生成的标签去掉“原报告”“原件”“主检”等后台用语（档名、病原评估名称）。模型撰写的正文不在渲染端改写。
-- 无出处的“模板比较目标”（`comparisonReference`）不显示；目标区间只画 `target`。
+- 报告末尾不加免责声明；不显示内部状态和英文代码。缺内容时显示回调给出的说明句，或省略该部分。
+- 表头和标签不出现“您”。程序生成的行标签已在回调里去掉“您”和后台用语；模型撰写的正文不在渲染端改写。
+- 理想目标只显示数值，不加出处类别标注，旁边不放文献角标。文献角标只跟在自身 `evidenceRefs` 非空的文字块之后；附录按编号连续列出正文标注的文献和各项理想目标的出处（`rows[].target.evidenceRefs`），并用一句话说明没有标注编号的文献是理想目标的依据。
 
 ### 2.5 打印
 
-- A4 纵向，页边距 16/15/18 mm，页码居中；正文 10pt，标题宋体（Noto Serif CJK SC），正文与数字黑体（Noto Sans CJK SC），表格与刻度数字用等宽数字。
-- 每章另起一页；卡片、范围条行、矩阵行、路线图阶段不跨页；小标题不落在页底。
+- A4 纵向，页码居中；标题宋体（Noto Serif CJK SC），正文与数字黑体（Noto Sans CJK SC）。
+- 各章连续排版，不另起一页。表格可以跨页，表头在每页重复；短行不拆开，成员不少于 5 项或文字超过 220 字的行允许跨页；标题不落在页底。
+- 单元格内的小图用行内块（`inline-block`）。Chrome 不会拆分含有块级 SVG 的单元格，用块级图会留下大片空白。
 
 ## 3. 通用组件
 
@@ -75,8 +73,8 @@ python scripts/replay_assessment_presentation.py RUN_DIR --output OUT_DIR
 
 - 坐标域：`range` 取 [低−0.55×宽, 高+0.55×宽]；`upper` 取 [0, 上限×1.6]；`lower` 取 [下限−0.6×|下限|, 下限+0.9×|下限|]。再并入实测值与目标端点，两端各留 4%；全部为非负量时下界不低于 0。实测值超出参考 4 个区间宽时截断坐标，在边缘画小三角表示越界。
 - 画法：灰色轨道；参考带（浅绿 `#cfe6d8`、描边 `#6fa688`）；目标带画在轨道下方的深青细条（`#0d5f52`）；实测点为按 `level` 着色的圆点，外加白色描边与细外圈；参考带两端写刻度数值（带太窄时两数字分别左右对齐）。
-- 行布局：名称（日期、计算值注记）｜数值+单位+方向箭头+状态标签（只对 `focus`/`borderline` 显示标签）｜范围条｜“参考 原文区间”“目标 文本 [文献号]”。
-- 缺失：`referenceKind=qualitative` 或数值解析不了，改为一行文字（原文结论）；有数值无参考写“无参考区间”；有 `target` 无临床参考时只画目标带。
+- 位置：放在表格“实测数值 / 实测结果”一格里，每个成员一行：名称、数值、单位、方向箭头，下方一条小范围条；单位按印刷习惯显示（`kg/m2` 写作 kg/m²，`10E9/L` 写作 ×10⁹/L），回调里的 `unit` 保持原样；参考范围和理想目标的文字在相邻的“参考”一格。
+- 缺失：`referenceKind=qualitative` 或数值解析不了时只写原文结论，不画条；有 `target` 而没有临床参考范围时只画目标带。
 
 ### 3.2 分档刻度条（BandScale）
 
@@ -84,15 +82,15 @@ python scripts/replay_assessment_presentation.py RUN_DIR --output OUT_DIR
 
 ### 3.3 评分条（ScoreBar，4.4 用）
 
-0–100 固定坐标，分档底色同 3.2，不写字；每个通路组上方用一行色块图例写出各分档（同组分档不同的分别列出）。两栏紧凑排布：名称｜条｜分数+箭头。偏离项排在前面，名称加粗。
+0–100 固定坐标，分档底色同 3.2，不写字。放在 4.4 表格“异常子项及评分”一格里，每个异常子项一行：名称｜条｜分数加箭头；正常子项只在相邻一格列名称和分数，并写出正常档的区间（“基准 25–75”）。
 
 ### 3.4 丰度偏离条（AbundanceBar，4.3 用）
 
-全报告共用一条对数轴 0.0001%–100%（每十倍一条细刻度），组头放一行刻度标签。参考带为 [`referenceLow`, `referenceHigh`]，下限为 0 时从轴原点开始。实测 0 画空心圆在原点，数值旁注“未检出”。
+全报告共用一条对数轴 0.0001%–100%（每十倍一条细刻度），放在 4.3 表格“异常菌种 / 基因及方向”一格里各成员的右侧。参考带为 [`referenceLow`, `referenceHigh`]，下限为 0 时从轴原点开始。实测 0 画空心圆在原点，数值旁注“未检出”。
 
 ### 3.5 其他
 
-- 值标签（ValueTag）：名称 + 数值 + 单位 + 方向箭头，左侧小圆点与浅底按 `level` 着色。用于系统锚点、主诉矩阵、集群证据、行动卡片依据。
+- 值标签（ValueTag）：名称 + 数值 + 单位 + 方向箭头，左侧小圆点与浅底按 `level` 着色。用于追加字段缺失时的退化显示（系统锚点、主诉证据、集群证据）和 1.3 事项的小标签。
 - 趋势小折线：`points` 至少 2 个可解析数值才画；首尾点标数值和日期。
 - 方向箭头为绘制的小图形（不用字符），并带“偏高/偏低”无障碍文字。
 
@@ -100,91 +98,48 @@ python scripts/replay_assessment_presentation.py RUN_DIR --output OUT_DIR
 
 ### 封面与前言
 
-| 字段 | 组件 | 画法要点 / 缺失时 |
-|---|---|---|
-| `subject.name/gender/age`、`sample.sampleId/method` | 身份卡（两列键值） | 档案编码用 `sampleId`，`method` 显示为“检测技术” |
-| `introduction.dataTiming.clinicalDate/clinicalInstitution` | 身份卡 | 机构缺失只写日期 |
-| `dataTiming.microbiomeSampleDate`，缺失时 `microbiomeReceivedDate`、`microbiomeReportDate` | 身份卡 + 资料时效条 | 无采样日时用收样日并注明“采样日期未注明”；间隔月数 = 天数/30.44，≤6 个月写“属同一健康周期，可交叉印证”，>6 个月写“结论以较新的资料为准”；任一日期缺失则不显示时效条 |
-| `introduction.preface`、`readingGuide[]` | 段落 + 编号列表 + 图例 | 固定文字 |
+身份栏：`subject.name/gender/age`、档案编码 `sample.sampleId`；临床体检日期 `introduction.dataTiming.clinicalDate`；菌群采样日期，缺失时用收样日期并注明；一行资料时效（间隔月数，6 个月内写同一健康周期）。然后是 `introduction.preface` 与 `readingGuide[]`。不放图例。
 
 ### 第一章
 
-| 字段 | 组件 | 画法要点 / 缺失时 |
+| 节 | 字段 | 表格与画法 |
 |---|---|---|
-| `overview.bodySummary` | 导语段 | |
-| `overview.bodyGroups[]{name, summary, rows[]}` | 分组面板 + 每行一条参考范围条 | 组头状态取成员最重档；组 `summary` 放在条下；无体格资料写“本次资料未包含体格测量。” |
-| `overview.summary` | 导语段 | |
-| `overview.systems[]{code, name, level, anchors[], moreCount, summary}` | 系统状态卡片（两列网格） | 表头色块按 `level` 着色并带状态标签；锚点为值标签，`moreCount>0` 写“另有 N 项”；定论取 `summary` 第一段。`notTested` 写“本次资料未包含该系统的检查项目。”且不写定论。有“其他器官与专项检查”异常时追加第六张卡 |
-| `overview.priorityFindings[code=urgent]` | 行动卡片（P0 红框） | 本部分 `text` 作导语；每个 `items[]` 一张卡：优先级标签、事项名、时限（描边小标签）、科室、需完成检查、依据（`basisRows` 画值标签），有 `clusterId` 时链接到第五章集群。卡内 `text` 由上述字段拼成，只在时限、科室、检查都缺失时显示。无事项时显示本部分 `text`（缺失说明句，如“本次未发现需优先就医排查的结果。”） |
-| `overview.priorityFindings[code=routine]` | 随访日程表 + 事项清单 | `timeframe.days` 可用的事项进日程表：列为首月、3 个月、6 个月、12 个月，按天数落点（≤31/92/183/366 天），首次实心点、之后按间隔重复为空心点；没有天数的事项列为“名称｜说明”清单。无事项时显示本部分 `text` |
-| `overview.priorityFindings[code=gaps]` | 检测盲区清单（项目｜理由） | 只在有事项时返回和显示 |
-| 旧回调（`priorityFindings` 无 `items`） | 行动卡片 | P0 集群画成行动卡（依据取其临床信号，“检查建议”取 `kind=advice` 的信号原文）；其余 `priorityFindings[]{name, action}` 画成文字卡 |
-| `overview.graphHub`、`graphClusterIds[]`、`clusters.clusters[]{id, name, priority}`、`graphSummary` | 集群关系图（SVG） | 左侧中心块：主题名 + 最多 3 个关键指标（BMI、内脏脂肪面积取自 `bodyGroups`，菌群总分与平衡状态取自 4.2）；右侧每个集群一个节点（编号、名称、优先级），节点底色按优先级；字号 12–15px。无集群写“本次各系统未形成需集中干预的失衡方向。”，不画图 |
+| 1.1 | `overview.bodySummary`、`bodyGroups[]` | 导语段；一张表：评估指标（`name`）｜实测数值（`rows[]`：名称、数值、单位、方向箭头，数值型且有参考范围或目标时下方一条小范围条）｜参考基准 / 理想目标（各成员 `referenceRange`，“理想：`comparisonReference`”）｜状态（`status`）｜生理与代谢意义（`summary`）。没有体格资料时只显示 `bodySummary` 的说明句 |
+| 1.2 | `overview.summary`、`systems[]` | 导语段；一张表：系统（`name`）｜综合状态（`status`）｜核心异常与关键实测值（`keyFindings`）｜当前阶段评估结论（`summary`）。`level = notTested` 的系统显示“未检测”和短横 |
+| 1.3 | `overview.priorityFindings[]` | `urgent`：“临床优先排查”提示框，每个事项为标题、对应集群、时限 / 科室 / 需完成的检查三组小标签和 `text` 段落；没有事项时显示该部分的 `text`。`routine`：表：发现｜科室｜复查间隔｜说明。`gaps`：表：建议补查｜依据；没有事项时不返回也不显示 |
+| 1.4 | `graphHub`、`graphClusterIds[]`、第五章的 `clusters[]`、`graphSummary` | 集群关系图（中心块为主题和最多 3 个关键指标，右侧为各集群节点，按优先级着色）；每个集群一行（编号、名称、优先级标签）；`graphSummary` 段落。没有集群时只显示 `graphSummary` |
 
 ### 第二章
 
-| 字段 | 组件 | 画法要点 / 缺失时 |
-|---|---|---|
-| `symptoms.symptomsLead` | 导语段 | |
-| `symptoms.symptoms[]{code, name, value, history, clinicalSignals[], microbiomeSignals[]}` | 主诉×证据矩阵 | 四列：主诉（编号块+名称）｜表现、持续与加重情境（`history` 按“问句：答案”拆行，问句改短标签；来源 B 的信号也放这一列）｜临床信号（值标签）｜菌群与代谢证据（值标签）。单元格只放短语和数值 |
-| `symptoms[].interpretation`、信号的 `interpretation` | 2.2 条目（名词性小标题 + 段落） | |
-| `symptoms.symptomSummary` | “综合印证”浅底块 | |
-| 无主诉 | | 2.1 写“本次未记录主诉症状。”；2.2 标题改为“主要异常与日常感受的关联”，有 `symptomSummary` 就显示，否则写“本次未记录主诉症状，本节不作对照说明。” |
+`symptomsLead` 导语；一张表：主诉（编号块加 `name`）｜持续时间与加重情境（`history`）｜临床检验与影像关联信号（`clinicalEvidence`）｜菌群与功能代谢关联证据（`microbiomeEvidence`）。2.2 每个主诉一条：小标题（`interpretationTitle`）加 `interpretation` 段落；最后是“综合印证”提示框（`symptomSummary`）。没有主诉时只显示 `symptomsLead` 与 `symptomSummary` 两句说明。
 
 ### 第三章
 
-| 字段 | 组件 | 画法要点 / 缺失时 |
-|---|---|---|
-| `clinical.clinicalGroups[code∈cardiometabolic, organMetabolism, hematologyImmune, endocrineMusculoskeletal].templateRows[]{name, rows[], summary, evidenceRefs}` | 分组面板（3.1–3.4） | 组头状态取成员最重档；`focus`/`borderline` 与未分级但有数值的行逐条画参考范围条；`normal` 成员压成一行“参考范围内：名称 数值 单位；…”；其余无数值记录压成“其他记录”一行；`summary` 放下方。整组无数据不出小节标题，章首写“本次资料未包含……类检查，相应小节从略。” |
-| `clinical.specialtyFindings[]` | 专项面板（3.5） | 按名称“ · ”前的设备名分组；`otherClinical` 组的行放本节末“其他检查”；无数据写“本次资料未包含设备专项检测与筛查项目。” |
-| `clinical.trends[]{name, direction, points[], interpretation}` | 趋势小折线卡片 | 无可比结果写“本次资料未包含可比较的历次结果。” |
-| `clinical.baselineSummary`、`clinical.normalBaselines[]{name, rows[]}` | 稳健基线：说明段落 + 一行清单 | 对勾图标 + 组名 + 名称数值 |
+- `clinical.summary` 导语。每个 `clinicalGroups[]` 一节（3.1 起顺序编号，回调已按糖脂、肝胆、血液、内分泌、其他排序），一张表：检验 / 影像项目（`templateRows[].name`）｜实测结果（`rows[]`，影像文字可换行，数值型加小范围条）｜临床参考范围（理想目标）（各成员参考范围用缩写加区间，如“TG 0.00-1.70”；“理想：`comparisonReference`”）｜状态｜解读（`summary`）。
+- 表后：有 `calibrationNote` 时放“数据校准说明”提示框；然后是分系统的 `summary` 段落。
+- 其后依次是“本次未纳入的专项检测”（`specialtySummary`；`specialtyFindings` 非空时列“其他专项记录”）和“历年指标演变趋势与已确认稳健安全基线”（`trendSummary`、有 `trends` 时画小折线；“已确认的稳健基线”提示框含 `baselineSummary` 与 `normalBaselines[]` 的名称数值清单）。
 
 ### 第四章
 
-| 字段 | 组件 | 画法要点 / 缺失时 |
+| 节 | 字段 | 表格与画法 |
 |---|---|---|
-| `microbiome.sampleContext`、`sampleSummary`、`fermentationSummary` | 章首浅底块 | 采样说明未提到抗生素、泻药、益生菌时补一句“采样前抗生素、泻药与益生菌使用情况未记录。” 整章无菌群数据写“本次资料未包含肠道菌群检测。” |
-| `microbiome.digestiveContext[]{name, rows[], symptomContext[], summary}` | 分组面板（4.1） | 同第三章面板；本人报告放组头下一行 |
-| `microbiome.structureGroups[].rows[]` | 宏观指数行（4.2） | 有 `bands` 用分档刻度条；有简单参考用参考范围条；名称含“评分/总分”且无参考时画 0–100 轴；肠龄画年龄轴并标出实足年龄刻线，右侧写“与实足年龄相差 ±N 岁”；分类值（平衡状态、肠型）只写值和状态标签。同一丰度行在 4.3 也出现时只在 4.3 画一次 |
-| `microbiome.organismGroups[]{rows[], normalBaseline{count, rows[], names[], undetectedRows[]}, summary}` | 功能菌群面板（4.3） | 面板判定行（如“有益菌 异常”）放组头下的状态标签；丰度行画丰度偏离条；基因序列与菌群关联评估画值标签；正常项只计数：“N 项在参考范围内 示例（最多 6 个）等”；未检出序列信号另起一行 |
-| `microbiome.functionalGroups[]{name, rows[], normalBaseline.rows[], panelStates[], summary}` | 评分条两栏（4.4） | 组数按实际；组头写“N 项中 M 项偏离”；`panelStates` 一行；分档色块图例；节首一句评分说明（基因预测的 0–100 分相对评分，不等同于体内营养素水平） |
-| `microbiome.riskSummary` | 本章风险小结段落 | 末尾固定一句：“菌群风险模型的分值反映样本在模型中的位置，健康管理以临床检查结果为准。” |
+| 章首 | `overviewSummary`、`sampleSummary`、`fermentationSummary` | 导语段；“样本基线与发酵耐受”提示框 |
+| 4.1 | `digestiveContext[]` | 表：消化道环节（`name`）｜相关检查结果（`rows[]`）｜对菌群定植与消化吸收的影响（`summary`） |
+| 4.2 | `structureGroups[]`、`structureSummary` | 表：评估维度｜检测结果（有 `bands` 画分档刻度条，肠龄画实足年龄刻度）｜参考基准｜状态｜解读（`summary`）；表后 `structureSummary` |
+| 4.3 | `organismGroups[]` | 表：类别｜异常菌种 / 基因及方向（面板判定标签；异常成员带数值、箭头和对数丰度条）｜已确认正常的部分（`normalBaseline` 的数量与几个示例）｜功能影响与调节意义（`summary`） |
+| 4.4 | `functionalGroups[]` | 表：代谢通路｜异常子项及评分（0–100 评分条）｜通路内正常子项｜与临床指标及症状的交叉印证（`summary`） |
+| 章末 | `riskSummary` | 段落 |
+
+没有菌群资料时只显示 `overviewSummary` 的说明句。
 
 ### 第五章
 
-| 字段 | 组件 | 画法要点 / 缺失时 |
-|---|---|---|
-| `clusters.clusterSummary` | 导语段 | |
-| `clusters.clusters[]{id, name, priority, clinicalSignals[], microbiomeSignals[], interpretation, action}` | 集群卡片 | 表头：编号块、名称、优先级标签；三栏证据：临床与影像锚点（值标签）｜微生态与代谢锚点（值标签）｜相关生活因素（来源 B 的问答、`lifestyleFactors[].clusterIds` 含本集群的因素名）。下方依次为“健康影响”“处理方向”（`action`，缺失时取 `conclusion.priorities[]` 同编号的 `action`）、“检查建议”（`kind=advice` 的信号原文，已在处理方向中出现的不重复）。某栏无内容写“本次未见相关记录”；某段无内容直接省略。无集群写“未形成需集中干预的失衡集群。” |
-| `clusters.lifestyleSummary`、`lifestyleFactors[kind∈background, history, trigger]` | 先天背景与触发事件 | 无内容省略 |
-| `clusters.lifestyleFactors[]{name, value, interpretation, clusterIds[]}` | 生活因素×集群矩阵 | 五个固定维度：饮食与进餐、饮酒与饮品、睡眠、运动与久坐、精神压力与口腔护理（按因素名称关键词归类，归不进的放“其他生活因素”）；列：行为特征（问答拆行）+ 每个集群一列，相关画实心圆点。无记录的维度写“未记录”。表下列出各因素的解读 |
-| `clusters.lifestyleRecognition[]{name, text}` | 健康认知校准浅底块 | 无内容省略 |
+`clusterSummary` 导语。每个集群：标题行“集群 C1：`name`”加优先级标签，然后四个小节：临床与影像证据（`clinicalEvidence`）、菌群与代谢证据（`microbiomeEvidence`）、对身体的影响与走向（`interpretation`）、处理方向（`action`）。5.2：`lifestyleSummary` 段落；表：生活方式维度（`name`）｜行为特征（`value`）｜正在维持的异常与对应集群（`interpretation` 加 `clusterIds` 标签）；“健康认知校准”提示框（`lifestyleRecognition[]` 编号列表）。
 
 ### 第六章
 
-| 字段 | 组件 | 画法要点 / 缺失时 |
-|---|---|---|
-| `conclusion.summary` | 导语段 | |
-| `overview.priorityFindings[].items[]` + `conclusion.layers[]{code, name, text, clusterIds}` | 三阶段路线图（三栏）+ 分层说明 | 首月（第一层级 临床专科排查与随访）：1.3 的全部事项（盲区事项写“补查 项目”）；90 天（第二层级 核心代谢与肠道微生态干预）与持续（第三层级 营养储备与长期健康维护）：按 `layers[].clusterIds` 放入第五章集群（编号、名称、优先级）。已作为 1.3 行动卡的集群不重复。`layers` 未给出集群时按优先级归入（P0 首月、P1 90 天、P2/P3 持续）。有事项的阶段，其 `layers[].text` 放在路线图下方的“分层说明”；没有事项的阶段在栏内显示该层 `text`（缺失说明句），没有时用“本次未发现需在首月内完成的专科排查或随访事项。”等默认句 |
-| `conclusion.managementDirections[]` | 方向块 | 带 `items[]` 的为“MTPN 个性化功能靶向配方方向”，`code=lifestyle` 的为“LSMI 去诱因生活方式干预方向”；有 P0 事项时块首写“先完成第一层级的专科排查，再开始配方与生活方式干预。”；都没有写“本次资料不足以形成配方与生活方式干预方向。” |
-| `appendices.referenceLiterature[]` | 参考文献附录 | 只列正文引用到的编号 |
+`conclusion.summary`；6.1 三阶段路线图（首月、90 天、持续三栏，来自 `layers[]`，各栏显示该层 `text` 和 `clusterIds` 标签，文字只出现一次）；6.2 `managementDirections[]`：MTPN 的 `items[]`（名称加文字）及其 `text` 提示，LSMI 的 `text`。附录为 `appendices.referenceLiterature[]` 中被正文标注或被理想目标引用的条目，编号连续。
 
-## 5. 程序判定规则摘要
+## 5. 资料缺失时
 
-- 临床行（字段缺失时的退化）：状态以“重点关注”开头或阳性 → `focus`；数值越出参考区间 20% 以上，或越界且状态为肥胖、过量 → `focus`；轻度越界或状态为偏高、偏低、有异常所见、结节等 → `borderline`；在参考区间内 → `normal`；无法判断为 `null`。临床视图给出 `level` 后以其为准。
-- 菌群行：失衡分度（I 度及以上“失调”）→ `focus`；单项丰度、评分、指数越出参考或分档非正常 → `borderline`；在参考内或分档为正常、丰富、健康 → `normal`；总分随其失衡分度；肠龄高于实足年龄 → `borderline`。
-- 系统：成员（第三章对应组的原子行，糖脂系统另含体格；菌群系统为宏观指数与功能菌群行）中最重的一档；无成员为 `notTested`。锚点取异常成员，按“重点关注优先、审阅单元引用过的优先、具体菌名优先于面板判定”排序。
-
-## 6. 样版截图说明
-
-样版 PDF 与截图放在仓库外 `_shulan_review/runs_v2/sample_render/`（含真实受检者资料，不入仓库）：
-
-1. `shot_overview.png`（48 岁男性实例第一章 1.2–1.3）：五张系统状态卡片，表头色块按分档着色（重点关注橙、亚临床边界黄），卡内是带数值和方向的锚点标签与“另有 N 项，见第三章/第四章”；其下为 1.3 优先排查的 P0 行动卡片（深红优先级标签、依据标签、链接到集群）与常规专科随访清单。
-2. `shot_graph_ranges.png`（第一章 1.4 与第三章 3.1）：集群关系图左侧为关键指标（BMI、内脏脂肪面积、菌群总分与失衡分度），右侧集群节点为白底描边、编号色块按优先级区分、名称可两行、第二行列出优先级与两项关键异常；3.1 中异常项各一条参考范围条（浅绿参考带、按状态着色的实测点、带边刻度），参考范围内的项目压成一行清单。
-3. `shot_microbiome.png`（第四章 4.3–4.4）：丰度对数轴偏离条（共用刻度，0% 画空心圆）、正常菌只计数并举例；4.4 每个通路组上方是分档色块图例（偏低蓝、正常绿、偏高暖色），下方两栏 0–100 评分条，偏离项在前。
-
-## 7. 尚未接入
-
-- 临床行结构化字段（`valueNumber` 等与 `target`）由临床视图实现；样版已按“有就画、没有就从字符串解析”接入。1.3 事项的 `timeframe`、`department`、`checks` 依赖规划契约给出，缺失时只显示事项名与说明。
-- 集群对象尚未在投影里追加 `level`、`anchors`、`moreCount`；样版暂由集群自身的信号画值标签，颜色取各信号的 `level`。
+样版对任何为空的列表和为 `null` 的文字都不报错：有说明句就显示说明句，否则省略该部分。没有菌群资料时，第四章只显示 `overviewSummary` 的说明句（`digestiveContext` 为空时不画 4.1），2.1 的表格不画菌群一栏；主诉或集群的某类证据文字为 `null` 时，表格格子显示“—”，集群卡片省略该小节。已用以下情形检查过：没有主诉；没有临床资料；没有集群和生活诱因；没有菌群资料；没有优先排查事项；全部文字为空；以及上一版的回调（没有追加字段，按 2.3 退化）。

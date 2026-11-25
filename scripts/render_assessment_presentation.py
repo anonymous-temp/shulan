@@ -1,15 +1,18 @@
 """Render the six-chapter assessment (``assessment.v2``) as the printable sample.
 
-This is the reference rendering given to the frontend team. It reads only the
-callback fields described in ``wiki/report-assessment-v2-render.md`` and draws
-each section with the component named by the content spec: range bars, system
-cards, action cards and a follow-up schedule, a relationship graph, an evidence
-matrix, macro-index and abundance scales, 0-100 score bars with their bands,
-cluster cards, a lifestyle-by-cluster matrix and a three-stage roadmap.
+This is the reference rendering given to the frontend team. Its layout follows
+the client's example report: each section is a plain table in which one row
+answers one clinical question, with the client's fixed columns, callout boxes
+and reading order. The only additions are small inline charts inside the
+cells (reference range bars, grade bands, log-abundance bars and 0-100 score
+bars), the cluster relation graph and the three-stage roadmap.
 
-It adds no medical judgement. Levels, bands and directions come from the
-callback; when a field is absent the same deterministic parser that produced
-it is applied to the row's own strings (``modules.report.assessment_chart_fields``).
+It adds no medical judgement. Statuses, levels, bands and directions come from
+the callback; when a field is absent the same deterministic parser that
+produced it is applied to the row's own strings
+(``modules.report.assessment_chart_fields``). Every list may be empty and every
+text may be null; an empty part is skipped or replaced by the statement the
+callback supplies.
 """
 
 from __future__ import annotations
@@ -28,7 +31,6 @@ from urllib.parse import urlsplit
 from modules.report import assessment_chart_fields as charts
 from modules.report.assessment_callback_view import ASSESSMENT_SECTIONS
 from modules.report.assessment_microbiome_view import annotate_microbiome_chart_fields
-from modules.report.assessment_microbiome_view import organism_assessment_display_group
 from modules.report.assessment_presentation import _SYSTEMS
 from modules.report.assessment_reading_labels import clinical_observation_display_name
 
@@ -39,6 +41,7 @@ main.assessment{
   --accent:#0d5f52;--accent-wash:#e7f0ed;--band:#cfe6d8;--band-edge:#6fa688;
   --focus:#ec835a;--focus-ink:#8a3413;--focus-wash:#fbe7dc;
   --borderline:#fab219;--borderline-ink:#6a4500;--borderline-wash:#fdf2d6;
+  --above:#d9822b;--above-ink:#7a4108;--below:#3f7fc9;--below-ink:#1d4a85;
   --normal:#0ca30c;--normal-ink:#1c5c1c;--normal-wash:#e6f3e4;
   --untested:#9aa09c;--untested-ink:#3f423f;--untested-wash:#eceeec;
   --p0:#d03b3b;--p0-ink:#9a2121;--p0-wash:#f9e1e0;
@@ -49,100 +52,124 @@ main.assessment{
 .assessment ::selection{background:#cfe3dd}
 .assessment h1,.assessment h2,.assessment h3{font-family:var(--serif);font-weight:700;letter-spacing:.01em;
   text-wrap:balance}
-.assessment h2{font-size:24px;line-height:1.35;margin:0 0 14px;padding:0 0 10px;border-bottom:1.5px solid var(--ink)}
-.assessment h3{font-size:18px;line-height:1.45;margin:32px 0 10px}
-.assessment h4{font-size:15.5px;line-height:1.5;margin:0;font-weight:650}
-.assessment h5{font-size:12.5px;line-height:1.5;margin:0 0 6px;font-weight:650;color:var(--muted);letter-spacing:.04em}
-.assessment p{margin:0 0 9px}
-.assessment section.chapter{padding-top:34px}
-.assessment .as-lead{font-size:15.5px;line-height:1.8;margin:0 0 14px}
+.assessment h2{font-size:23px;line-height:1.35;margin:0 0 12px;padding:0 0 8px;border-bottom:1.5px solid var(--ink)}
+.assessment h3{font-size:17.5px;line-height:1.45;margin:24px 0 8px}
+.assessment h4{font-size:15px;line-height:1.5;margin:14px 0 6px;font-weight:650}
+.assessment p{margin:0 0 8px}
+.assessment section.chapter{padding-top:30px}
+.assessment .as-lead{margin:0 0 10px}
 .assessment .as-muted{color:var(--muted)}
 .assessment .as-small{font-size:13px;line-height:1.65}
-.assessment .as-missing{color:var(--ink-2);padding:10px 14px;background:var(--wash);border-radius:6px;margin:8px 0 12px}
-.assessment .as-note{padding:11px 15px;background:var(--accent-wash);border-radius:6px;margin:12px 0}
-.assessment .as-note>p:last-child,.assessment .as-note>ul:last-child{margin-bottom:0}
-.assessment .cite{font-size:11px;vertical-align:super;line-height:0;margin-left:1px;white-space:nowrap}
+.assessment .as-missing{color:var(--ink-2);padding:8px 12px;background:var(--wash);border-radius:6px;margin:6px 0 10px}
+.assessment .as-dash{color:var(--muted)}
+.assessment .cite{font-size:10.5px;vertical-align:super;line-height:0;margin-left:1px;white-space:nowrap}
 .assessment .cite a{text-decoration:none;padding:0 1px;color:var(--accent)}
-.assessment .num{font-variant-numeric:tabular-nums}
 /* cover */
-.assessment header.as-cover{padding:0 0 22px;margin:0 0 6px;border-bottom:3px double var(--ink)}
-.assessment header.as-cover .kind{font-size:13px;letter-spacing:.32em;color:var(--muted);margin:0 0 10px}
-.assessment header.as-cover h1{font-size:30px;line-height:1.3;margin:0 0 20px}
-.assessment dl.as-id{display:grid;grid-template-columns:repeat(2,auto minmax(0,1fr));gap:6px 14px;margin:0;
-  font-size:14.5px}
-.assessment dl.as-id dt{color:var(--muted);white-space:nowrap}
-.assessment dl.as-id dd{margin:0;font-weight:600;font-variant-numeric:tabular-nums}
-.assessment .as-timing{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;margin:16px 0 0;padding:10px 14px;
-  background:var(--wash);border-radius:6px;font-size:14px}
-.assessment .as-timing b{font-weight:650}
-/* status and priority chips */
-.assessment .as-lv,.assessment .as-pri{display:inline-flex;align-items:center;gap:4px;padding:0 8px 0 6px;
-  border-radius:3px;font-size:12.5px;line-height:1.8;font-weight:600;white-space:nowrap;vertical-align:middle}
-.assessment .as-lv svg,.assessment .as-pri svg{width:11px;height:11px;flex:none}
+.assessment header.as-cover{padding:0 0 14px;margin:0 0 4px;border-bottom:3px double var(--ink)}
+.assessment header.as-cover h1{font-size:27px;line-height:1.3;margin:0 0 12px}
+.assessment .as-ident{border-left:3px solid var(--accent);padding:2px 0 2px 14px;font-size:14px;line-height:1.8}
+.assessment .as-ident p{margin:0}
+.assessment .as-ident b{font-weight:650}
+.assessment .as-ident .sep{color:var(--line);margin:0 8px}
+/* status, priority and fact chips */
+.assessment .as-lv,.assessment .as-pri{display:inline-flex;align-items:center;gap:4px;padding:0 7px 0 5px;
+  border-radius:3px;font-size:11.5px;line-height:1.75;font-weight:600;white-space:nowrap;vertical-align:middle}
+.assessment .as-lv svg,.assessment .as-pri svg{width:10px;height:10px;flex:none}
 .assessment .lv-focus{background:var(--focus-wash);color:var(--focus-ink)}
 .assessment .lv-borderline{background:var(--borderline-wash);color:var(--borderline-ink)}
+.assessment .lv-above{background:var(--paper);color:var(--above-ink);box-shadow:inset 0 0 0 1px var(--above)}
+.assessment .lv-below{background:var(--paper);color:var(--below-ink);box-shadow:inset 0 0 0 1px var(--below)}
 .assessment .lv-normal{background:var(--normal-wash);color:var(--normal-ink)}
 .assessment .lv-notTested,.assessment .lv-none{background:var(--untested-wash);color:var(--untested-ink)}
+.assessment .as-lvnote{display:block;font-size:11.5px;color:var(--ink-2);margin-top:3px;line-height:1.45}
 .assessment .pri-p0{background:var(--p0-ink);color:#fff}
 .assessment .pri-p1{background:var(--ink-2);color:#fff}
 .assessment .pri-p2{background:var(--paper);color:var(--ink-2);box-shadow:inset 0 0 0 1px #8f9692}
 .assessment .pri-p3{background:var(--paper);color:var(--muted);box-shadow:inset 0 0 0 1px var(--line)}
-.assessment .as-when{display:inline-block;font-size:12.5px;line-height:1.75;padding:0 8px;
-  border:1px solid var(--accent);
-  color:var(--accent);border-radius:3px;white-space:normal;max-width:100%;overflow-wrap:anywhere}
+.assessment .as-cid{display:inline-block;font-size:11.5px;font-weight:700;padding:0 6px;border-radius:3px;
+  background:var(--ink-2);color:#fff;line-height:1.7;margin-right:4px;text-decoration:none;white-space:nowrap}
+.assessment .as-cid.pri-p0{background:var(--p0-ink)}
+.assessment .as-cid.pri-p2,.assessment .as-cid.pri-p3{background:#8f9692}
+.assessment .as-facts{display:flex;flex-wrap:wrap;gap:4px 6px;margin:4px 0 6px}
+.assessment .as-fact{display:inline-block;font-size:12.5px;line-height:1.65;padding:0 7px;border-radius:3px;
+  background:var(--paper);box-shadow:inset 0 0 0 1px var(--line);overflow-wrap:anywhere}
+.assessment .as-fact small{color:var(--muted);font-size:11.5px;margin-right:5px}
 /* tags carry a measured value; the dot carries the level */
-.assessment .as-tags{display:flex;flex-wrap:wrap;gap:5px 5px;margin:2px 0}
-.assessment .as-tag{display:inline-flex;align-items:baseline;gap:5px;padding:2px 8px 2px 7px;border-radius:3px;
-  background:var(--wash);font-size:13px;line-height:1.6;color:var(--ink)}
-.assessment .as-tag i{width:7px;height:7px;border-radius:50%;background:var(--untested);flex:none;align-self:center}
-.assessment .as-tag b{font-weight:650;font-variant-numeric:tabular-nums}
-.assessment .as-tag small{color:var(--muted);font-size:12px}
+.assessment .as-tags{display:flex;flex-wrap:wrap;gap:4px;margin:2px 0}
+.assessment .as-tag{display:inline-flex;align-items:baseline;gap:4px;padding:1px 7px 1px 6px;border-radius:3px;
+  background:var(--wash);font-size:12px;line-height:1.55;color:var(--ink)}
+.assessment .as-tag i{width:6px;height:6px;border-radius:50%;background:var(--untested);flex:none;align-self:center}
+.assessment .as-tag b{font-weight:650}
+.assessment .as-tag small{color:var(--muted);font-size:11px}
 .assessment .as-tag.lv-focus{background:var(--focus-wash)}.assessment .as-tag.lv-focus i{background:var(--focus)}
 .assessment .as-tag.lv-borderline{background:var(--borderline-wash)}
 .assessment .as-tag.lv-borderline i{background:var(--borderline)}
 .assessment .as-tag.lv-normal{background:var(--normal-wash)}.assessment .as-tag.lv-normal i{background:var(--normal)}
 .assessment .as-tag.lv-focus,.assessment .as-tag.lv-borderline,.assessment .as-tag.lv-normal{color:var(--ink)}
-.assessment .as-tag.plain{background:transparent;box-shadow:inset 0 0 0 1px var(--line)}
 .assessment .as-tag.lv-none{background:transparent;box-shadow:inset 0 0 0 1px var(--line)}
 .assessment .as-tag.lv-none i{background:#fff;box-shadow:inset 0 0 0 1.5px #7d837f}
-.assessment .as-dir{display:inline-block;width:8px;height:10px;fill:currentColor;vertical-align:-1px}
-.assessment .as-more{font-size:12.5px;color:var(--muted);align-self:center}
-/* legend */
-.assessment .as-legend{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px 14px;align-items:center;
-  margin:16px 0 4px;padding:12px 16px;background:var(--wash);border-radius:6px;font-size:13px}
-.assessment .as-legend>b{font-weight:650;color:var(--ink-2)}
-.assessment .as-legend>div{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px}
-.assessment .as-legend span.sw{display:inline-flex;align-items:center;gap:6px}
-.assessment .as-legend .sw svg{height:18px;width:auto}
-/* measured rows */
-.assessment .as-mrows{margin:4px 0 6px}
-.assessment .as-mrow{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) minmax(140px,2fr) minmax(0,1.1fr);
-  gap:2px 14px;align-items:center;padding:7px 0;border-bottom:1px solid var(--grid);font-size:14px}
-.assessment .as-mrows>.as-mrow:last-child{border-bottom:none}
-.assessment .as-mrow .nm{line-height:1.45}
-.assessment .as-mrow .nm small{display:block;color:var(--muted);font-size:12px}
-.assessment .as-mrow .val{line-height:1.45}
-.assessment .as-mrow .val b{font-size:15.5px;font-weight:650;font-variant-numeric:tabular-nums}
-.assessment .as-mrow .val .as-lv{margin-left:4px}
-.assessment .as-mrow .ref{font-size:12.5px;color:var(--ink-2);line-height:1.5;font-variant-numeric:tabular-nums}
-.assessment .as-mrow .txt{grid-column:3/5;font-size:13.5px;color:var(--ink-2);line-height:1.6}
-.assessment .as-mrow .gap{font-size:12.5px;color:var(--muted)}
-.assessment .as-mrow .ch>svg,.assessment .as-axis svg{display:block;width:100%;height:auto;overflow:visible}
-.assessment .as-axis{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) minmax(140px,2fr) minmax(0,1.1fr);
-  gap:0 14px;font-size:11.5px;color:var(--muted);padding:2px 0 0}
-.assessment .as-axis>div:nth-child(3){grid-column:3}
+.assessment .as-dir{display:inline-block;width:7px;height:9px;fill:currentColor;vertical-align:-1px;margin-left:1px}
+.assessment .as-more{font-size:12px;color:var(--muted);align-self:center}
+/* tables */
+.assessment table.as-table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:12.5px;line-height:1.6;
+  margin:6px 0 12px}
+.assessment table.as-table th{text-align:left;font-weight:650;font-size:12px;color:var(--ink-2);background:var(--wash);
+  padding:6px 7px;border:1px solid var(--line);vertical-align:bottom}
+.assessment table.as-table td{padding:6px 7px;border:1px solid var(--line);vertical-align:top;overflow-wrap:anywhere}
+.assessment table.as-table td.k{font-weight:650;color:var(--ink)}
+.assessment table.as-table td.k small{display:block;font-weight:400;color:var(--muted);font-size:11.5px}
+.assessment table.as-table td p{margin:0 0 4px}
+.assessment table.as-table td p:last-child{margin:0}
+.assessment table.as-table td.st{text-align:left}
+.assessment .as-v{margin:0 0 5px;line-height:1.5}
+.assessment .as-v:last-child{margin-bottom:0}
+.assessment .as-v .nm{color:var(--ink-2)}
+.assessment .as-v b{font-weight:650;font-variant-numeric:tabular-nums}
+.assessment .as-v b.lv-focus{background:none;color:var(--focus-ink)}
+.assessment .as-v b.lv-borderline{background:none;color:var(--borderline-ink)}
+.assessment .as-v small{color:var(--muted);font-size:11px}
+/* inline-block, not block: Chrome will not fragment a table cell that holds a block-level auto-height SVG */
+.assessment .as-v svg:not(.as-dir){display:inline-block;vertical-align:top;width:100%;max-width:190px;height:auto;
+  margin:2px 0 0;overflow:visible}
+.assessment .as-v .tx{font-weight:400;color:var(--ink)}
+.assessment .as-tx{display:grid;grid-template-columns:minmax(0,1fr) 40%;gap:2px 8px;align-items:center;margin:0 0 3px;
+  line-height:1.45}
+.assessment .as-tx b{font-weight:650;font-variant-numeric:tabular-nums}
+.assessment .as-tx b.lv-focus{background:none;color:var(--focus-ink)}
+.assessment .as-tx b.lv-borderline{background:none;color:var(--borderline-ink)}
+.assessment .as-tx small{color:var(--muted);font-size:10.5px}
+.assessment .as-tx svg:not(.as-dir){display:block;width:100%;height:auto;overflow:visible}
+.assessment .as-v.wide svg:not(.as-dir){max-width:none}
+.assessment .as-ref>div{margin:0 0 3px;line-height:1.5}
+.assessment .as-ref .ideal{color:var(--accent)}
+.assessment .as-plain{list-style:none;margin:0;padding:0}
+.assessment .as-plain li{margin:0 0 3px}
+/* callouts */
+.assessment .as-callout{border-left:3px solid var(--accent);background:var(--accent-wash);padding:9px 14px 9px 13px;
+  margin:10px 0 12px;border-radius:0 6px 6px 0}
+.assessment .as-callout>h4:first-child{margin:0 0 5px;font-size:14px}
+.assessment .as-callout>p:last-child,.assessment .as-callout>ol:last-child,.assessment .as-callout>div:last-child{
+  margin-bottom:0}
+.assessment .as-callout.urgent{border-left-color:var(--p0-ink);background:var(--p0-wash)}
+.assessment .as-callout ol{margin:4px 0 0;padding-left:1.4em}
+.assessment .as-callout li{margin:0 0 8px}
+.assessment .as-callout li>p{margin:2px 0 0}
+.assessment .as-urgent{padding:4px 0 2px}
+.assessment .as-urgent+.as-urgent{border-top:1px solid rgba(154,33,33,.18);margin-top:6px;padding-top:8px}
+.assessment .as-urgent h5{font-size:14.5px;margin:0 0 2px;font-weight:700}
+/* scales (inline SVG; numbers are always printed beside them) */
 .assessment svg text{font-family:var(--sans)}
 .assessment svg .trk{stroke:#dde1de;stroke-width:2;stroke-linecap:round}
 .assessment svg .band{fill:var(--band);stroke:var(--band-edge);stroke-width:1}
 .assessment svg .tgt{fill:var(--accent)}
-.assessment svg .tk{font-size:11px;fill:var(--muted)}
+.assessment svg .tk{font-size:10px;fill:var(--muted)}
 .assessment svg .tkl{stroke:#c9cec9;stroke-width:1}
-.assessment svg .dot{stroke:#fff;stroke-width:2}
+.assessment svg .dot{stroke:#fff;stroke-width:1.6}
 .assessment svg .ring{fill:none;stroke:rgba(27,31,29,.5);stroke-width:.8}
 .assessment svg .dot.lv-focus{fill:var(--focus)}.assessment svg .dot.lv-borderline{fill:var(--borderline)}
 .assessment svg .dot.lv-normal{fill:var(--normal)}.assessment svg .dot.lv-notTested{fill:#7d837f}
-.assessment svg .dot.lv-none{fill:#fff;stroke:#6b716d;stroke-width:1.8}
-.assessment svg .hollow{fill:#fff;stroke:#5b615d;stroke-width:1.6}
+.assessment svg .dot.lv-none{fill:#fff;stroke:#6b716d;stroke-width:1.6}
+.assessment svg .hollow{fill:#fff;stroke:#5b615d;stroke-width:1.4}
 .assessment svg .over{fill:#5b615d}
 .assessment svg .bn{fill:var(--normal-wash);stroke:#a9d3a4;stroke-width:.8}
 .assessment svg .blo{fill:#e5eefa;stroke:#a8c4e6;stroke-width:.8}
@@ -150,178 +177,84 @@ main.assessment{
 .assessment svg .bhi{fill:#fdf0d8;stroke:#ebcf8f;stroke-width:.8}
 .assessment svg .bhx{fill:#fbe0d2;stroke:#e6ad93;stroke-width:.8}
 .assessment svg .bo{fill:#f1efe9;stroke:#cfcac0;stroke-width:.8}
-.assessment svg .bt{font-size:10px;fill:var(--ink-2)}
-/* panels of chapter three and four */
-.assessment .as-panel{margin:16px 0 20px}
-.assessment .as-panel-head{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;padding:0 0 6px;
-  border-bottom:1.5px solid var(--ink-2)}
-.assessment .as-panel-head .as-lv{margin-left:auto}
-.assessment .as-panel-head small{color:var(--muted);font-size:12.5px}
-.assessment .as-normal{display:flex;gap:8px;font-size:13px;color:var(--ink-2);line-height:1.7;padding:7px 0 2px}
-.assessment .as-normal svg{width:13px;height:13px;flex:none;margin-top:4px;color:var(--normal)}
-.assessment .as-normal b{font-weight:650;color:var(--normal-ink);white-space:nowrap}
-.assessment .as-interp{margin:9px 0 0;font-size:14.5px}
-.assessment .as-interp p{margin:0 0 7px}
-.assessment .as-refline{font-size:12px;color:var(--muted)}
-/* system cards */
-.assessment .as-systems{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:12px 0}
-.assessment .as-sys{border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--paper)}
-.assessment .as-sys>header{display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--wash)}
-.assessment .as-sys.lv-focus>header{background:var(--focus-wash)}
-.assessment .as-sys.lv-borderline>header{background:var(--borderline-wash)}
-.assessment .as-sys.lv-normal>header{background:var(--normal-wash)}
-.assessment .as-sys>header h4{font-size:15px;color:var(--ink)}
-.assessment .as-sys>header .as-lv{margin-left:auto;background:rgba(255,255,255,.75)}
-.assessment .as-sys .bd{padding:10px 12px 12px;font-size:13.5px}
-.assessment .as-sys .bd p{margin:7px 0 0;color:var(--ink-2)}
-/* action cards and schedule */
-.assessment .as-actions{display:grid;gap:10px;margin:10px 0}
-.assessment .as-act{border:1px solid var(--line);border-radius:8px;padding:12px 15px}
-.assessment .as-act.p0{border-color:#e3b1ae}
-.assessment .as-act>header{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:0 0 4px}
-.assessment .as-act dl{display:grid;grid-template-columns:5em minmax(0,1fr);gap:4px 12px;margin:8px 0 0;
-  font-size:13.5px}
-.assessment .as-act dt{color:var(--muted)}
-.assessment .as-act dd{margin:0}
-.assessment .as-act p{font-size:14px;margin:6px 0 0}
-.assessment .as-gaps{margin:8px 0;padding:0;list-style:none}
-.assessment .as-gaps li{display:grid;grid-template-columns:minmax(8em,auto) minmax(0,1fr);gap:4px 14px;padding:7px 0;
-  border-bottom:1px solid var(--grid);font-size:14px}
-.assessment .as-gaps li:last-child{border-bottom:none}
-.assessment table.sched td:first-child{text-align:left}
-.assessment table.sched th{font-family:var(--sans)}
+.assessment svg .bt{font-size:9px;fill:var(--ink-2)}
+.assessment .as-srow{display:grid;grid-template-columns:minmax(0,5.6em) minmax(0,1fr) 2.9em;align-items:center;gap:6px;
+  padding:1px 0;font-size:12px;line-height:1.5}
+.assessment .as-srow>svg{display:block;width:100%;height:auto;overflow:visible}
+.assessment .as-srow .v{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 /* graph */
-.assessment figure.as-graph{margin:12px 0 8px}
+.assessment figure.as-graph{margin:8px 0 6px}
 .assessment figure.as-graph svg{display:block;width:100%;height:auto}
 .assessment figure.as-graph .hub{fill:var(--accent)}
 .assessment figure.as-graph .hub-t{fill:#fff;font-size:15px;font-weight:700}
 .assessment figure.as-graph .hub-s{fill:#d9ebe5;font-size:12px}
 .assessment figure.as-graph .edge{fill:none;stroke:#a9b1ac;stroke-width:1.5}
-.assessment figure.as-graph .node{stroke-width:1.2}
-.assessment figure.as-graph .node{fill:#fff}
+.assessment figure.as-graph .node{fill:#fff;stroke-width:1.2}
 .assessment figure.as-graph .node.pri-p0{stroke:var(--p0-ink);stroke-width:2}
 .assessment figure.as-graph .node.pri-p1{stroke:var(--ink-2);stroke-width:1.6}
 .assessment figure.as-graph .node.pri-p2{stroke:#8f9692}
 .assessment figure.as-graph .node.pri-p3{stroke:var(--line)}
-.assessment figure.as-graph .badge{rx:3}
 .assessment figure.as-graph .badge.pri-p0{fill:var(--p0-ink)}
 .assessment figure.as-graph .badge.pri-p1{fill:var(--ink-2)}
 .assessment figure.as-graph .badge.pri-p2,.assessment figure.as-graph .badge.pri-p3{fill:#8f9692}
 .assessment figure.as-graph .bid{font-size:12px;font-weight:700;fill:#fff}
 .assessment figure.as-graph .ns{font-size:11.5px;fill:var(--ink-2)}
-.assessment figure.as-graph .nid{font-size:13px;font-weight:700;fill:var(--ink)}
 .assessment figure.as-graph .nt{font-size:13px;fill:var(--ink)}
-.assessment figure.as-graph .np{font-size:11px;fill:var(--ink-2)}
-.assessment figcaption{font-size:12.5px;color:var(--muted);margin:6px 0 0}
-/* matrices */
-.assessment table.as-matrix{width:100%;border-collapse:collapse;font-size:13.5px;line-height:1.6;margin:8px 0 12px;
-  border-top:1.5px solid var(--ink);border-bottom:1.5px solid var(--ink);table-layout:fixed}
-.assessment table.as-matrix th{text-align:left;font-weight:650;font-size:12.5px;color:var(--ink-2);
-  padding:7px 10px 7px 0;
-  border-bottom:1px solid var(--ink);vertical-align:bottom}
-.assessment table.as-matrix td{padding:9px 10px 9px 0;border-bottom:1px solid var(--grid);vertical-align:top}
-.assessment table.as-matrix tr:last-child td{border-bottom:none}
-.assessment table.as-matrix td.c{text-align:center;padding-right:0}
-.assessment table.as-matrix th.c{text-align:center;padding-right:0}
-.assessment table.as-matrix .qa{display:block;color:var(--ink-2)}
-.assessment table.as-matrix .qa+.qa{margin-top:3px}
-.assessment .as-hit{display:inline-block;width:11px;height:11px;border-radius:50%;background:var(--accent)}
-/* cluster cards */
-.assessment .as-cluster{border:1px solid var(--line);border-radius:8px;margin:14px 0;overflow:hidden}
-.assessment .as-cluster>header{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;padding:10px 14px;
-  background:var(--wash)}
-.assessment .as-cid{font-size:12.5px;font-weight:700;padding:0 7px;border-radius:3px;background:var(--ink);color:#fff;
-  line-height:1.8}
-.assessment .as-cluster>header h4{font-size:15.5px}
-.assessment .as-cluster>header .as-pri{margin-left:auto}
-.assessment .as-evidence{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
-.assessment .as-evidence>div{padding:10px 12px;border-top:1px solid var(--grid)}
-.assessment .as-evidence>div+div{border-left:1px solid var(--grid)}
-.assessment .as-cluster .notes{padding:10px 14px 4px;border-top:1px solid var(--grid);font-size:14.5px}
-.assessment .as-cluster .notes h5{margin-top:2px}
+.assessment ul.as-clines{list-style:none;margin:4px 0 8px;padding:0;font-size:13.5px}
+.assessment ul.as-clines li{margin:0 0 3px}
+.assessment .as-v .r{white-space:nowrap}
+.assessment ul.as-clines .as-pri{margin-left:6px}
+/* clusters */
+.assessment .as-cluster{margin:14px 0 10px}
+.assessment .as-cluster>h4{font-family:var(--serif);font-size:15.5px;margin:0 0 6px;line-height:1.55}
+.assessment .as-cluster>h4 .as-pri{margin-left:8px}
+.assessment .as-cluster>div{margin:0 0 6px;padding-left:12px;border-left:2px solid var(--grid)}
+.assessment .as-cluster>div>h5{font-size:13px;font-weight:650;color:var(--ink-2);margin:0 0 1px}
+.assessment .as-cluster>div p{margin:0 0 3px}
 /* roadmap */
-.assessment .as-roadmap{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:14px 0}
+.assessment .as-roadmap{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:10px 0 12px}
 .assessment .as-stage{border:1px solid var(--line);border-radius:8px;overflow:hidden}
-.assessment .as-stage>header{padding:10px 13px;border-bottom:1px solid var(--grid);background:var(--wash)}
+.assessment .as-stage>header{padding:8px 12px;border-bottom:1px solid var(--grid);background:var(--wash)}
 .assessment .as-stage>header .t{display:flex;align-items:baseline;gap:8px}
-.assessment .as-stage>header .t b{font-family:var(--serif);font-size:19px}
-.assessment .as-stage>header .t span{font-size:12.5px;color:var(--muted)}
-.assessment .as-stage>header h4{font-size:13.5px;color:var(--ink-2);font-weight:600;margin-top:2px}
-.assessment .as-stage ul{list-style:none;margin:0;padding:6px 13px 10px}
-.assessment .as-stage li{padding:7px 0;border-bottom:1px solid var(--grid);font-size:13.5px;line-height:1.6}
-.assessment .as-stage li:last-child{border-bottom:none}
-.assessment .as-stage li strong{display:block;font-weight:650}
-.assessment .as-stage p{padding:8px 13px 0;font-size:13.5px;color:var(--ink-2)}
-.assessment .as-direction{margin:12px 0}
-.assessment .as-direction h4{margin:0 0 6px}
-.assessment .as-direction ol{margin:6px 0 0;padding-left:1.3em}
-.assessment .as-direction li{margin:0 0 10px}
-.assessment .as-scores{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:28px;margin:4px 0 4px}
-.assessment .as-srow{display:grid;grid-template-columns:minmax(0,7.5em) minmax(0,1fr) 3.2em;align-items:center;gap:8px;
-  padding:3px 0;border-bottom:1px solid var(--grid);font-size:13px;line-height:1.5}
-.assessment .as-srow>svg{display:block;width:100%;height:auto;overflow:visible}
-.assessment .as-srow .v{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
-.assessment .as-srow[data-lv=borderline] .nm,.assessment .as-srow[data-lv=focus] .nm{font-weight:650}
-.assessment .as-bandkey{display:flex;flex-wrap:wrap;gap:2px 14px;font-size:12px;color:var(--ink-2);margin:6px 0 2px}
-.assessment .as-bandkey i{display:inline-block;width:14px;height:9px;border-radius:2px;margin-right:5px;
-  vertical-align:0}
-.assessment .as-bandkey i.bn{background:var(--normal-wash);border:1px solid #a9d3a4}
-.assessment .as-bandkey i.blo{background:#e5eefa;border:1px solid #a8c4e6}
-.assessment .as-bandkey i.blx{background:#cfe0f5;border:1px solid #86abd9}
-.assessment .as-bandkey i.bhi{background:#fdf0d8;border:1px solid #ebcf8f}
-.assessment .as-bandkey i.bhx{background:#fbe0d2;border:1px solid #e6ad93}
-.assessment .as-bandkey i.bo{background:#f1efe9;border:1px solid #cfcac0}
-.assessment .as-systems>.as-sys:last-child:nth-child(odd){grid-column:1/-1}
-.assessment nav.as-toc{margin:18px 0 0;font-size:13.5px;line-height:1.75}
-.assessment nav.as-toc ol{columns:2;column-gap:32px;margin:0;padding:0;list-style:none}
-.assessment nav.as-toc a{color:var(--ink-2);text-decoration:none}
-.assessment .as-layers{margin:6px 0 10px}
-.assessment .as-layers h4{margin:12px 0 4px}
-.assessment h4.as-sub{margin:20px 0 8px;font-size:15px}
-.assessment ol.as-readings,.assessment ul.as-readings{list-style:none;margin:6px 0;padding:0}
-.assessment .as-readings>li{margin:0 0 12px}
-.assessment .as-readings>li>h4{margin:0 0 4px}
-.assessment .as-readings>li>strong{display:block;margin:0 0 3px}
+.assessment .as-stage>header .t b{font-family:var(--serif);font-size:18px}
+.assessment .as-stage>header .t span{font-size:12px;color:var(--muted)}
+.assessment .as-stage>header h4{font-size:13px;color:var(--ink-2);font-weight:600;margin:2px 0 0}
+.assessment .as-stage .ids{padding:8px 12px 0}
+.assessment .as-stage p{padding:6px 12px 2px;margin:0 0 6px;font-size:13px;line-height:1.65}
+.assessment .as-direction{margin:10px 0}
+.assessment .as-direction h4{margin:0 0 4px}
+.assessment .as-direction ol{margin:4px 0 0;padding-left:1.4em}
+.assessment .as-direction li{margin:0 0 6px}
+.assessment .as-direction li>p{margin:2px 0 0}
 /* trends */
-.assessment .as-trends{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;margin:10px 0}
-.assessment .as-trend{border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.assessment .as-trends{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px;margin:8px 0}
+.assessment .as-trend{border:1px solid var(--line);border-radius:8px;padding:8px 10px}
 .assessment .as-trend svg{display:block;width:100%;height:auto}
 .assessment .as-trend .line{fill:none;stroke:var(--accent);stroke-width:2;stroke-linejoin:round}
 .assessment .as-trend .pt{fill:var(--accent);stroke:#fff;stroke-width:1.5}
 /* references */
-.assessment .as-references{margin-top:28px;padding-top:18px;border-top:1px solid var(--line)}
-.assessment .as-reference-list{padding-left:2.2em;font-size:12.5px;color:var(--ink-2)}
-.assessment .as-reference-list li{margin:0 0 8px;overflow-wrap:anywhere}
+.assessment .as-references{margin-top:24px;padding-top:14px;border-top:1px solid var(--line)}
+.assessment .as-reference-list{padding-left:2.2em;font-size:12px;color:var(--ink-2)}
+.assessment .as-reference-list li{margin:0 0 6px;overflow-wrap:anywhere}
 .assessment .as-reference-list a{white-space:nowrap}
 @media screen and (max-width:720px){
   .assessment-shell{padding:0}
   main.assessment{padding:24px 14px;border:none}
-  .assessment dl.as-id{grid-template-columns:auto minmax(0,1fr)}
-  .assessment .as-systems,.assessment .as-roadmap,.assessment .as-evidence,.assessment .as-scores{
-    grid-template-columns:minmax(0,1fr)}
-  .assessment .as-evidence>div+div{border-left:none}
-  .assessment .as-mrow{grid-template-columns:minmax(0,1fr) auto}
-  .assessment .as-mrow>div:nth-child(3),.assessment .as-mrow .txt{grid-column:1/-1}
-  .assessment .as-mrow .ref{grid-column:1/-1}
-  .assessment .as-axis{display:none}
-  .assessment table.as-matrix{table-layout:auto}
+  .assessment .as-roadmap{grid-template-columns:minmax(0,1fr)}
+  .assessment table.as-table{table-layout:auto}
 }
 @media print{
   .assessment-shell{max-width:none;padding:0;margin:0}
   main.assessment{padding:0;border:none;font-size:10pt;line-height:1.62}
   .assessment *{print-color-adjust:exact;-webkit-print-color-adjust:exact}
-  .assessment section.chapter{break-before:page;padding-top:0}
-  .assessment section#as-preface{break-before:auto;padding-top:18pt}
-  .assessment h2,.assessment h3,.assessment h4,.assessment h5,.assessment .as-panel-head{break-after:avoid-page}
-  .assessment .as-cluster,.assessment .as-note,.assessment .as-roadmap,.assessment .as-direction>h4{
+  .assessment section.chapter{break-before:auto;padding-top:16pt}
+  .assessment h2,.assessment h3,.assessment h4,.assessment h5,.assessment .as-cluster>h4{break-after:avoid-page}
+  .assessment table.as-table thead{display:table-header-group}
+  .assessment table.as-table tr:not(.long){break-inside:avoid}
+  .assessment .as-urgent,.assessment .as-stage,.assessment figure.as-graph,.assessment .as-trend,
+  .assessment .as-ident,.assessment .as-tx,.assessment .as-v,.assessment .as-srow,.assessment ul.as-clines{
     break-inside:avoid}
-  .assessment .as-sys,.assessment .as-act,.assessment .as-mrow,.assessment .as-stage,.assessment .as-legend,
-  .assessment figure.as-graph,.assessment table.as-matrix tr,.assessment .as-trend,.assessment .as-gaps li,
-  .assessment table.sched,.assessment .as-cluster>header,.assessment .as-evidence,.assessment .as-timing{
-    break-inside:avoid}
-  .assessment .as-panel-head+.as-mrows .as-mrow:first-child{break-before:avoid-page}
-  .assessment .as-axis{break-after:avoid-page}
-  .assessment .as-srow{break-inside:avoid}
+  .assessment .as-cluster>div>h5{break-after:avoid-page}
   .assessment p,.assessment li{orphans:2;widows:2}
   .assessment .as-reference-list li{break-inside:avoid}
   .assessment a{color:inherit;text-decoration:none}
@@ -330,7 +263,7 @@ main.assessment{
 
 _CLINICAL_CONCLUSION = re.compile(
     r'(?:^|(?<=[。；;\n]))\s*(?:'
-    r'(?:检查结论|影像诊断|影像印象|诊断意见|结论)(?:\s*[：:]\s*|\s+|(?=[\u4e00-\u9fff]))'
+    r'(?:检查结论|影像诊断|影像印象|诊断意见|结论)(?:\s*[：:]\s*|\s+|(?=[一-鿿]))'
     r'|(?:超声提示|提示)\s*[：:]\s*)'
 )
 _CLINICAL_IMAGE = re.compile(r'超声|彩超|影像|正位片|侧位片|X线|CT|MRI|磁共振', re.IGNORECASE)
@@ -407,7 +340,7 @@ def _value(row):
     normalized_unit = normalize('NFKC', unit)
     if ''.join(displayed.casefold().split()).endswith(''.join(normalized_unit.casefold().split())):
         return value
-    return f'{value} {unit}'
+    return f'{value} {_unit(unit)}'
 
 
 def _clinical_conclusion(value):
@@ -475,6 +408,10 @@ def _is_advice(row):
     return row.get('kind') == 'advice' or row.get('status') in {'原报告医嘱', '检查建议'}
 
 
+def _is_personal(row):
+    return any(source.get('sourceCode') == 'B' for source in row.get('sources') or ())
+
+
 def _recorded_advice(item):
     quotes = {}
     for row in item.get('clinicalSignals') or ():
@@ -482,10 +419,8 @@ def _recorded_advice(item):
             continue
         if not any(ref.get('sourceCode') == 'A' and ref.get('recordId') for ref in row.get('sources') or ()):
             continue
-        labels = quotes.setdefault(quote, {})
-        if label := _text(row.get('name')).partition(' · ')[2]:
-            labels[label] = None
-    return quotes
+        quotes.setdefault(quote, None)
+    return list(quotes)
 
 
 def _cluster_anchor(cluster_id):
@@ -548,7 +483,6 @@ def _numbered_refs(data):
     return {row['number']: row for row in rows if type(row.get('number')) is int and row['number'] > 0}
 
 
-
 # ---------- vocabulary ----------
 
 _ICONS = {
@@ -557,11 +491,22 @@ _ICONS = {
     '</svg>',
     'borderline': '<svg viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4.6" fill="none" '
     'stroke="currentColor" stroke-width="1.8"/><circle cx="6" cy="6" r="1.6" fill="currentColor"/></svg>',
+    'above': '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M6 1.5 10.5 9.5H1.5Z" fill="currentColor"/></svg>',
+    'below': '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M6 10.5 10.5 2.5H1.5Z" fill="currentColor"/></svg>',
     'normal': '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2.2 6.3 4.9 9 9.8 3.4" fill="none" '
     'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     'notTested': '<svg viewBox="0 0 12 12" aria-hidden="true"><rect x="2.4" y="5.2" width="7.2" height="1.6" rx=".8" '
     'fill="currentColor"/></svg>',
     'P0': '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M6 1 11 10.5H1Z" fill="currentColor"/></svg>',
+}
+# The five reader statuses (spec: body groups, systems, clinical groups, template rows) and their chips.
+_STATUS_CHIPS = {
+    '重点关注': 'focus',
+    '亚临床边界': 'borderline',
+    '高于理想值': 'above',
+    '低于理想值': 'below',
+    '稳健达标': 'normal',
+    '未检测': 'notTested',
 }
 _PRIORITIES = {
     'P0': ('优先医疗排查', 'p0'),
@@ -569,36 +514,25 @@ _PRIORITIES = {
     'P2': ('协同调理', 'p2'),
     'P3': ('随访巩固', 'p3'),
 }
-_CLINICAL_SECTIONS = (
-    ('cardiometabolic', '3.1 糖脂代谢、胰岛素敏感性与心血管系统'),
-    ('organMetabolism', '3.2 肝胆胰消化、肾脏代谢与营养辅酶'),
-    ('hematologyImmune', '3.3 血液学、铁代谢、免疫与一碳甲基化'),
-    ('endocrineMusculoskeletal', '3.4 内分泌激素、骨骼肌肉与器官影像'),
-)
-_SECTION_TOPICS = {
-    'cardiometabolic': '糖脂代谢与心血管',
-    'organMetabolism': '肝胆胰与肾脏',
-    'hematologyImmune': '血液与免疫',
-    'endocrineMusculoskeletal': '内分泌、骨骼肌肉与器官影像',
+# Chapter three follows the client's order of systems; other groups keep the callback order after them.
+_CLINICAL_ORDER = ('cardiometabolic', 'organMetabolism', 'hematologyImmune', 'endocrineMusculoskeletal')
+_CLINICAL_TITLES = {
+    'cardiometabolic': '糖脂代谢、胰岛素敏感性与心血管系统评估',
+    'organMetabolism': '肝胆胰消化、肾脏代谢与营养辅酶状态评估',
+    'hematologyImmune': '血液学、铁代谢、免疫与一碳甲基化评估',
+    'endocrineMusculoskeletal': '内分泌激素、骨骼肌肉与器官影像学评估',
+    'otherClinical': '其他器官与专项检查',
 }
 _OTHER_SYSTEM = ('otherClinical', '其他器官与专项检查')
 _STAGES = (
-    ('s1', '第一层级', '首月', '临床专科排查与随访', '本次未发现需在首月内完成的专科排查或随访事项。'),
-    ('s2', '第二层级', '90 天', '核心代谢与肠道微生态干预', '本次未形成需在 90 天内集中干预的代谢或微生态方向。'),
-    ('s3', '第三层级', '持续', '营养储备与长期健康维护', '保持现有健康习惯，按常规周期复查。'),
+    ('clinical', '第一层级', '首月', '临床专科排查与随访', '本次未发现需在首月内完成的专科排查或随访事项。'),
+    ('core', '第二层级', '90 天', '核心代谢与肠道微生态干预', '本次未形成需在 90 天内集中干预的代谢或微生态方向。'),
+    ('maintenance', '第三层级', '持续', '营养储备与长期健康维护', '保持现有健康习惯，按常规周期复查。'),
 )
-_LAYER_STAGES = {'clinical': 's1', 'routine': 's1', 'core': 's2', 'maintenance': 's3'}
-_PRIORITY_STAGES = {'P0': 's1', 'P1': 's2', 'P2': 's3', 'P3': 's3'}
-_FINDING_PRIORITIES = {'urgent': 'P0', 'planned': 'P1'}
-_LIFESTYLE_DIMENSIONS = (
-    ('diet', '饮食与进餐', r'饮食|进餐|正餐|夜宵|甜食|膳食|主食|三餐|零食|含糖'),
-    ('drinks', '饮酒与饮品', r'饮酒|喝酒|酒精|饮品|饮水|喝水|咖啡|浓茶'),
-    ('sleep', '睡眠', r'睡眠|入睡|作息|熬夜|睡'),
-    ('exercise', '运动与久坐', r'运动|久坐|体力活动|锻炼|步行'),
-    ('stress', '精神压力与口腔护理', r'压力|情绪|焦虑|口腔|刷牙|牙'),
-)
+_LAYER_STAGES = {'clinical': 'clinical', 'routine': 'clinical', 'core': 'core', 'maintenance': 'maintenance'}
+_PRIORITY_STAGES = {'P0': 'clinical', 'P1': 'core', 'P2': 'maintenance', 'P3': 'maintenance'}
+_LAYER_NAME = re.compile(r'^\s*(?P<level>第.层级)\s*[：:]\s*(?P<title>.+?)\s*(?:[（(](?P<when>[^（）()]+)[）)])?\s*$')
 _BACKGROUND_KINDS = {'background', 'history', 'trigger'}
-_SCHEDULE = (('首月', 31), ('3 个月', 92), ('6 个月', 183), ('12 个月', 366))
 _QA = re.compile(
     r'^\s*(?:\d{4}[-/]\d{1,2}[-/]\d{1,2}(?:[ T]\d{2}:\d{2}(?::\d{2})?)?\s+)?'
     r'(?P<label>[^；;：:\n]{1,80}?)\s*(?:：|(?<!\d):(?!\d))\s*(?P<answer>.*)$',
@@ -609,6 +543,7 @@ _LABEL_NOISE = (
     (re.compile(r'原报告|原件|主检'), ''),
 )
 _MICROBIOME_INDEX_NOTE = '菌群功能评分为基因预测的 0–100 分相对评分，反映代谢潜力，不等同于体内营养素水平。'
+_DASH = '<span class="as-dash">—</span>'
 
 
 def _label(value):
@@ -651,14 +586,13 @@ def _qa_pairs(value):
     return [tuple(pair) for pair in pairs]
 
 
-def _qa_html(value):
-    rows = []
-    for label, answer in _qa_pairs(value):
-        if label:
-            rows.append(f'<span class="qa">{_e(label)}：{_e(answer)}</span>')
-        elif answer:
-            rows.append(f'<span class="qa">{_e(answer)}</span>')
-    return ''.join(rows)
+def _answers_html(value):
+    """Questionnaire answers ("题目：答案；…") one per line; written prose stays one paragraph."""
+    pairs = _qa_pairs(value)
+    if len(pairs) < 2 or not all(label for label, _ in pairs):
+        text = re.sub(r'您的|您', '', _text(value)).strip()
+        return f'<p>{_e(text)}</p>' if text else ''
+    return '<ul class="as-plain">' + ''.join(f'<li>{_e(label)}：{_e(answer)}</li>' for label, answer in pairs) + '</ul>'
 
 
 def _fmt(number):
@@ -678,19 +612,38 @@ def _fmt(number):
     return text.rstrip('0').rstrip('.') if '.' in text else text
 
 
+_SUPERSCRIPT = str.maketrans('0123456789', '⁰¹²³⁴⁵⁶⁷⁸⁹')
+
+
 def _unit(unit):
-    return re.sub(r'(?<![A-Za-z])(kg/m|cm|m)2(?![0-9A-Za-z])', r'\1²', _text(unit))
+    """Printed form of a recorded unit: kg/m2 as kg/m², 10E9/L and 10^9/L as ×10⁹/L."""
+    text = re.sub(r'(?<![A-Za-z])(kg/m|cm|m)2(?![0-9A-Za-z])', r'\1²', _text(unit))
+    return re.sub(
+        r'^\s*[×xX*]?\s*10\s*(?:[Ee]|\^)\s*(\d{1,2})(?=\s*/)',
+        lambda match: '×10' + match[1].translate(_SUPERSCRIPT),
+        text,
+    )
 
 
 def _level_class(level):
     return level if level in charts.LEVEL_LABELS else 'none'
 
 
-def _level_chip(level, label=None):
-    if level not in charts.LEVEL_LABELS:
-        return ''
-    text = label or charts.LEVEL_LABELS[level]
-    return f'<span class="as-lv lv-{level}">{_ICONS[level]}{_e(text)}</span>'
+def _status_chip(status=None, level=None):
+    """The reader status as a chip: one of the five labels, otherwise the level's label with the status below it."""
+    label = _label(status)
+    # Older callbacks wrote "重点关注：项目、项目"; the items are already listed in the row.
+    label = re.sub(rf'^({"|".join(_STATUS_CHIPS)})\s*[：:].*$', r'\1', label, flags=re.S)
+    css = _STATUS_CHIPS.get(label)
+    note = ''
+    if css is None:
+        if level not in charts.LEVEL_LABELS:
+            return f'<span class="as-lvnote">{_e(label)}</span>' if label else ''
+        css = level
+        if label and label != charts.LEVEL_LABELS[level]:
+            note = f'<span class="as-lvnote">{_e(label)}</span>'
+        label = charts.LEVEL_LABELS[level]
+    return f'<span class="as-lv lv-{css}">{_ICONS[css]}{_e(label)}</span>{note}'
 
 
 def _priority_chip(priority):
@@ -716,12 +669,50 @@ def _arrow(direction):
 
 
 def _note(text):
-    return f'<p class="as-missing">{_e(text)}</p>'
+    return f'<p class="as-missing">{_e(text)}</p>' if _text(text).strip() else ''
 
 
 def _subsection(title, content, *, anchor=None):
     anchor_attr = f' id="{_e(anchor)}"' if anchor else ''
     return f'<h3{anchor_attr}>{_e(title)}</h3>{content}' if content else ''
+
+
+def _table(heads, widths, rows, *, css=''):
+    """A plain table: fixed columns, a header repeated on every printed page, one row per clinical question."""
+    if not rows:
+        return ''
+    cols = ''.join(f'<col style="width:{width}%">' for width in widths)
+    head = ''.join(f'<th>{_e(title)}</th>' for title in heads)
+    klass = f'as-table {css}'.strip()
+    return (
+        f'<table class="{klass}"><colgroup>{cols}</colgroup><thead><tr>{head}</tr></thead>'
+        f'<tbody>{"".join(rows)}</tbody></table>'
+    )
+
+
+def _tr(cells, *, long=False):
+    """A table row; a row taller than about a third of a page may break across pages, a shorter one stays whole."""
+    return f'<tr{" class=long" if long else ""}>{"".join(cells)}</tr>'
+
+
+def _is_long(count, *texts):
+    return count >= 5 or max((len(_text(text)) for text in texts), default=0) > 220
+
+
+_ABBREVIATION = re.compile(r'[（(]([A-Za-z][A-Za-z0-9\-/.\u2160-\u217f ]*)[）)]\s*$')
+
+
+def _short_name(name):
+    """The abbreviation in a name's closing brackets, as the client's reference column writes it."""
+    match = _ABBREVIATION.search(_text(name))
+    return match[1].strip() if match else _text(name)
+
+
+def _callout(title, body, *, css=''):
+    if not body:
+        return ''
+    klass = f'as-callout {css}'.strip()
+    return f'<div class="{klass}"><h4>{_e(title)}</h4>{body}</div>'
 
 
 def _days_between(first, second):
@@ -731,20 +722,23 @@ def _days_between(first, second):
         return None
 
 
-def _shared_date(rows):
-    dates = {_text(row.get('observedAt'))[:10] for row in rows}
-    return next(iter(dates)) if len(dates) == 1 and '' not in dates else ''
+_FULL_WIDTH_MARKS = frozenset('—…“”‘’')
+
+
+def _advance(char, size):
+    """Advance of one glyph: CJK glyphs and the dashes and quotes set with them take one em."""
+    return size if ord(char) > 0x2E80 or char in _FULL_WIDTH_MARKS else size * 0.58
 
 
 def _text_width(text, size):
-    return sum(size if ord(char) > 0x2E80 else size * 0.58 for char in _text(text))
+    return sum(_advance(char, size) for char in _text(text))
 
 
 def _wrap(text, size, width, lines=2):
     """Lines of at most ``width`` user units at ``size``; CJK glyphs count as one em."""
     result, current, used = [], '', 0.0
     for char in _text(text):
-        advance = size if ord(char) > 0x2E80 else size * 0.58
+        advance = _advance(char, size)
         if used + advance > width and current:
             result.append(current)
             current, used = '', 0.0
@@ -760,11 +754,23 @@ def _wrap(text, size, width, lines=2):
     return result
 
 
+def _row_label(row):
+    """(short name, shown result) of a clinical row, without repeating the name inside the result."""
+    shown = _clinical_display(row).strip()
+    name = clinical_observation_display_name(row)
+    name = _label(charts.display_name(name)) if name else ''
+    if name and shown == name:
+        shown = ''
+    elif name and shown.startswith(name):
+        shown = shown[len(name):].lstrip(' ：:；;，,')
+    return name, shown
+
+
 # ---------- scales (inline SVG; numbers are always printed beside them) ----------
 
-_SW = 260.0
-_X0 = 10.0
-_X1 = _SW - 10.0
+_SW = 200.0
+_X0 = 8.0
+_X1 = _SW - 8.0
 
 
 def _x(value, low, high):
@@ -772,7 +778,7 @@ def _x(value, low, high):
 
 
 def _range_svg(number, low, high, kind, level, label, target=None):
-    """Clinical reference band, optional target band and the measured point."""
+    """A small clinical reference band, optional target bar and the measured point (no labels; text sits beside)."""
     target = target if isinstance(target, dict) else {}
     t_low, t_high = target.get('low'), target.get('high')
     values = [value for value in (number, low, high, t_low, t_high) if isinstance(value, (int, float))]
@@ -803,26 +809,22 @@ def _range_svg(number, low, high, kind, level, label, target=None):
     b0 = _x(band[0], lo, hi) if band[0] is not None else _X0
     b1 = _x(band[1], lo, hi) if band[1] is not None else _X1
     parts = [
-        f'<svg viewBox="0 0 {_SW:.0f} 32" role="img" aria-label="{_e(label)}">',
-        f'<line class="trk" x1="{_X0}" y1="13" x2="{_X1}" y2="13"/>',
-        f'<rect class="band" x="{b0:.1f}" y="7" width="{max(b1 - b0, 2):.1f}" height="12" rx="3"/>',
+        f'<svg viewBox="0 0 {_SW:.0f} 20" role="img" aria-label="{_e(label)}">',
+        f'<line class="trk" x1="{_X0}" y1="9" x2="{_X1}" y2="9"/>',
+        f'<rect class="band" x="{b0:.1f}" y="4" width="{max(b1 - b0, 2):.1f}" height="10" rx="3"/>',
     ]
     if t_low is not None or t_high is not None:
         g0 = _x(max(t_low, lo), lo, hi) if t_low is not None else _X0
         g1 = _x(min(t_high, hi), lo, hi) if t_high is not None else _X1
-        parts.append(f'<rect class="tgt" x="{g0:.1f}" y="21.5" width="{max(g1 - g0, 2):.1f}" height="3.2" rx="1.6"/>')
-    ticks = [(b0, band[0], 'end' if b1 - b0 < 26 else 'middle'), (b1, band[1], 'start' if b1 - b0 < 26 else 'middle')]
-    for position, value, anchor in ticks:
-        if value is not None:
-            parts.append(f'<text class="tk" x="{position:.1f}" y="31" text-anchor="{anchor}">{_e(_fmt(value))}</text>')
+        parts.append(f'<rect class="tgt" x="{g0:.1f}" y="16" width="{max(g1 - g0, 2):.1f}" height="3" rx="1.5"/>')
     if number is not None:
         cx = min(max(_x(number, lo, hi), _X0), _X1)
-        parts.append(f'<circle class="ring" cx="{cx:.1f}" cy="13" r="7.2"/>')
-        parts.append(f'<circle class="dot lv-{_level_class(level)}" cx="{cx:.1f}" cy="13" r="6.1"/>')
+        parts.append(f'<circle class="ring" cx="{cx:.1f}" cy="9" r="6.6"/>')
+        parts.append(f'<circle class="dot lv-{_level_class(level)}" cx="{cx:.1f}" cy="9" r="5.6"/>')
         if overflow == 'right':
-            parts.append(f'<path class="over" d="M{_X1 + 4:.1f} 9.5 {_X1 + 8:.1f} 13 {_X1 + 4:.1f} 16.5Z"/>')
+            parts.append(f'<path class="over" d="M{_X1 + 3:.1f} 6 {_X1 + 7:.1f} 9 {_X1 + 3:.1f} 12Z"/>')
         elif overflow == 'left':
-            parts.append(f'<path class="over" d="M{_X0 - 4:.1f} 9.5 {_X0 - 8:.1f} 13 {_X0 - 4:.1f} 16.5Z"/>')
+            parts.append(f'<path class="over" d="M{_X0 - 3:.1f} 6 {_X0 - 7:.1f} 9 {_X0 - 3:.1f} 12Z"/>')
     parts.append('</svg>')
     return ''.join(parts)
 
@@ -843,21 +845,18 @@ def _band_class(label):
     return 'bo'
 
 
-def _bands_svg(number, bands, level, label, *, domain=None):
+def _bands_svg(number, bands, level, label):
     """Grade bands of the source report as the background, the measured point on top."""
     finite = [value for band in bands for value in (band.get('low'), band.get('high')) if value is not None]
-    if domain:
-        lo, hi = domain
-    else:
-        lo, hi = min(finite), max(finite)
-        span = (hi - lo) or 1.0
-        if any(band.get('low') is None for band in bands):
-            lo -= 0.25 * span
-        if any(band.get('high') is None for band in bands):
-            hi += 0.25 * span
-        if number is not None:
-            lo, hi = min(lo, number), max(hi, number)
-    parts = [f'<svg viewBox="0 0 {_SW:.0f} 32" role="img" aria-label="{_e(label)}">']
+    lo, hi = min(finite), max(finite)
+    span = (hi - lo) or 1.0
+    if any(band.get('low') is None for band in bands):
+        lo -= 0.25 * span
+    if any(band.get('high') is None for band in bands):
+        hi += 0.25 * span
+    if number is not None:
+        lo, hi = min(lo, number), max(hi, number)
+    parts = [f'<svg viewBox="0 0 {_SW:.0f} 30" role="img" aria-label="{_e(label)}">']
     edges = set()
     for band in bands:
         x0 = _x(band['low'], lo, hi) if band.get('low') is not None else _X0
@@ -866,22 +865,22 @@ def _bands_svg(number, bands, level, label, *, domain=None):
         if x1 - x0 < 0.5:
             continue
         parts.append(
-            f'<rect class="{_band_class(band["label"])}" x="{x0 + 0.5:.1f}" y="6" width="{max(x1 - x0 - 1, 1):.1f}" '
-            'height="14" rx="2"/>'
+            f'<rect class="{_band_class(band["label"])}" x="{x0 + 0.5:.1f}" y="5" width="{max(x1 - x0 - 1, 1):.1f}" '
+            'height="13" rx="2"/>'
         )
-        if len(band['label']) * 10.2 + 6 < x1 - x0:
+        if len(band['label']) * 9.2 + 4 < x1 - x0:
             middle = (x0 + x1) / 2
-            parts.append(f'<text class="bt" x="{middle:.1f}" y="16.6" text-anchor="middle">{_e(band["label"])}</text>')
+            parts.append(f'<text class="bt" x="{middle:.1f}" y="14.8" text-anchor="middle">{_e(band["label"])}</text>')
         for value in (band.get('low'), band.get('high')):
             if value is not None and lo < value < hi:
                 edges.add(value)
     for value in sorted(edges):
         x = _x(value, lo, hi)
-        parts.append(f'<text class="tk" x="{x:.1f}" y="31" text-anchor="middle">{_e(_fmt(value))}</text>')
+        parts.append(f'<text class="tk" x="{x:.1f}" y="29" text-anchor="middle">{_e(_fmt(value))}</text>')
     if number is not None:
         cx = min(max(_x(number, lo, hi), _X0), _X1)
-        parts.append(f'<circle class="ring" cx="{cx:.1f}" cy="13" r="7.2"/>')
-        parts.append(f'<circle class="dot lv-{_level_class(level)}" cx="{cx:.1f}" cy="13" r="6.1"/>')
+        parts.append(f'<circle class="ring" cx="{cx:.1f}" cy="11.5" r="6.6"/>')
+        parts.append(f'<circle class="dot lv-{_level_class(level)}" cx="{cx:.1f}" cy="11.5" r="5.6"/>')
     parts.append('</svg>')
     return ''.join(parts)
 
@@ -889,26 +888,26 @@ def _bands_svg(number, bands, level, label, *, domain=None):
 def _axis_svg(number, lo, hi, ticks, level, label, *, marker=None):
     """A plain axis with labelled ticks, an optional reference marker and the measured point."""
     parts = [
-        f'<svg viewBox="0 0 {_SW:.0f} 32" role="img" aria-label="{_e(label)}">',
-        f'<line class="trk" x1="{_X0}" y1="13" x2="{_X1}" y2="13"/>',
+        f'<svg viewBox="0 0 {_SW:.0f} 30" role="img" aria-label="{_e(label)}">',
+        f'<line class="trk" x1="{_X0}" y1="11.5" x2="{_X1}" y2="11.5"/>',
     ]
     for value, text in ticks:
         x = _x(value, lo, hi)
-        parts.append(f'<line class="tkl" x1="{x:.1f}" y1="9" x2="{x:.1f}" y2="17"/>')
-        parts.append(f'<text class="tk" x="{x:.1f}" y="31" text-anchor="middle">{_e(text)}</text>')
+        parts.append(f'<line class="tkl" x1="{x:.1f}" y1="7.5" x2="{x:.1f}" y2="15.5"/>')
+        parts.append(f'<text class="tk" x="{x:.1f}" y="29" text-anchor="middle">{_e(text)}</text>')
     if marker is not None:
         x = _x(marker, lo, hi)
-        parts.append(f'<rect class="tgt" x="{x - 1:.1f}" y="5" width="2" height="16" rx="1"/>')
+        parts.append(f'<rect class="tgt" x="{x - 1:.1f}" y="4" width="2" height="15" rx="1"/>')
     if number is not None:
         cx = min(max(_x(number, lo, hi), _X0), _X1)
-        parts.append(f'<circle class="ring" cx="{cx:.1f}" cy="13" r="7.2"/>')
-        parts.append(f'<circle class="dot lv-{_level_class(level)}" cx="{cx:.1f}" cy="13" r="6.1"/>')
+        parts.append(f'<circle class="ring" cx="{cx:.1f}" cy="11.5" r="6.6"/>')
+        parts.append(f'<circle class="dot lv-{_level_class(level)}" cx="{cx:.1f}" cy="11.5" r="5.6"/>')
     parts.append('</svg>')
     return ''.join(parts)
 
 
 def _score_svg(score, bands, level, label):
-    """A 0–100 score over its grade bands (no text; the legend line names the bands)."""
+    """A 0–100 score over its grade bands; the normal band is named in the next column."""
     width = 200.0
     parts = [f'<svg viewBox="0 0 {width:.0f} 16" role="img" aria-label="{_e(label)}">']
     for band in bands:
@@ -921,58 +920,42 @@ def _score_svg(score, bands, level, label):
                 'height="10" rx="2"/>'
             )
     cx = 4 + min(max(score, 0.0), 100.0) / 100 * (width - 8)
-    parts.append(f'<circle class="ring" cx="{cx:.1f}" cy="8" r="5.6"/>')
-    parts.append(f'<circle class="dot lv-{_level_class(level)}" cx="{cx:.1f}" cy="8" r="4.6"/>')
+    parts.append(f'<circle class="ring" cx="{cx:.1f}" cy="8" r="6.2"/>')
+    parts.append(f'<circle class="dot lv-{_level_class(level)}" cx="{cx:.1f}" cy="8" r="5.2"/>')
     parts.append('</svg>')
     return ''.join(parts)
 
-
-def _band_key(bands):
-    return ''.join(
-        f'<span><i class="{_band_class(band["label"])}"></i>{_e(band["label"])} {_e(_band_text(band))}</span>'
-        for band in bands
-    )
 
 _LOG_LOW, _LOG_HIGH = -4.0, 2.0  # 0.0001 % to 100 %, one shared axis for every abundance row
 
 
-def _log_x(percent):
+def _log_x(percent, width=_SW):
     value = min(max(percent, 10**_LOG_LOW), 10**_LOG_HIGH)
-    return _x(math.log10(value), _LOG_LOW, _LOG_HIGH)
+    return 6 + (math.log10(value) - _LOG_LOW) / (_LOG_HIGH - _LOG_LOW) * (width - 12)
 
 
-def _abundance_svg(abundance, low, high, level, label):
+def _abundance_svg(abundance, low, high, level, label, *, width=_SW):
     """Relative abundance on a log axis against the reported reference band; 0 is drawn hollow at the origin."""
     parts = [
-        f'<svg viewBox="0 0 {_SW:.0f} 26" role="img" aria-label="{_e(label)}">',
-        f'<line class="trk" x1="{_X0}" y1="13" x2="{_X1}" y2="13"/>',
+        f'<svg viewBox="0 0 {width:.0f} 18" role="img" aria-label="{_e(label)}">',
+        f'<line class="trk" x1="6" y1="9" x2="{width - 6:.0f}" y2="9"/>',
     ]
     for exponent in range(int(_LOG_LOW), int(_LOG_HIGH) + 1):
-        x = _x(exponent, _LOG_LOW, _LOG_HIGH)
-        parts.append(f'<line class="tkl" x1="{x:.1f}" y1="10" x2="{x:.1f}" y2="16"/>')
+        x = _log_x(10.0**exponent, width)
+        parts.append(f'<line class="tkl" x1="{x:.1f}" y1="6" x2="{x:.1f}" y2="12"/>')
     if high is not None:
-        b0 = _log_x(low) if low else _X0
-        b1 = _log_x(high)
-        parts.append(f'<rect class="band" x="{b0:.1f}" y="7" width="{max(b1 - b0, 2):.1f}" height="12" rx="3"/>')
+        b0 = _log_x(low, width) if low else 6
+        b1 = _log_x(high, width)
+        parts.append(f'<rect class="band" x="{b0:.1f}" y="4" width="{max(b1 - b0, 2):.1f}" height="10" rx="3"/>')
     if abundance is not None:
         if abundance <= 0:
-            parts.append(f'<circle class="hollow" cx="{_X0:.1f}" cy="13" r="5"/>')
+            parts.append('<circle class="hollow" cx="6" cy="9" r="4.4"/>')
         else:
-            cx = _log_x(abundance)
-            parts.append(f'<circle class="ring" cx="{cx:.1f}" cy="13" r="7.2"/>')
-            parts.append(f'<circle class="dot lv-{_level_class(level)}" cx="{cx:.1f}" cy="13" r="6.1"/>')
+            cx = _log_x(abundance, width)
+            parts.append(f'<circle class="ring" cx="{cx:.1f}" cy="9" r="6.2"/>')
+            parts.append(f'<circle class="dot lv-{_level_class(level)}" cx="{cx:.1f}" cy="9" r="5.2"/>')
     parts.append('</svg>')
     return ''.join(parts)
-
-
-def _abundance_axis():
-    labels = ''.join(
-        f'<text class="tk" x="{_x(exponent, _LOG_LOW, _LOG_HIGH):.1f}" y="10" text-anchor="middle">'
-        f'{_e(_fmt(10.0**exponent))}</text>'
-        for exponent in range(int(_LOG_LOW), int(_LOG_HIGH) + 1)
-    )
-    svg = f'<svg viewBox="0 0 {_SW:.0f} 13" aria-hidden="true">{labels}</svg>'
-    return f'<div class="as-axis"><div></div><div></div><div>{svg}</div><div>相对丰度（%，对数刻度）</div></div>'
 
 
 def _trend_svg(points, label):
@@ -1005,21 +988,21 @@ def _trend_svg(points, label):
 
 
 def _graph_svg(hub, hub_lines, nodes):
-    """Centre (key indicators) to cluster nodes; names wrap to two lines, text is 11.5–15 px."""
-    width, gap, node_x = 680.0, 10.0, 300.0
+    """Centre (key indicators) to cluster nodes; names wrap to at most three lines, text is 11.5–15 px."""
+    width, gap, node_x = 680.0, 6.0, 300.0
     text_width = width - node_x - 6 - 56
     laid = []
     for identifier, name, priority, anchors in nodes:
-        lines = _wrap(name, 13, text_width, lines=2)
+        lines = _wrap(name, 13, text_width, lines=3)
         sub = f'{priority} {_PRIORITIES[priority][0]}' if priority in _PRIORITIES else ''
         for anchor in anchors:  # an anchor that does not fit is left out, never cut
             candidate = f'{sub} · {anchor}' if sub else anchor
             if _text_width(candidate, 11.5) <= text_width:
                 sub = candidate
-        laid.append((identifier, lines, priority, [sub] if sub else [], 22 + 18 * len(lines) + 16))
+        laid.append((identifier, lines, priority, [sub] if sub else [], 16 + 17 * len(lines) + (15 if sub else 0)))
     total = sum(item[4] for item in laid) + gap * (len(laid) - 1)
     hub_h = 40 + 20 * len(hub_lines)
-    height = max(total + 16, hub_h + 24)
+    height = max(total + 12, hub_h + 20)
     hub_y = (height - hub_h) / 2
     parts = [f'<svg viewBox="0 0 {width:.0f} {height:.0f}" role="img" aria-label="{_e(hub)}与失衡集群关系">']
     y = (height - total) / 2
@@ -1043,53 +1026,17 @@ def _graph_svg(hub, hub_lines, nodes):
             f'<rect class="node pri-{css}" x="{node_x:.1f}" y="{top:.1f}" width="{width - node_x - 6:.0f}" '
             f'height="{box_h:.0f}" rx="7"/>'
         )
-        parts.append(f'<rect class="badge pri-{css}" x="{node_x + 10:.1f}" y="{top + 9:.1f}" width="32" height="19"/>')
-        parts.append(f'<text class="bid" x="{node_x + 26:.1f}" y="{top + 23:.1f}" text-anchor="middle">'
+        parts.append(f'<rect class="badge pri-{css}" x="{node_x + 10:.1f}" y="{top + 6:.1f}" width="32" height="18" '
+                     'rx="3"/>')
+        parts.append(f'<text class="bid" x="{node_x + 26:.1f}" y="{top + 19.5:.1f}" text-anchor="middle">'
                      f'{_e(identifier)}</text>')
         for index, line in enumerate(lines):
-            parts.append(f'<text class="nt" x="{node_x + 50:.1f}" y="{top + 23 + index * 18:.1f}">{_e(line)}</text>')
+            parts.append(f'<text class="nt" x="{node_x + 50:.1f}" y="{top + 20 + index * 17:.1f}">{_e(line)}</text>')
         if sub:
-            parts.append(f'<text class="ns" x="{node_x + 50:.1f}" y="{top + 23 + len(lines) * 18 + 2:.1f}">'
+            parts.append(f'<text class="ns" x="{node_x + 50:.1f}" y="{top + 19 + len(lines) * 17:.1f}">'
                          f'{_e(sub[0])}</text>')
     parts.append('</svg>')
     return ''.join(parts)
-
-
-def _legend():
-    def chip_row():
-        return ''.join(_level_chip(level) for level in charts.LEVELS)
-
-    sample = (
-        '<svg viewBox="0 0 92 18" aria-hidden="true"><line class="trk" x1="2" y1="8" x2="90" y2="8"/>'
-        '<rect class="band" x="24" y="3" width="40" height="10" rx="3"/>'
-        '<rect class="tgt" x="34" y="14.5" width="22" height="3" rx="1.5"/>'
-        '<circle class="ring" cx="74" cy="8" r="5.9"/><circle class="dot lv-focus" cx="74" cy="8" r="4.8"/></svg>'
-    )
-    return (
-        '<div class="as-legend" aria-label="阅读图例">'
-        f'<b>状态分档</b><div>{chip_row()}</div>'
-        f'<b>参考范围条</b><div><span class="sw">{sample}</span>'
-        '<span>绿色区段为临床参考区间，下方深色细条为有出处的目标区间，圆点为本次实测值并按状态着色</span></div>'
-        '<b>未分级</b><div><span class="as-tag lv-none"><i></i>空心圆点</span>'
-        '<span>没有可比的参考区间或分档，只列出原始数值</span></div>'
-        f'<b>优先级</b><div>{"".join(_priority_chip(key) for key in ("P0", "P1", "P2"))}</div>'
-        '</div>'
-    )
-
-
-def _schedule_marks(days):
-    """Column -> first/repeat mark of an interval within twelve months."""
-    if not isinstance(days, (int, float)) or days <= 0:
-        return {}
-    marks = {}
-    moment = float(days)
-    while moment <= 366:
-        column = next((index for index, (_, limit) in enumerate(_SCHEDULE) if moment <= limit), None)
-        if column is None:
-            break
-        marks.setdefault(column, 're' if marks else 'first')
-        moment += days
-    return marks
 
 
 def _cited_numbers(node):
@@ -1115,19 +1062,34 @@ def _anchor_tag(anchor, level):
     )
 
 
-def _advice_quotes(item):
-    return list(_recorded_advice(item))
+def _band_text(band):
+    low, high = band.get('low'), band.get('high')
+    if low is None:
+        return f'<{_fmt(high)}'
+    if high is None:
+        return f'>{_fmt(low)}'
+    return f'{_fmt(low)}–{_fmt(high)}'
+
+
+def _strip_lead(text, name):
+    """A line without the item name it repeats at its start."""
+    text = _text(text).strip()
+    if name and text.startswith(name):
+        return text[len(name):].lstrip('：:，,；; ')
+    return text
 
 
 class _AssessmentRenderer:
     def __init__(self, data, presentation, *, status=None, partial_reasons=()):
         # Completeness travels in the callback status; the page shows no banner.
         self.data = presentation
-        # The appendix lists the works this report cites, as the delivered callback does.
         cited = set(_cited_numbers(presentation))
         self.references = {number: row for number, row in _numbered_refs(data).items() if number in cited}
-        self.core_clusters = list(presentation.get('clusters') or ())
+        # The appendix lists the works that a printed citation mark points to, in order of first mention.
+        self.shown_refs = {}
+        self.core_clusters = [item for item in presentation.get('clusters') or () if isinstance(item, dict)]
         self.cluster_ids = {item.get('id') for item in self.core_clusters}
+        self.cluster_priority = {item.get('id'): item.get('priority') for item in self.core_clusters}
         self.overview_data = presentation.get('overview') or {}
         self.clinical_data = presentation.get('clinical') or {}
         # Older callbacks carry no chart fields; the same parser fills them on a copy.
@@ -1144,6 +1106,7 @@ class _AssessmentRenderer:
         }
         links = ''
         for number in numbers:
+            self.shown_refs.setdefault(number, None)
             row = self.references[number]
             title = ' · '.join(_text(value) for value in (row.get('title'), row.get('year')) if value)
             title_attr = f' title="{_e(title)}"' if title else ''
@@ -1160,20 +1123,18 @@ class _AssessmentRenderer:
             f'<p{klass}>{_e(part)}{tail if index == len(parts) - 1 else ""}</p>' for index, part in enumerate(parts)
         )
 
-    def cluster_link(self, cluster_id, label):
+    def cluster_chip(self, cluster_id, label=None):
+        css = _PRIORITIES.get(self.cluster_priority.get(cluster_id), ('', 'p1'))[1]
         anchor = _cluster_anchor(cluster_id)
+        text = _e(label or cluster_id)
         if anchor and cluster_id in self.cluster_ids:
-            return f'<a href="#{anchor}">{_e(label)}</a>'
-        return _e(label)
+            return f'<a class="as-cid pri-{css}" href="#{anchor}">{text}</a>'
+        return f'<span class="as-cid pri-{css}">{text}</span>'
 
-    def tag(self, row, *, microbiome=False, name=None):
+    def tag(self, row, *, microbiome=False):
         """One measured value as a tag: name, value, unit, direction; the dot carries the level."""
         fields = charts.microbiome_chart_fields(row) if microbiome else charts.clinical_chart_fields(row)
-        level = fields.get('level')
-        if name is None:
-            name = charts.display_name(clinical_observation_display_name(row) or row.get('name'))
-        label = name
-        label = _label(label)
+        name = _label(charts.display_name(clinical_observation_display_name(row) or row.get('name')))
         number = charts.parse_number(row.get('value'), row.get('unit'))
         value = ''
         if number is not None:
@@ -1182,106 +1143,94 @@ class _AssessmentRenderer:
                 value += f'<small>{_e(_unit(row["unit"]))}</small>'
         else:
             shown = _clinical_display(row) if not microbiome else _value(row)
-            if shown and shown != label and len(shown) <= 18 and shown not in label:
+            if shown and shown != name and len(shown) <= 18 and shown not in name:
                 value = f'<b>{_e(shown)}</b>'
-        if not label and not value:
+        if not name and not value:
             return ''
         return (
-            f'<span class="as-tag lv-{_level_class(level)}"><i></i>{_e(label)}{" " if value else ""}{value}'
-            f'{_arrow(fields.get("direction"))}</span>'
+            f'<span class="as-tag lv-{_level_class(fields.get("level"))}"><i></i>{_e(name)}{" " if value else ""}'
+            f'{value}{_arrow(fields.get("direction"))}</span>'
         )
 
     def tags(self, rows, *, microbiome=False):
-        items = [self.tag(row, microbiome=microbiome) for row in rows or ()]
+        items = [self.tag(row, microbiome=microbiome) for row in rows or () if isinstance(row, dict)]
         unique = list(dict.fromkeys(item for item in items if item))
         return f'<div class="as-tags">{"".join(unique)}</div>' if unique else ''
 
-    def measure_row(self, row, *, name=None, date_shown=False):
-        """A clinical row: name | value + level | reference bar | reference and target text."""
+    def value_line(self, row, *, named=True):
+        """A clinical result: name, value, unit and direction, with a small reference bar under a number."""
         fields = charts.clinical_chart_fields(row)
-        level, number = fields['level'], fields['valueNumber']
-        title = _label(name or charts.display_name(row.get('name')))
-        when = f'<small>{_e(row["observedAt"])}</small>' if date_shown and row.get('observedAt') else ''
-        if row.get('sourceKind') == 'derived':
-            when += '<small>计算值</small>'
-        chip = _level_chip(level) if level in {charts.FOCUS, charts.BORDERLINE} else ''
-        if number is None:
-            text = _clinical_display(row)
-            if title and text.startswith(title):
-                text = text[len(title) :].lstrip(' ：:')
-            return (
-                f'<div class="as-mrow"><div class="nm">{_e(title)}{when}</div><div class="val">{chip}</div>'
-                f'<div class="txt">{_e(text) or _e(_text(row.get("templateStatus") or row.get("status")))}</div></div>'
-            )
+        level, number = fields.get('level'), fields.get('valueNumber')
+        name, shown = _row_label(row)
+        css = f' class="lv-{level}"' if level in {charts.FOCUS, charts.BORDERLINE} else ''
         value = _text(row.get('value')).strip()
-        shown = f'<b>{_e(value)}</b> {_e(_unit(row.get("unit")))}{_arrow(fields["direction"])}'
-        reference_text = _text(row.get('referenceRange')).strip()
-        target = fields.get('target') if isinstance(fields.get('target'), dict) else None
-        low, high, kind = fields['referenceLow'], fields['referenceHigh'], fields['referenceKind']
-        label = f'{title} {_text(row.get("value"))}{_text(row.get("unit"))}'
-        if kind in {'range', 'upper', 'lower'}:
-            chart = _range_svg(number, low, high, kind, level, label + f'，参考 {reference_text}', target)
-        elif target and (target.get('low') is not None or target.get('high') is not None):
-            t_kind = 'range' if target.get('low') is not None and target.get('high') is not None else (
-                'upper' if target.get('high') is not None else 'lower')
-            chart = _range_svg(number, target.get('low'), target.get('high'), t_kind, level, label, None)
+        if number is not None and re.fullmatch(r'[<>≤≥]?\s*[+-]?\d+(?:\.\d+)?\s*[↑↓]*', value):
+            unit = _unit(row.get('unit'))
+            result = (f'<span class="r"><b{css}>{_e(value)}</b>{" " + _e(unit) if unit else ""}'
+                      f'{_arrow(fields.get("direction"))}</span>')
+        elif shown and len(shown) > 14:
+            result = f'<span class="tx">{_e(shown)}</span>{_arrow(fields.get("direction"))}'
+        elif shown:
+            result = f'<b{css}>{_e(shown)}</b>{_arrow(fields.get("direction"))}'
         else:
-            chart = '<span class="gap">无参考区间</span>'
-        notes = []
-        if reference_text:
-            notes.append(f'参考 {_e(reference_text)}')
-        status = charts.status_text(row)
-        if not reference_text and status and not charts.is_normal_label(status) and len(status) <= 10:
-            notes.append(f'分级 {_e(status)}')
-        if target:
-            target_text = _text(target.get('text')) or '–'.join(
-                _fmt(value) for value in (target.get('low'), target.get('high')) if value is not None
-            )
-            notes.append(f'目标 {_e(target_text)}{self.refs(target)}')
-        return (
-            f'<div class="as-mrow"><div class="nm">{_e(title)}{when}</div><div class="val">{shown}{chip}</div>'
-            f'<div class="ch">{chart}</div><div class="ref">{"<br>".join(notes)}</div></div>'
-        )
-
-    def normal_line(self, rows, label='参考范围内'):
-        items = []
-        for row in rows:
-            name = _label(charts.display_name(row.get('name')))
-            value = _value(row) if charts.parse_number(row.get('value'), row.get('unit')) is not None else ''
-            if not value:
-                shown = _clinical_display(row)
-                value = shown if shown and shown != name and len(shown) <= 16 else ''
-            items.append(f'{_e(name)}{" " if value else ""}<span class="num">{_e(_unit(value))}</span>')
-        if not items:
+            result = _arrow(fields.get('direction'))
+        if not named and not result:
+            result = f'<b{css}>{_e(name)}</b>'
+        label = f'<span class="nm">{_e(name)}</span> ' if named and name else ''
+        if not label and not result:
             return ''
-        icon = _ICONS['normal'].replace('aria-hidden="true"', 'aria-hidden="true" style="color:var(--normal)"')
-        return f'<div class="as-normal">{icon}<span><b>{_e(label)}</b>　{"；".join(items)}</span></div>'
+        bar = ''
+        if isinstance(number, (int, float)):
+            target = fields.get('target') if isinstance(fields.get('target'), dict) else None
+            kind, low, high = fields.get('referenceKind'), fields.get('referenceLow'), fields.get('referenceHigh')
+            aria = f'{name} {value}{_unit(row.get("unit"))}'
+            if kind in {'range', 'upper', 'lower'} and (low is not None or high is not None):
+                bar = _range_svg(number, low, high, kind, level, aria, target)
+            elif target and (target.get('low') is not None or target.get('high') is not None):
+                t_low, t_high = target.get('low'), target.get('high')
+                t_kind = 'range' if t_low is not None and t_high is not None else (
+                    'upper' if t_high is not None else 'lower')
+                bar = _range_svg(number, t_low, t_high, t_kind, level, aria)
+        return f'<div class="as-v">{label}{result}{bar}</div>'
 
-    def panel(self, title, rows, node=None, *, summary=None, extra=''):
-        """A measured group: head with level, abnormal rows drawn, normal rows on one line, then the reading."""
-        rows = [row for row in rows or () if row.get('name')]
-        levels = [charts.clinical_chart_fields(row)['level'] for row in rows]
-        abnormal = [row for row, level in zip(rows, levels, strict=True) if level in {charts.FOCUS, charts.BORDERLINE}]
-        unknown = [row for row, level in zip(rows, levels, strict=True) if level is None]
-        normal = [row for row, level in zip(rows, levels, strict=True) if level == charts.NORMAL]
-        shared = _shared_date(rows)
-        numeric = [row for row in unknown if charts.parse_number(row.get('value'), row.get('unit')) is not None]
-        drawn = [*abnormal, *numeric]
-        listed = [row for row in unknown if row not in drawn]
-        body = ''.join(self.measure_row(row, date_shown=not shared) for row in drawn)
-        body = f'<div class="as-mrows">{body}</div>' if body else ''
-        body += self.normal_line(normal)
-        body += self.normal_line(listed, '其他记录')
-        reading = self.paragraph(summary, node) if summary else ''
-        if not body and not reading:
-            return ''
-        level = charts.worst_level(levels)
-        date_html = f'<small>{_e(shared)}</small>' if shared else ''
-        return (
-            f'<div class="as-panel"><div class="as-panel-head"><h4>{_e(_label(title))}</h4>{date_html}'
-            f'{_level_chip(level)}</div>{body}{extra}'
-            f'{f"<div class=as-interp>{reading}</div>" if reading else ""}</div>'
-        )
+    def values_cell(self, rows):
+        rows = [row for row in rows or () if isinstance(row, dict) and (row.get('name') or row.get('value'))]
+        lines = ''.join(self.value_line(row, named=len(rows) > 1 or not row.get('value')) for row in rows)
+        return lines or _DASH
+
+    def reference_cell(self, rows, group):
+        """Each row's clinical reference range, then the group's ideal target as "理想：…".
+
+        Callbacks without ``comparisonReference`` show the rows' own targets instead.
+        """
+        rows = [row for row in rows or () if isinstance(row, dict)]
+        lines = []
+        ranged = [row for row in rows if _text(row.get('referenceRange')).strip()]
+        for row in ranged:
+            name = _short_name(_row_label(row)[0]) if len(rows) > 1 else ''
+            lines.append(f'<div>{_e(name + " " if name else "")}{_e(_label(row.get("referenceRange")))}</div>')
+        ideal = _text(group.get('comparisonReference')).strip()
+        if ideal:
+            lines.append(f'<div class="ideal">理想：{_e(ideal)}</div>')
+        elif 'comparisonReference' not in group:
+            for row in rows:
+                target = row.get('target')
+                if not isinstance(target, dict):
+                    continue
+                text = _text(target.get('text')) or '–'.join(
+                    _fmt(value) for value in (target.get('low'), target.get('high')) if value is not None
+                )
+                if text:
+                    name = _short_name(_row_label(row)[0]) if len(rows) > 1 else ''
+                    lines.append(f'<div class="ideal">理想：{_e(name + " " if name else "")}{_e(text)}</div>')
+        return f'<div class="as-ref">{"".join(lines)}</div>' if lines else _DASH
+
+    def group_status(self, group, rows=(), *, microbiome=False):
+        level = group.get('level')
+        if level not in charts.LEVEL_LABELS:
+            fields = charts.microbiome_chart_fields if microbiome else charts.clinical_chart_fields
+            level = charts.worst_level(fields(row).get('level') for row in rows if isinstance(row, dict))
+        return _status_chip(group.get('status'), level) or _DASH
 
     # ----- front matter -----
 
@@ -1291,227 +1240,189 @@ class _AssessmentRenderer:
         guide = ''.join(
             f'<li><strong>{_e(row.get("name"))}：</strong>{_e(row.get("text"))}</li>'
             for row in overview.get('readingGuide') or ()
-            if row.get('text')
+            if isinstance(row, dict) and row.get('text')
         )
-        guide = f'<ol class="as-small">{guide}</ol>' if guide else ''
-        return intro + guide + _legend()
+        if guide:
+            guide = f'<p><strong>本报告阅读指南：</strong></p><ol class="as-small">{guide}</ol>'
+        return intro + guide
 
     # ----- chapter one -----
 
     def body_measurements(self):
         clinical = self.clinical_data
-        groups = clinical.get('bodyGroups') or ()
-        if not groups and clinical.get('bodyMetrics'):
-            groups = [{'name': '体格测量', 'rows': clinical['bodyMetrics']}]
-        blocks = []
+        groups = [group for group in clinical.get('bodyGroups') or () if isinstance(group, dict)]
+        if not groups:
+            groups = [{'name': charts.display_name(row.get('name')), 'rows': [row]}
+                      for row in clinical.get('bodyMetrics') or () if isinstance(row, dict) and row.get('name')]
+        rows = []
         for group in groups:
-            rows = [row for row in group.get('rows') or () if row.get('name')]
-            if not rows:
-                continue
-            shared = _shared_date(rows)
-            measured = ''.join(self.measure_row(row, date_shown=not shared) for row in rows)
-            level = charts.worst_level(charts.clinical_chart_fields(row)['level'] for row in rows)
-            date_html = f'<small>{_e(shared)}</small>' if shared else ''
+            members = [row for row in group.get('rows') or () if isinstance(row, dict) and row.get('name')]
             reading = self.paragraph(group.get('summary'), group)
-            blocks.append(
-                f'<div class="as-panel"><div class="as-panel-head"><h4>{_e(_label(group.get("name")))}</h4>'
-                f'{date_html}{_level_chip(level)}</div><div class="as-mrows">{measured}</div>'
-                f'{f"<div class=as-interp>{reading}</div>" if reading else ""}</div>'
+            if not members and not reading:
+                continue
+            rows.append(_tr((
+                f'<td class="k">{_e(_label(group.get("name")))}</td><td>{self.values_cell(members)}</td>',
+                f'<td>{self.reference_cell(members, group)}</td>',
+                f'<td class="st">{self.group_status(group, members)}</td><td>{reading or _DASH}</td>',
+            ), long=_is_long(len(members), group.get('summary'))))
+        overview = self.overview_data
+        summary = _text(overview.get('bodySummary')).strip()
+        phenotype = _text(overview.get('phenotype')).strip()
+        lead = ''
+        if summary:
+            parts = [part.strip() for part in summary.split('\n\n') if part.strip()]
+            refs = self.refs({'evidenceRefs': overview.get('bodySummaryEvidenceRefs')})
+            prefix = f'<strong>{_e(phenotype)}。</strong>' if phenotype and phenotype not in summary else ''
+            lead = ''.join(
+                f'<p class="as-lead">{prefix if index == 0 else ""}{_e(part)}{refs if index == len(parts) - 1 else ""}'
+                '</p>'
+                for index, part in enumerate(parts)
             )
-        lead = self.paragraph(
-            self.overview_data.get('bodySummary'), {'evidenceRefs': self.overview_data.get('bodySummaryEvidenceRefs')},
-            css='as-lead',
+        elif phenotype:
+            lead = f'<p class="as-lead"><strong>{_e(phenotype)}</strong></p>'
+        table = _table(
+            ('评估指标', '实测数值', '参考基准 / 理想目标', '状态', '生理与代谢意义'), (15, 23, 19, 15, 28), rows,
         )
-        if not blocks:
+        if not table:
             return lead or _note('本次资料未包含体格测量。')
-        return lead + ''.join(blocks)
+        return lead + table
 
-    def systems(self):
-        provided = {row.get('code'): row for row in self.overview_data.get('systems') or ()}
-        cards = []
-        definitions = list(_SYSTEMS)
-        other_rows = [
-            row for group in self.clinical_data.get('clinicalGroups') or () if group.get('code') == _OTHER_SYSTEM[0]
-            for row in group.get('rows') or ()
-        ]
-        if other_rows:
-            definitions.append((_OTHER_SYSTEM[0], _OTHER_SYSTEM[1], (_OTHER_SYSTEM[0],)))
-        for code, name, group_codes in definitions:
-            row = provided.get(code) or {}
+    def system_rows(self):
+        """(name, level, status, findings html, summary node) of each system; older callbacks are completed here."""
+        provided = [row for row in self.overview_data.get('systems') or () if isinstance(row, dict)]
+        if provided:
+            items = [((row.get('code'), row.get('name'), None), row) for row in provided]
+        else:
+            definitions = list(_SYSTEMS)
+            other_rows = [
+                row for group in self.clinical_data.get('clinicalGroups') or ()
+                if group.get('code') == _OTHER_SYSTEM[0] for row in group.get('rows') or ()
+            ]
+            if other_rows:
+                definitions.append((_OTHER_SYSTEM[0], _OTHER_SYSTEM[1], (_OTHER_SYSTEM[0],)))
+            items = [(definition, {}) for definition in definitions]
+        result = []
+        for (code, name, group_codes), row in items:
             fields = {key: row.get(key) for key in ('level', 'anchors', 'moreCount')}
             if fields['level'] is None and fields['anchors'] is None:
-                atoms = charts.system_atoms(code, group_codes, self.clinical_data, self.microbiome_data)
+                codes = group_codes
+                if codes is None:
+                    codes = next((codes for known, _, codes in _SYSTEMS if known == code), (code,))
+                atoms = charts.system_atoms(code, codes, self.clinical_data, self.microbiome_data)
                 fields = charts.system_chart_fields(atoms, row.get('rows') or (), microbiome=code == 'microbiome')
             level = fields.get('level') or (charts.NOT_TESTED if not row else None)
-            if code == _OTHER_SYSTEM[0] and level == charts.NORMAL:
+            if not row and code == _OTHER_SYSTEM[0] and level == charts.NORMAL:
                 continue
-            anchors = ''.join(_anchor_tag(anchor, level) for anchor in fields.get('anchors') or ())
-            more = fields.get('moreCount') or 0
-            if more:
-                where = '第四章' if code == 'microbiome' else '第三章'
-                anchors += f'<span class="as-more">另有 {more} 项，见{where}</span>'
-            if level == charts.NOT_TESTED:
-                body = '<p>本次资料未包含该系统的检查项目。</p>'
+            name = row.get('name') or name or next((known for key, known, _ in _SYSTEMS if key == code), '')
+            result.append((name, level, row, fields))
+        return result
+
+    def systems(self):
+        rows = []
+        for name, level, row, fields in self.system_rows():
+            if level == charts.NOT_TESTED or _text(row.get('status')).strip() == '未检测':
+                rows.append(f'<tr><td class="k">{_e(name)}</td><td class="st">{_status_chip("未检测")}</td>'
+                            f'<td>{_DASH}</td><td>{_DASH}</td></tr>')
+                continue
+            findings = _text(row.get('keyFindings')).strip()
+            if findings:
+                findings = f'<p>{_e(findings)}</p>'
             else:
-                verdict = _text(row.get('summary')).split('\n\n')[0].strip()
-                body = (f'<div class="as-tags">{anchors}</div>' if anchors else
-                        '<p>已检项目均在参考范围内。</p>' if level == charts.NORMAL else '')
-                if verdict:
-                    body += f'<p>{_e(verdict)}{self.refs(row)}</p>'
-            cards.append(
-                f'<article class="as-sys lv-{_level_class(level)}"><header><h4>{_e(row.get("name") or name)}</h4>'
-                f'{_level_chip(level) or _level_chip(charts.NOT_TESTED, "未分级")}</header>'
-                f'<div class="bd">{body}</div></article>'
+                anchors = ''.join(_anchor_tag(anchor, level) for anchor in fields.get('anchors') or ()
+                                  if isinstance(anchor, dict) and anchor.get('name'))
+                more = fields.get('moreCount') or 0
+                if more:
+                    where = '第四章' if row.get('code') == 'microbiome' else '第三章'
+                    anchors += f'<span class="as-more">另有 {more} 项，见{where}</span>'
+                findings = f'<div class="as-tags">{anchors}</div>' if anchors else ''
+            verdict = self.paragraph(row.get('summary'), row)
+            if not findings and not verdict and level == charts.NORMAL:
+                verdict = '<p>已检项目均在参考范围内。</p>'
+            chip = _status_chip(row.get('status'), level) or _DASH
+            rows.append(
+                f'<tr><td class="k">{_e(name)}</td><td class="st">{chip}</td>'
+                f'<td>{findings or _DASH}</td><td>{verdict or _DASH}</td></tr>'
             )
         summary = self.paragraph(self.overview_data.get('summary'), self.overview_data, css='as-lead')
-        return summary + f'<div class="as-systems">{"".join(cards)}</div>'
+        table = _table(('系统', '综合状态', '核心异常与关键实测值', '当前阶段评估结论'), (17, 14, 38, 31), rows)
+        return summary + table
 
-    def priority_cards(self):
-        findings = list(self.overview_data.get('priorityFindings') or ())
-        if any('items' in row for row in findings):
-            return self.structured_priorities(findings)
-        return self.legacy_priorities(findings)
+    def item_facts(self, item):
+        facts = []
+        timeframe = (item.get('timeframe') or {}).get('text') if isinstance(item.get('timeframe'), dict) else None
+        if timeframe:
+            facts.append(('时限', timeframe))
+        if item.get('department'):
+            facts.append(('科室', item['department']))
+        checks = [_text(check) for check in item.get('checks') or () if _text(check).strip()]
+        if checks:
+            facts.append(('需完成', '、'.join(checks)))
+        if not facts:
+            return ''
+        return '<div class="as-facts">' + ''.join(
+            f'<span class="as-fact"><small>{_e(label)}</small>{_e(value)}</span>' for label, value in facts
+        ) + '</div>'
 
-    def structured_priorities(self, findings):
-        """1.3 in three parts (``priorityFindings[code=urgent|routine|gaps].items[]``)."""
+    def priorities(self):
+        """1.3 in three parts: an urgent callout, a routine follow-up table and a table of tests to add."""
+        findings = [row for row in self.overview_data.get('priorityFindings') or () if isinstance(row, dict)]
         sections = {row.get('code'): row for row in findings}
         urgent = sections.get('urgent') or {}
-        items = urgent.get('items') or []
-        html = '<h4 class="as-sub">优先排查</h4>'
+        items = [item for item in urgent.get('items') or () if isinstance(item, dict)]
         if items:
-            cards = ''.join(self.item_card(item) for item in items)
-            html += self.paragraph(urgent.get('text'), urgent) + f'<div class="as-actions">{cards}</div>'
+            blocks = ''.join(
+                f'<div class="as-urgent"><h5>{_e(_label(item.get("name") or item.get("title")))}'
+                f'{self.cluster_ref(item.get("clusterId"))}</h5>{self.item_facts(item)}'
+                f'{self.paragraph(item.get("text"), item)}</div>'
+                for item in items
+            )
+            html = f'<div class="as-callout urgent"><h4>临床优先排查</h4>{blocks}</div>'
+        elif urgent.get('text') and 'items' not in urgent:
+            # An older callback keeps the urgent finding as one paragraph.
+            html = _callout('临床优先排查', self.paragraph(urgent.get('text'), urgent), css='urgent')
         else:
-            html += _note(_text(urgent.get('text')) or '本次未发现需优先就医排查的结果。')
+            html = _note(_text(urgent.get('text')) or '本次未发现需优先就医排查的结果。')
         routine = sections.get('routine') or {}
-        items = routine.get('items') or []
-        html += '<h4 class="as-sub">常规专科随访</h4>'
+        items = [item for item in routine.get('items') or () if isinstance(item, dict)]
         if items:
-            scheduled = [item for item in items if isinstance((item.get('timeframe') or {}).get('days'), (int, float))]
-            listed = [item for item in items if item not in scheduled]
-            html += self.paragraph(routine.get('text'), routine)
-            html += self.schedule(scheduled) if scheduled else ''
-            html += self.item_list(listed)
-        else:
-            html += _note(_text(routine.get('text')) or '本次未发现需定期专科复查的发现。')
-        gaps = (sections.get('gaps') or {}).get('items') or []
-        if gaps:
-            html += '<h4 class="as-sub">检测盲区</h4>' + self.paragraph((sections.get('gaps') or {}).get('text'))
-            html += self.item_list(gaps, reason=True)
+            rows = []
+            for item in items:
+                name = _label(item.get('name') or item.get('title'))
+                timeframe = item.get('timeframe') if isinstance(item.get('timeframe'), dict) else {}
+                rows.append(
+                    f'<tr><td class="k">{_e(name)}</td><td>{_e(item.get("department")) or _DASH}</td>'
+                    f'<td>{_e(timeframe.get("text")) or _DASH}</td>'
+                    f'<td>{self.paragraph(_strip_lead(item.get("text"), name), item) or _DASH}</td></tr>'
+                )
+            html += '<h4>常规专科随访</h4>' + _table(('发现', '科室', '复查间隔', '说明'), (24, 13, 15, 48), rows)
+        elif routine.get('text'):
+            html += '<h4>常规专科随访</h4>' + self.paragraph(routine.get('text'), routine)
+        gaps = sections.get('gaps') or {}
+        items = [item for item in gaps.get('items') or () if isinstance(item, dict)]
+        if items:
+            rows = []
+            for item in items:
+                name = _label(item.get('name') or item.get('title') or item.get('test'))
+                reason = _strip_lead(item.get('text') or item.get('reason'), name)
+                rows.append(f'<tr><td class="k">{_e(name)}</td><td>{self.paragraph(reason, item) or _DASH}</td></tr>')
+            html += '<h4>建议补查</h4>' + _table(('建议补查', '依据'), (26, 74), rows)
+        elif gaps.get('text'):
+            html += '<h4>建议补查</h4>' + self.paragraph(gaps.get('text'), gaps)
+        for row in findings:  # older callbacks may carry other finding codes
+            if row.get('code') not in {'urgent', 'routine', 'gaps'} and (row.get('text') or row.get('action')):
+                html += f'<h4>{_e(_label(row.get("name")))}</h4>' + self.paragraph(row.get('text') or row.get('action'),
+                                                                                    row)
         return html
 
-    def item_card(self, item):
-        timeframe = (item.get('timeframe') or {}).get('text')
-        title = _text(item.get('name') or item.get('title'))
-        # The card line is composed from the drawn fields; it is shown only when they are absent.
-        text = None if (timeframe or item.get('department') or item.get('checks')) else item.get('text')
-        card = self.action_card(
-            title, item.get('priority') or 'P0', timeframe=timeframe, department=item.get('department'),
-            checks=item.get('checks'), basis=item.get('basisRows'), text=text,
-        )
-        if cluster := item.get('clusterId'):
-            card = card.replace('</h4></header>', f'</h4>{self.cluster_ref(cluster)}</header>', 1)
-        return card
-
     def cluster_ref(self, cluster_id):
-        anchor = _cluster_anchor(cluster_id)
-        if anchor and cluster_id in self.cluster_ids:
-            return f'<a class="as-more" href="#{anchor}">见集群 {_e(cluster_id)}</a>'
+        if cluster_id and cluster_id in self.cluster_ids:
+            return ' ' + self.cluster_chip(cluster_id, f'见集群 {cluster_id}')
         return ''
-
-    def item_list(self, items, *, reason=False):
-        rows = []
-        for item in items:
-            title = _text(item.get('name') or item.get('title') or item.get('test'))
-            detail = _text(item.get('reason')) if reason and item.get('reason') else _text(item.get('text'))
-            if detail.startswith(title):
-                detail = detail[len(title):].lstrip('：: ')
-            meta = ' '.join(
-                f'<span class="as-when">{_e(value)}</span>' for value in (
-                    (item.get('timeframe') or {}).get('text'), item.get('department'),
-                ) if value
-            )
-            rows.append(f'<li><strong>{_e(_label(title))}</strong><span>{meta}{" " if meta else ""}{_e(detail)}'
-                        f'{self.cluster_ref(item.get("clusterId")) if item.get("clusterId") else ""}</span></li>')
-        return f'<ul class="as-gaps">{"".join(rows)}</ul>' if rows else ''
-
-    def legacy_priorities(self, findings):
-        """Older callbacks: P0 clusters as cards, then the authored priority paragraphs."""
-        parts = []
-        for cluster in self.core_clusters:
-            if cluster.get('priority') != 'P0':
-                continue
-            clinical = [row for row in cluster.get('clinicalSignals') or ()
-                        if not _is_advice(row)
-                        and not any(source.get('sourceCode') == 'B' for source in row.get('sources') or ())]
-            parts.append(self.action_card(
-                f'{cluster.get("id")} {cluster.get("name")}', 'P0', basis=clinical,
-                advice=_advice_quotes(cluster), text=cluster.get('action'), node=cluster,
-            ))
-        gaps = ''
-        for finding in findings:
-            text = finding.get('action') or finding.get('text')
-            if finding.get('code') == 'gaps':
-                gaps += self.paragraph(text, finding)
-                continue
-            priority = _FINDING_PRIORITIES.get(finding.get('code'))
-            if priority == 'P0' and parts:
-                continue
-            parts.append(self.action_card(
-                _text(finding.get('name')), priority, text=text, node=finding, routine=priority is None,
-            ))
-        html = f'<div class="as-actions">{"".join(parts)}</div>' if parts else ''
-        if not any('class="as-act p0"' in part for part in parts):
-            html = _note('本次未发现需优先就医排查的结果。') + html
-        return html + (f'<h4 class="as-sub">检测盲区</h4>{gaps}' if gaps else '')
-
-    def action_card(self, title, priority, *, timeframe=None, department=None, checks=None, basis=None,
-                    advice=None, text=None, node=None, routine=False):
-        rows = []
-        if timeframe:
-            rows.append(f'<dt>时限</dt><dd><span class="as-when">{_e(timeframe)}</span></dd>')
-        if department:
-            rows.append(f'<dt>科室</dt><dd>{_e(department)}</dd>')
-        if checks:
-            rows.append(f'<dt>需完成</dt><dd>{_e("；".join(_text(check) for check in checks))}</dd>')
-        if basis:
-            rows.append(f'<dt>依据</dt><dd>{self.tags(basis)}</dd>')
-        if advice:
-            rows.append(f'<dt>检查建议</dt><dd>{"<br>".join(_e(quote) for quote in advice)}</dd>')
-        details = f'<dl>{"".join(rows)}</dl>' if rows else ''
-        reading = self.paragraph(text, node)
-        css = 'p0' if priority == 'P0' else 'routine' if routine else ''
-        chip = _priority_chip(priority) if priority else '<span class="as-pri pri-p3">常规随访</span>'
-        return (
-            f'<article class="as-act {css}"><header>{chip}<h4>{_e(_label(title))}</h4></header>'
-            f'{details}{reading}</article>'
-        )
-
-    def schedule(self, followups):
-        head = ''.join(f'<th class="c">{_e(label)}</th>' for label, _ in _SCHEDULE)
-        rows = []
-        for item in followups:
-            interval = item.get('interval') or item.get('timeframe') or {}
-            marks = _schedule_marks(interval.get('days'))
-            symbols = {'first': '<span class="mk"></span>', 're': '<span class="mk re"></span>'}
-            cells = ''.join(
-                f'<td class="c">{symbols.get(marks.get(index), "")}</td>' for index in range(len(_SCHEDULE))
-            )
-            rows.append(
-                f'<tr><td><b>{_e(item.get("name") or item.get("title"))}</b><br><small class="as-muted">'
-                f'{_e(" · ".join(_text(value) for value in (interval.get("text"), item.get("department")) if value))}'
-                f'</small></td>{cells}</tr>'
-            )
-        legend = ('<div class="legend"><span><i class="mk"></i>首次复查</span>'
-                  '<span><i class="mk re"></i>按间隔再次复查</span></div>')
-        return (
-            f'<table class="sched"><thead><tr><th>事项</th>{head}</tr></thead><tbody>{"".join(rows)}</tbody></table>'
-            + legend
-        )
 
     def hub_lines(self):
         lines = []
         body_rows = [row for group in self.clinical_data.get('bodyGroups') or () for row in group.get('rows') or ()]
+        body_rows = body_rows or list(self.clinical_data.get('bodyMetrics') or ())
         for pattern in (r'BMI|体重指数', r'内脏脂肪'):
             row = next((row for row in body_rows if re.search(pattern, _text(row.get('name')))), None)
             if row and charts.parse_number(row.get('value')) is not None:
@@ -1532,7 +1443,7 @@ class _AssessmentRenderer:
         texts = []
         for row, microbiome in [*((row, False) for row in cluster.get('clinicalSignals') or ()),
                                 *((row, True) for row in cluster.get('microbiomeSignals') or ())]:
-            if _is_advice(row) or any(source.get('sourceCode') == 'B' for source in row.get('sources') or ()):
+            if _is_advice(row) or _is_personal(row):
                 continue
             fields = charts.microbiome_chart_fields(row) if microbiome else charts.clinical_chart_fields(row)
             if fields.get('level') not in {charts.FOCUS, charts.BORDERLINE}:
@@ -1556,20 +1467,22 @@ class _AssessmentRenderer:
             for item in clusters
         ]
         hub = _text(self.overview_data.get('graphHub')) or '核心失衡态势'
+        figure = f'<figure class="as-graph">{_graph_svg(hub, self.hub_lines(), nodes)}</figure>'
+        lines = ''.join(
+            f'<li>{self.cluster_chip(item.get("id"))}{_e(_label(item.get("name")))}'
+            f'{_priority_chip(item.get("priority"))}</li>'
+            for item in clusters
+        )
         summary = self.paragraph(
             self.overview_data.get('graphSummary'), {'evidenceRefs': self.overview_data.get('graphSummaryEvidenceRefs')}
         )
-        figure = (
-            f'<figure class="as-graph">{_graph_svg(hub, self.hub_lines(), nodes)}'
-            '<figcaption>左侧为本次关键指标，右侧为失衡集群及优先级；各集群的证据与解读见第五章。</figcaption></figure>'
-        )
-        return summary + figure
+        return figure + f'<ul class="as-clines">{lines}</ul>' + summary
 
     def overview(self):
         return (
             _subsection('1.1 基础体格与人体成分深度校准', self.body_measurements())
             + _subsection('1.2 多系统健康状态分级总览', self.systems())
-            + _subsection('1.3 临床优先排查项与未检风险提示', self.priority_cards())
+            + _subsection('1.3 临床优先排查项与未检风险提示', self.priorities())
             + _subsection('1.4 核心系统失衡态势速览', self.problem_graph())
         )
 
@@ -1577,115 +1490,132 @@ class _AssessmentRenderer:
 
     def symptoms(self):
         clinical = self.clinical_data
-        symptoms = [item for item in clinical.get('symptoms') or () if item.get('name') or item.get('value')]
+        symptoms = [item for item in clinical.get('symptoms') or ()
+                    if isinstance(item, dict) and (item.get('name') or item.get('value'))]
         lead = self.paragraph(clinical.get('symptomsLead'))
-        if not symptoms:
-            return (
-                _subsection('2.1 主诉症状谱与临床检验信号印证', _note('本次未记录主诉症状。'))
-                + _subsection(
-                    '2.2 主要异常与日常感受的关联',
-                    self.paragraph(clinical.get('symptomSummary'), {
-                        'evidenceRefs': clinical.get('symptomSummaryEvidenceRefs')
-                    }) or _note('本次未记录主诉症状，本节不作对照说明。'),
-                )
-            )
-        rows, readings = [], []
-        for index, item in enumerate(symptoms, start=1):
-            code = _text(item.get('code')) or f'S{index}'
-            name = _text(item.get('name'))
-            context = _qa_html(item.get('history'))
-            if item.get('value') and _text(item.get('value')) not in name:
-                context = f'<span class="qa">表现：{_e(item["value"])}</span>' + context
-            signals = item.get('clinicalSignals') or ()
-            personal = [row for row in signals if any(src.get('sourceCode') == 'B' for src in row.get('sources') or ())]
-            context += ''.join(
-                f'<span class="qa">{_e(_prompt(row.get("name")))}：{_e(row.get("value"))}</span>'
-                for row in personal if row.get('value') and _text(row.get('value')) not in context
-            )
-            observed = [row for row in signals if row not in personal]
-            rows.append(
-                f'<tr><td><span class="as-cid">{_e(code)}</span> <b>{_e(name)}</b></td><td>{context or "—"}</td>'
-                f'<td>{self.tags(observed) or "<span class=as-muted>—</span>"}</td>'
-                f'<td>{self.tags(item.get("microbiomeSignals"), microbiome=True) or "<span class=as-muted>—</span>"}'
-                '</td></tr>'
-            )
-            explanations = [self.paragraph(item.get('interpretation'), item)]
-            for signal in [*(item.get('clinicalSignals') or ()), *(item.get('microbiomeSignals') or ())]:
-                if signal.get('interpretation'):
-                    explanations.append(self.paragraph(signal['interpretation'], signal))
-            body = ''.join(dict.fromkeys(part for part in explanations if part))
-            if body:
-                readings.append(f'<li><h4>{_e(code)} {_e(name)}的相关线索</h4>{body}</li>')
-        matrix = (
-            '<table class="as-matrix"><colgroup><col style="width:17%"><col style="width:27%"><col style="width:28%">'
-            '<col style="width:28%"></colgroup><thead><tr><th>主诉</th><th>表现、持续与加重情境</th>'
-            '<th>临床检验与影像信号</th><th>菌群与代谢证据</th></tr></thead>'
-            f'<tbody>{"".join(rows)}</tbody></table>'
-        )
-        details = f'<ol class="as-readings">{"".join(readings)}</ol>' if readings else ''
         summary = self.paragraph(
             clinical.get('symptomSummary'), {'evidenceRefs': clinical.get('symptomSummaryEvidenceRefs')}
         )
-        if summary:
-            details += f'<div class="as-note"><h5>综合印证</h5>{summary}</div>'
+        if not symptoms:
+            return _subsection(
+                '2.1 主诉症状谱与临床检验信号印证', lead + summary or _note('本次未记录主诉症状。')
+            )
+        rows, readings = [], []
+        # The microbiome column is dropped only when the request carried no microbiome report at all.
+        gut = self.microbiome_data
+        with_microbiome = bool(gut.get('structureGroups') or gut.get('organismGroups')) or any(
+            item.get('microbiomeEvidence') or item.get('microbiomeSignals') for item in symptoms
+        )
+        for index, item in enumerate(symptoms, start=1):
+            code = _text(item.get('code')) or f'S{index}'
+            name = _text(item.get('name') or item.get('value'))
+            context = _answers_html(item.get('history'))
+            if item.get('value') and _text(item.get('value')) not in name:
+                context = f'<p>表现：{_e(item["value"])}</p>' + context
+            signals = [row for row in item.get('clinicalSignals') or () if isinstance(row, dict)]
+            personal = [row for row in signals if _is_personal(row)]
+            context += ''.join(
+                f'<p>{_e(_prompt(row.get("name")))}：{_e(row.get("value"))}</p>'
+                for row in personal if row.get('value') and _text(row.get('value')) not in context
+            )
+            observed = [row for row in signals if row not in personal and not _is_advice(row)]
+            clinical_text = self.paragraph(item.get('clinicalEvidence')) or self.tags(observed)
+            microbiome_text = (self.paragraph(item.get('microbiomeEvidence'))
+                               or self.tags(item.get('microbiomeSignals'), microbiome=True))
+            last = f'<td>{microbiome_text or _DASH}</td>' if with_microbiome else ''
+            rows.append(
+                f'<tr><td class="k"><span class="as-cid">{_e(code)}</span>{_e(name)}</td><td>{context or _DASH}</td>'
+                f'<td>{clinical_text or _DASH}</td>{last}</tr>'
+            )
+            body = self.paragraph(item.get('interpretation'), item)
+            if body:
+                title = _text(item.get('interpretationTitle')).strip() or name
+                readings.append(f'<li><strong>{_e(title)}</strong>{body}</li>')
+        heads = ('主诉', '持续时间与加重情境', '临床检验与影像关联信号', '菌群与功能代谢关联证据')
+        table = _table(heads, (15, 25, 30, 30), rows) if with_microbiome else _table(heads[:3], (18, 34, 48), rows)
+        details = f'<ol class="as-readings">{"".join(readings)}</ol>' if readings else ''
+        details += _callout('综合印证', summary)
         return (
-            _subsection('2.1 主诉症状谱与临床检验信号印证', lead + matrix)
-            + _subsection('2.2 躯体感知背后的微生态与代谢线索', details or _note('本节暂无可对照的线索说明。'))
+            _subsection('2.1 主诉症状谱与临床检验信号印证', lead + table)
+            + _subsection('2.2 躯体感知背后的微生态与代谢线索', details)
         )
 
     # ----- chapter three -----
 
+    def clinical_rows(self, group):
+        """Table rows of one system: a template row per clinical question, otherwise one per recorded result."""
+        rows = []
+        templates = [row for row in group.get('templateRows') or () if isinstance(row, dict)]
+        if not any(template.get('rows') or template.get('summary') for template in templates):
+            templates = [{'name': _row_label(row)[0] or row.get('name'), 'rows': [row],
+                          'summary': row.get('interpretation')}
+                         for row in group.get('rows') or () if isinstance(row, dict) and row.get('name')]
+        for template in templates:
+            members = [row for row in template.get('rows') or ()
+                       if isinstance(row, dict) and (row.get('name') or row.get('value'))]
+            reading = self.paragraph(template.get('summary'), template)
+            if not members and not reading:
+                continue
+            texts = [template.get('summary'), *(row.get('value') for row in members)]
+            rows.append(_tr((
+                f'<td class="k">{_e(_label(template.get("name")))}</td><td>{self.values_cell(members)}</td>',
+                f'<td>{self.reference_cell(members, template)}</td>',
+                f'<td class="st">{self.group_status(template, members)}</td><td>{reading or _DASH}</td>',
+            ), long=_is_long(len(members), *texts)))
+        return rows
+
     def clinical(self):
         clinical = self.clinical_data
-        groups = {group.get('code'): group for group in clinical.get('clinicalGroups') or ()}
-        sections, missing = [], []
-        for code, title in _CLINICAL_SECTIONS:
-            group = groups.get(code) or {}
-            panels = group.get('templateRows') or ()
-            content = ''.join(
-                self.panel(panel.get('name'), panel.get('rows'), panel, summary=panel.get('summary'))
-                for panel in panels
+        groups = [group for group in clinical.get('clinicalGroups') or () if isinstance(group, dict)]
+        order = {code: index for index, code in enumerate(_CLINICAL_ORDER)}
+        groups.sort(key=lambda group: order.get(group.get('code'), len(order)))
+        sections = []
+        for group in groups:
+            rows = self.clinical_rows(group)
+            table = _table(
+                ('检验 / 影像项目', '实测结果', '临床参考范围（理想目标）', '状态', '解读'), (15, 23, 19, 15, 28), rows,
             )
-            if not content and group.get('rows'):
-                content = self.panel(group.get('name') or title[4:], group.get('rows'))
+            note = _callout('数据校准说明', self.paragraph(group.get('calibrationNote')))
             reading = self.paragraph(group.get('summary'), group)
-            if reading:
-                content += f'<div class="as-note">{reading}</div>'
-            if content:
-                sections.append(_subsection(title, content, anchor=f'as-system-{code}'))
-            else:
-                missing.append(_SECTION_TOPICS[code])
-        intro = self.paragraph(clinical.get('summary'), clinical)
-        if missing:
-            intro += f'<p class="as-muted">本次资料未包含{_e("、".join(missing))}类检查，相应小节从略。</p>'
-        return intro + ''.join(sections) + self.specialty() + self.trends()
+            if not (table or reading):
+                continue
+            title = _label(group.get('name')) or _CLINICAL_TITLES.get(group.get('code'), '临床检查')
+            sections.append((title, group.get('code'), table + note + reading))
+        html = self.paragraph(clinical.get('summary'), clinical, css='as-lead')
+        for number, (title, code, content) in enumerate(sections, start=1):
+            html += _subsection(f'3.{number} {title}', content, anchor=f'as-system-{code}' if code else None)
+        number = len(sections)
+        html += _subsection(f'3.{number + 1} 本次未纳入的专项检测', self.specialty())
+        html += _subsection(f'3.{number + 2} 历年指标演变趋势与已确认稳健安全基线', self.trends())
+        return html
 
     def specialty(self):
         clinical = self.clinical_data
-        groups = {}
-        for row in clinical.get('specialtyFindings') or ():
-            name = _text(row.get('name'))
-            parent, separator, _ = name.partition(' · ')
-            groups.setdefault(parent if separator else '专项检测', []).append(row)
-        content = ''
-        for title, rows in groups.items():
-            readings = ''.join(dict.fromkeys(self.paragraph(row.get('interpretation'), row) for row in rows))
-            content += self.panel(title, rows, extra=f'<div class="as-interp">{readings}</div>' if readings else '')
-        other = [row for group in clinical.get('clinicalGroups') or ()
-                 if group.get('code') == _OTHER_SYSTEM[0] for row in group.get('rows') or ()]
-        if other:
-            content += self.panel('其他检查', other)
-        content += self.paragraph(clinical.get('specialtySummary'), {
+        content = self.paragraph(clinical.get('specialtySummary'), {
             'evidenceRefs': clinical.get('specialtySummaryEvidenceRefs')
         })
-        return _subsection('3.5 专项检测与筛查', content or _note('本次资料未包含设备专项检测与筛查项目。'))
+        items = []
+        for row in clinical.get('specialtyFindings') or ():
+            if not isinstance(row, dict):
+                continue
+            name, shown = _row_label(row)
+            parent = _text(row.get('name')).partition(' · ')[0] if ' · ' in _text(row.get('name')) else ''
+            if parent and parent != name:
+                name = f'{parent}：{name}' if name else parent
+            text = f'{name}：{shown}' if name and shown else name or shown
+            if text:
+                items.append(f'<li>{_e(text)}</li>')
+        if items:
+            content += f'<h4>其他专项记录</h4><ul class="as-plain as-small">{"".join(items)}</ul>'
+        return content or _note('本次资料未包含设备专项检测与筛查项目。')
 
     def trends(self):
         clinical = self.clinical_data
         cards = []
         for item in clinical.get('trends') or ():
-            points = item.get('points') or ()
-            chart = _trend_svg(points, _text(item.get('name')))
+            if not isinstance(item, dict):
+                continue
+            chart = _trend_svg(item.get('points') or (), _text(item.get('name')))
             if not chart:
                 continue
             reading = self.paragraph(item.get('interpretation'), item)
@@ -1693,23 +1623,28 @@ class _AssessmentRenderer:
                 f'<div class="as-trend"><h4>{_e(item.get("name"))} <small class="as-muted">{_e(item.get("direction"))}'
                 f'</small></h4>{chart}{reading}</div>'
             )
-        no_trend = '本次资料未包含可比较的历次结果。'
-        trend = f'<div class="as-trends">{"".join(cards)}</div>' if cards else _note(no_trend)
-        if (clinical.get('trendSummary') or '').strip() != no_trend:
-            trend += self.paragraph(
-                clinical.get('trendSummary'), {'evidenceRefs': clinical.get('trendSummaryEvidenceRefs')}
-            )
+        trend = f'<div class="as-trends">{"".join(cards)}</div>' if cards else ''
+        trend += self.paragraph(
+            clinical.get('trendSummary'), {'evidenceRefs': clinical.get('trendSummaryEvidenceRefs')}
+        )
+        if not trend:
+            trend = _note('本次资料未包含可比较的历次结果。')
         baselines = self.paragraph(clinical.get('baselineSummary'), {
             'evidenceRefs': clinical.get('baselineSummaryEvidenceRefs')
         })
-        baselines += ''.join(
-            self.normal_line(group.get('rows') or (), _label(group.get('name')))
-            for group in clinical.get('normalBaselines') or ()
-            if group.get('rows')
-        )
-        if baselines:
-            trend += f'<h4 class="as-sub">已确认的稳健安全基线</h4>{baselines}'
-        return _subsection('3.6 历年指标演变趋势与已确认稳健安全基线', trend)
+        for group in clinical.get('normalBaselines') or ():
+            if not isinstance(group, dict):
+                continue
+            items = []
+            for row in group.get('rows') or ():
+                name, shown = _row_label(row)
+                text = f'{name} {shown}' if name and shown and len(shown) <= 24 else name or shown
+                if text:
+                    items.append(text)
+            if items:
+                baselines += f'<p class="as-small"><strong>{_e(_label(group.get("name")))}：</strong>' \
+                             f'{_e("；".join(dict.fromkeys(items)))}</p>'
+        return trend + _callout('已确认的稳健基线', baselines)
 
     # ----- chapter four -----
 
@@ -1718,35 +1653,29 @@ class _AssessmentRenderer:
         has_data = any(gut.get(key) for key in ('structureGroups', 'structure', 'organismGroups', 'functionalGroups'))
         lead = self.paragraph(gut.get('overviewSummary'), {'evidenceRefs': gut.get('overviewSummaryEvidenceRefs')})
         if not has_data:
-            digestive = _subsection('4.1 消化道器质基础与消化液微环境', self.digestive())
-            return lead + _note('本次资料未包含肠道菌群检测。') + digestive
-        sample = gut.get('sampleContext') or {}
-        facts = [
-            f'{label} {_text(sample[key])}'
-            for key, label in (('sampleType', '样本'), ('sampleDate', '采样日'), ('receivedDate', '收样日'),
-                               ('reportDate', '报告日'))
-            if sample.get(key)
-        ]
-        notes = [f'<p>{_e("；".join(facts))}</p>'] if facts else []
-        notes.append(self.paragraph(gut.get('sampleSummary'), {'evidenceRefs': gut.get('sampleSummaryEvidenceRefs')}))
-        if not re.search(r'抗生素|泻药|益生菌', _text(gut.get('sampleSummary'))):
-            notes.append('<p>采样前抗生素、泻药与益生菌使用情况未记录。</p>')
+            # Without a microbiome report the chapter is one statement; the digestive
+            # examinations are shown here only when the payload still lists them.
+            groups = self.clinical_data.get('digestiveContext') or gut.get('digestiveContext')
+            digestive = _subsection('4.1 消化道器质基础与消化液微环境', self.digestive()) if groups else ''
+            return (lead or _note('本次资料未包含肠道菌群检测。')) + digestive
+        digestive = _subsection('4.1 消化道器质基础与消化液微环境', self.digestive())
+        notes = ''
+        sample = self.paragraph(gut.get('sampleSummary'), {'evidenceRefs': gut.get('sampleSummaryEvidenceRefs')})
+        if sample:
+            notes += sample.replace('<p>', '<p><strong>采样基线：</strong>', 1)
         fermentation = self.paragraph(gut.get('fermentationSummary'), {
             'evidenceRefs': gut.get('fermentationSummaryEvidenceRefs')
         })
         if fermentation:
-            notes.append('<h5>发酵耐受</h5>' + fermentation)
+            notes += fermentation.replace('<p>', '<p><strong>发酵耐受：</strong>', 1)
         risk = self.paragraph(gut.get('riskSummary'), {'evidenceRefs': gut.get('riskSummaryEvidenceRefs')})
-        if '临床检查结果为准' not in _text(gut.get('riskSummary')):
-            risk += '<p>菌群风险模型的分值反映样本在模型中的位置，健康管理以临床检查结果为准。</p>'
         return (
             lead
-            + f'<div class="as-note">{"".join(notes)}</div>'
-            + _subsection('4.1 消化道器质基础与消化液微环境', self.digestive())
+            + _callout('样本基线与发酵耐受', notes)
+            + digestive
             + _subsection(self.structure_heading(), self.structure())
             + _subsection('4.3 核心功能菌群结构、条件致病谱与毒力因子', self.organisms())
-            + _subsection('4.4 菌群营养合成与外源毒素代谢潜能', self.functions())
-            + _subsection('本章风险小结', risk)
+            + _subsection('4.4 菌群营养合成与外源毒素代谢潜能', self.functions() + risk)
         )
 
     def structure_heading(self):
@@ -1758,160 +1687,162 @@ class _AssessmentRenderer:
         return '4.2 微生态宏观稳态指数'
 
     def digestive(self):
-        blocks = []
-        for group in self.clinical_data.get('digestiveContext') or self.microbiome_data.get('digestiveContext') or ():
+        rows = []
+        groups = self.clinical_data.get('digestiveContext') or self.microbiome_data.get('digestiveContext') or ()
+        for group in groups:
+            if not isinstance(group, dict):
+                continue
+            members = [row for row in _digestive_measurements(group) if isinstance(row, dict) and row.get('name')]
+            results = ''.join(self.value_line(row) for row in members)
             context = '；'.join(
                 f'{_prompt(row.get("name"))}：{_text(row.get("value"))}' for row in group.get('symptomContext') or ()
-                if row.get('value')
+                if isinstance(row, dict) and row.get('value')
             )
-            extra = f'<p class="as-small as-muted">自述：{_e(context)}</p>' if context else ''
-            blocks.append(self.panel(group.get('name'), _digestive_measurements(group), group,
-                                     summary=group.get('summary'), extra=extra))
-        content = ''.join(block for block in blocks if block)
-        return content or _note('本次资料未包含口腔、胃肠与肝胆胰的相关检查。')
+            if context:
+                results += f'<p class="as-small as-muted">自述：{_e(context)}</p>'
+            reading = self.paragraph(group.get('summary'), group)
+            if not results and not reading:
+                continue
+            rows.append(f'<tr><td class="k">{_e(_label(group.get("name")))}</td><td>{results or _DASH}</td>'
+                        f'<td>{reading or _DASH}</td></tr>')
+        table = _table(('消化道环节', '相关检查结果', '对菌群定植与消化吸收的影响'), (20, 34, 46), rows)
+        return table or _note('本次资料未包含口腔、胃肠与肝胆胰的相关检查。')
 
-    def index_row(self, row, group):
-        """One macro index: name | value + level | grade bands, reference band or plain axis | reference text."""
+    def index_line(self, row, group, *, named):
+        """One macro index: value with direction, and its grade bands, reference band or plain axis."""
         fields = charts.microbiome_chart_fields(row)
         level = fields.get('level')
         number = fields.get('valueNumber')
         if number is None:
+            number = fields.get('abundance')
+        if number is None:
             number = charts.parse_number(row.get('value'))
         name = _label(charts.display_name(row.get('name')))
-        label = f'{name} {_text(row.get("value"))}'
-        chip = _level_chip(level) if level in {charts.FOCUS, charts.BORDERLINE} else ''
-        status = charts.status_text(row)
-        notes = []
+        value = _text(row.get('value')).strip()
+        label = f'{name} {value}'
         bands = fields.get('bands') or []
+        reference = ''
+        chart = ''
         if row.get('code') == 'gutAge' and number is not None:
             actual = row.get('actualAge', group.get('actualAge'))
+            if not isinstance(actual, (int, float)):
+                actual = charts.parse_number(re.sub(r'[^\d.]+', ' ', _text(row.get('referenceRange'))).strip() or None)
             difference = row.get('ageDifference', group.get('gutAgeDifference'))
             if isinstance(actual, (int, float)):
                 lo, hi = min(number, actual) - 10, max(number, actual) + 10
-                ticks = [(actual, f'实足 {_fmt(actual)} 岁')]
-                chart = _axis_svg(number, lo, hi, ticks, level, label, marker=actual)
+                chart = _axis_svg(number, lo, hi, [(actual, f'实足 {_fmt(actual)} 岁')], level, label, marker=actual)
+                reference = f'实足年龄 {_fmt(actual)} 岁'
                 if isinstance(difference, (int, float)):
-                    notes.append(f'与实足年龄相差 {"+" if difference > 0 else ""}{_fmt(difference)} 岁')
-            else:
-                chart = '<span class="gap">无对照年龄</span>'
+                    reference += f'（相差 {"+" if difference > 0 else ""}{_fmt(difference)} 岁）'
         elif bands and number is not None:
             chart = _bands_svg(number, bands, level, label)
-            notes.append('分档 ' + '；'.join(f'{_e(band["label"])} {_e(_band_text(band))}' for band in bands))
+            reference = '；'.join(f'{band["label"]} {_band_text(band)}' for band in bands)
+        elif charts.microbiome_kind(row) == 'abundance' and number is not None:
+            chart = _abundance_svg(number, fields.get('referenceLow'), fields.get('referenceHigh'), level, label)
+            reference = _label(row.get('referenceRange'))
         elif number is not None and fields.get('referenceKind') in {'range', 'upper', 'lower'}:
             chart = _range_svg(number, fields['referenceLow'], fields['referenceHigh'], fields['referenceKind'], level,
                                label)
-            notes.append(f'参考 {_e(row.get("referenceRange"))}')
+            reference = _label(row.get('referenceRange'))
         elif number is not None and 0 <= number <= 100 and re.search(r'评分|得分|总分', _text(row.get('name'))):
             chart = _axis_svg(number, 0, 100, [(0, '0'), (50, '50'), (100, '100')], level, label)
         else:
-            chart = ''
-        if status and not charts.is_normal_label(status) and status != _text(row.get('value')):
-            notes.insert(0, f'判定 {_e(_label(status))}')
-        value = _text(row.get('value')).strip()
-        shown = (f'<b>{_e(value)}</b> {_e(_unit(row.get("unit")))}{_arrow(fields.get("direction"))}'
-                 if number is not None else f'<b>{_e(value)}</b>')
-        if not chart:
-            return (f'<div class="as-mrow"><div class="nm">{_e(name)}</div><div class="val">{shown}{chip}</div>'
-                    f'<div class="txt">{"<br>".join(notes)}</div></div>')
-        return (f'<div class="as-mrow"><div class="nm">{_e(name)}</div><div class="val">{shown}{chip}</div>'
-                f'<div class="ch">{chart}</div><div class="ref">{"<br>".join(notes)}</div></div>')
+            reference = _label(row.get('referenceRange'))
+        css = f' class="lv-{level}"' if level in {charts.FOCUS, charts.BORDERLINE} else ''
+        unit = _unit(row.get('unit'))
+        shown = f'<b{css}>{_e(value)}</b>{" " + _e(unit) if unit and number is not None else ""}'
+        shown += _arrow(fields.get('direction'))
+        prefix = f'<span class="nm">{_e(name)}</span> ' if named else ''
+        line = f'<div class="as-v wide">{prefix}{shown}{chart}</div>'
+        ref = f'<div>{_e(name + " " if named else "")}{_e(reference)}</div>' if reference else ''
+        return line, ref
 
     def structure(self):
         gut = self.microbiome_data
-        organism_codes = {
-            row.get('code') for group in gut.get('organismGroups') or () for row in group.get('rows') or ()
-        }
-        blocks = []
+        rows = []
         for group in gut.get('structureGroups') or ():
-            rows = [row for row in group.get('rows') or ()
-                    if not (charts.microbiome_kind(row) == 'abundance' and row.get('code') in organism_codes)]
-            abundance = [row for row in rows if charts.microbiome_kind(row) == 'abundance']
-            others = [row for row in rows if row not in abundance]
-            body = ''.join(self.index_row(row, group) for row in others)
-            body += ''.join(self.abundance_row(row) for row in abundance)
-            if not body:
+            if not isinstance(group, dict):
                 continue
-            level = charts.worst_level(charts.microbiome_chart_fields(row)['level'] for row in group.get('rows') or ())
+            members = [row for row in group.get('rows') or () if isinstance(row, dict) and row.get('name')]
+            lines = [self.index_line(row, group, named=len(members) > 1) for row in members]
             reading = self.paragraph(group.get('summary'), group)
-            blocks.append(
-                f'<div class="as-panel"><div class="as-panel-head"><h4>{_e(_label(group.get("name")))}</h4>'
-                f'{_level_chip(level)}</div><div class="as-mrows">{body}</div>'
-                f'{f"<div class=as-interp>{reading}</div>" if reading else ""}</div>'
+            if not lines and not reading:
+                continue
+            results = ''.join(line for line, _ in lines) or _DASH
+            references = ''.join(ref for _, ref in lines)
+            status = self.group_status({'status': group.get('status')}, members, microbiome=True)
+            rows.append(
+                f'<tr><td class="k">{_e(_label(group.get("name")))}</td><td>{results}</td>'
+                f'<td>{f"<div class=as-ref>{references}</div>" if references else _DASH}</td>'
+                f'<td class="st">{status}</td><td>{reading or _DASH}</td></tr>'
             )
+        table = _table(('评估维度', '检测结果', '参考基准', '状态', '解读'), (15, 28, 16, 15, 26), rows)
         summary = self.paragraph(gut.get('structureSummary'), {'evidenceRefs': gut.get('structureSummaryEvidenceRefs')})
-        return ''.join(blocks) + summary or _note('本次菌群检测未包含宏观稳态指数。')
+        return table + summary or _note('本次菌群检测未包含宏观稳态指数。')
 
-    def abundance_row(self, row):
+    def taxon_line(self, row):
         fields = charts.microbiome_chart_fields(row)
         level = fields.get('level')
-        name = _label(row.get('name'))
+        name = _label(charts.display_name(row.get('name')))
         abundance = fields.get('abundance')
         value = _text(row.get('value')).strip()
+        css = f' class="lv-{level}"' if level in {charts.FOCUS, charts.BORDERLINE} else ''
         if abundance is not None and abundance <= 0:
-            shown = '<b>0</b> %<small class="as-muted">（未检出）</small>'
+            shown = f'<b{css}>0</b> %<small>（未检出）</small>'
         else:
-            shown = f'<b>{_e(value)}</b> {_e(row.get("unit"))}{_arrow(fields.get("direction"))}'
-        chip = ''  # a column of identical labels is noise; the dot and arrow carry the deviation
-        reference = _text(row.get('referenceRange'))
+            shown = f'<b{css}>{_e(value)}</b> {_e(row.get("unit"))}'
+        shown += _arrow(fields.get('direction'))
+        reference = _text(row.get('referenceRange')).strip()
+        if reference:
+            shown += f' <small>参考 {_e(reference)}</small>'
         chart = _abundance_svg(abundance, fields.get('referenceLow'), fields.get('referenceHigh'), level,
-                               f'{name} {value}%，参考 {reference}')
-        return (f'<div class="as-mrow"><div class="nm">{_e(name)}</div><div class="val">{shown}{chip}</div>'
-                f'<div class="ch">{chart}</div><div class="ref">{"参考 " + _e(reference) if reference else ""}</div>'
-                '</div>')
+                               f'{name} {value}%，参考 {reference}', width=110)
+        return f'<div class="as-tx"><span><span class="nm">{_e(name)}</span> {shown}</span>{chart}</div>'
 
     def organisms(self):
-        blocks = []
+        rows = []
         for group in self.microbiome_data.get('organismGroups') or ():
-            rows = list(group.get('rows') or ())
-            panels = [row for row in rows if charts.microbiome_kind(row) == 'panel'
-                      and not organism_assessment_display_group(row) and not row.get('detectionStatus')]
-            assessments = [row for row in rows if organism_assessment_display_group(row)]
-            genes = [row for row in rows if row.get('detectionStatus') and charts.microbiome_kind(row) == 'panel'
-                     and row not in assessments]
-            taxa = [row for row in rows if charts.microbiome_kind(row) == 'abundance']
-            body = ''
-            if taxa:
-                body += _abundance_axis() + ''.join(self.abundance_row(row) for row in taxa)
-                body = f'<div class="as-mrows">{body}</div>'
-            if genes or assessments:
-                body += self.tags([*genes, *assessments], microbiome=True)
+            if not isinstance(group, dict):
+                continue
+            members = [row for row in group.get('rows') or () if isinstance(row, dict) and row.get('name')]
+            taxa = [row for row in members if charts.microbiome_kind(row) == 'abundance']
+            panels = [row for row in members if row not in taxa]
+            abnormal = self.tags(panels, microbiome=True) + ''.join(self.taxon_line(row) for row in taxa)
             baseline = group.get('normalBaseline') or {}
-            normal_rows = baseline.get('rows') or ()
+            normal_rows = [row for row in baseline.get('rows') or () if isinstance(row, dict)]
             names = baseline.get('names') or [row.get('name') for row in normal_rows]
             count = baseline.get('count') if type(baseline.get('count')) is int else len(names)
+            normal = ''
             if count:
-                examples = [f'{_label(row.get("name"))} {_value(row)}'.strip() for row in normal_rows[:6]]
-                examples = examples or [_label(name) for name in names[:6]]
-                body += (
-                    f'<div class="as-normal">{_ICONS["normal"]}<span><b>{count} 项在参考范围内</b>　'
-                    f'{_e("；".join(examples))}{"等" if count > len(examples) else ""}</span></div>'
-                )
+                examples = [f'{_label(row.get("name"))} {_value(row)}'.strip() for row in normal_rows[:4]]
+                examples = examples or [_label(name) for name in names[:4]]
+                more = '等' if count > len(examples) else ''
+                normal = f'<p><strong>{count} 项在参考范围内</strong>：{_e("、".join(examples))}{more}</p>'
             undetected = [row.get('name') for row in baseline.get('undetectedRows') or () if row.get('name')]
             if undetected:
-                body += f'<p class="as-small as-muted">未检出序列信号：{_e("、".join(undetected))}</p>'
+                normal += f'<p>未检出序列信号：{_e("、".join(undetected))}</p>'
             reading = self.paragraph(group.get('summary'), group)
-            if not body and not reading:
+            if not abnormal and not normal and not reading:
                 continue
-            level = charts.worst_level(charts.microbiome_chart_fields(row)['level'] for row in rows)
-            panel_chips = ''.join(
-                f'<span class="as-tag lv-{_level_class(charts.microbiome_chart_fields(row)["level"])}"><i></i>'
-                f'{_e(_label(charts.display_name(row.get("name"))))} <b>{_e(_value(row))}</b></span>'
-                for row in panels
-            )
-            blocks.append(
-                f'<div class="as-panel"><div class="as-panel-head"><h4>{_e(_label(group.get("name")))}</h4>'
-                f'{_level_chip(level)}</div>{f"<div class=as-tags>{panel_chips}</div>" if panel_chips else ""}{body}'
-                f'{f"<div class=as-interp>{reading}</div>" if reading else ""}</div>'
-            )
-        return ''.join(blocks) or _note('本次菌群检测未包含功能菌群与病原谱。')
+            rows.append(_tr((
+                f'<td class="k">{_e(_label(group.get("name")))}</td><td>{abnormal or _DASH}</td>',
+                f'<td>{normal or _DASH}</td><td>{reading or _DASH}</td>',
+            ), long=_is_long(len(members), group.get('summary'))))
+        table = _table(
+            ('类别', '异常菌种 / 基因及方向', '已确认正常的部分', '功能影响与调节意义'), (15, 35, 21, 29), rows,
+        )
+        return table or _note('本次菌群检测未包含功能菌群与病原谱。')
 
     def functions(self):
-        blocks = []
+        rows = []
         for group in self.microbiome_data.get('functionalGroups') or ():
+            if not isinstance(group, dict):
+                continue
             baseline = group.get('normalBaseline') or {}
-            rows = [*(group.get('rows') or ()), *(baseline.get('rows') or ())]
             seen, scored = set(), []
-            for row in rows:
+            for row in [*(group.get('rows') or ()), *(baseline.get('rows') or ())]:
+                if not isinstance(row, dict):
+                    continue
                 identity = (_text(row.get('name')), _text(row.get('value')))
                 if identity in seen:
                     continue
@@ -1919,38 +1850,32 @@ class _AssessmentRenderer:
                 fields = charts.microbiome_chart_fields(row)
                 if fields.get('score') is not None:
                     scored.append((row, fields))
-            if not scored:
-                reading = self.paragraph(group.get('summary'), group)
-                if reading:
-                    blocks.append(f'<div class="as-panel"><div class="as-panel-head"><h4>{_e(group.get("name"))}</h4>'
-                                  f'</div><div class="as-interp">{reading}</div></div>')
-                continue
-            deviating = sum(1 for _, fields in scored if fields.get('level') in {charts.FOCUS, charts.BORDERLINE})
-            schemes = []
-            for _, fields in scored:
-                key = _band_key(fields.get('bands') or ())
-                if key and key not in schemes:
-                    schemes.append(key)
-            ordered = sorted(scored, key=lambda item: item[1].get('level') not in {charts.FOCUS, charts.BORDERLINE})
-            body = ''.join(self.score_row(row, fields) for row, fields in ordered)
-            states = '；'.join(
-                f'{_label(panel.get("sourceName"))}：{_label(panel.get("status"))}'
-                for panel in group.get('panelStates') or () if panel.get('sourceName') and panel.get('status')
-            )
+            deviating = [(row, fields) for row, fields in scored if fields.get('level') in {charts.FOCUS,
+                                                                                            charts.BORDERLINE}]
+            normal = [(row, fields) for row, fields in scored if (row, fields) not in deviating]
+            abnormal = ''.join(self.score_row(row, fields) for row, fields in deviating)
+            normal_text = '、'.join(f'{_label(row.get("name"))} {_fmt(fields["score"])}' for row, fields in normal)
+            if not normal_text:
+                normal_text = '、'.join(_label(name) for name in baseline.get('names') or ())
+            basis = next((band for _, fields in scored for band in fields.get('bands') or ()
+                          if charts.is_normal_label(band.get('label'))), None)
+            normal_html = f'<p>{_e(normal_text)}</p>' if normal_text else ''
+            if basis:
+                normal_html += f'<p class="as-muted">基准 {_e(_band_text(basis))}</p>'
             reading = self.paragraph(group.get('summary'), group)
+            if not abnormal and not normal_html and not reading:
+                continue
             title = re.sub(r'^\d+\.\s*', '', _text(group.get('name')))
-            keys = ''.join(f'<div class="as-bandkey">{key}</div>' for key in schemes)
-            blocks.append(
-                f'<div class="as-panel"><div class="as-panel-head"><h4>{_e(title)}</h4>'
-                f'<small>{len(scored)} 项中 {deviating} 项偏离</small>'
-                f'{_level_chip(charts.BORDERLINE if deviating else charts.NORMAL)}</div>'
-                f'{f"<p class=as-refline>{_e(states)}</p>" if states else ""}{keys}'
-                f'<div class="as-scores">{body}</div>'
-                f'{f"<div class=as-interp>{reading}</div>" if reading else ""}</div>'
+            rows.append(
+                f'<tr><td class="k">{_e(title)}</td><td>{abnormal or "<p>无偏离子项</p>"}</td>'
+                f'<td>{normal_html or _DASH}</td><td>{reading or _DASH}</td></tr>'
             )
-        if not blocks:
+        table = _table(
+            ('代谢通路', '异常子项及评分', '通路内正常子项', '与临床指标及症状的交叉印证'), (15, 33, 20, 32), rows,
+        )
+        if not table:
             return _note('本次菌群检测未包含营养合成与代谢潜能评分。')
-        return f'<p>{_e(_MICROBIOME_INDEX_NOTE)}</p>' + ''.join(blocks)
+        return f'<p>{_e(_MICROBIOME_INDEX_NOTE)}</p>' + table
 
     def score_row(self, row, fields):
         level = fields.get('level')
@@ -1959,205 +1884,132 @@ class _AssessmentRenderer:
         bands = fields.get('bands') or [{'label': '正常', 'low': 0.0, 'high': 100.0}]
         chart = _score_svg(score, bands, level, f'{name} {_fmt(score)} 分')
         return (
-            f'<div class="as-srow" data-lv="{_level_class(level)}"><span class="nm">{_e(name)}</span>{chart}'
+            f'<div class="as-srow"><span class="nm">{_e(name)}</span>{chart}'
             f'<span class="v"><b>{_e(_fmt(score))}</b>{_arrow(fields.get("direction"))}</span></div>'
         )
 
     # ----- chapter five -----
 
-    def cluster_card(self, item):
+    def cluster_block(self, item):
         identifier = _text(item.get('id'))
         anchor = _cluster_anchor(item.get('id'))
-        clinical = item.get('clinicalSignals') or ()
-        personal = [
-            row for row in clinical if any(source.get('sourceCode') == 'B' for source in row.get('sources') or ())
-        ]
-        observations = [row for row in clinical if row not in personal and not _is_advice(row)]
-        factors = [factor for factor in self.data.get('lifestyleFactors') or ()
-                   if identifier and identifier in (factor.get('clusterIds') or ())]
-        life = ''.join(
-            f'<span class="as-tag plain">{_e(_prompt(row.get("name")))}：{_e(_text(row.get("value")))}</span>'
-            for row in personal if row.get('value')
-        )
-        life += ''.join(f'<span class="as-tag plain">{_e(factor.get("name"))}</span>' for factor in factors)
-        columns = (
-            ('临床与影像锚点', self.tags(observations)),
-            ('微生态与代谢锚点', self.tags(item.get('microbiomeSignals'), microbiome=True)),
-            ('相关生活因素', f'<div class="as-tags">{life}</div>' if life else ''),
-        )
-        evidence = ''.join(
-            f'<div><h5>{_e(title)}</h5>{content or "<span class=as-muted>本次未见相关记录</span>"}</div>'
-            for title, content in columns
-        )
-        notes = ''
-        if reading := self.paragraph(item.get('interpretation'), item):
-            notes += f'<h5>健康影响</h5>{reading}'
+        clinical = [row for row in item.get('clinicalSignals') or () if isinstance(row, dict)]
+        observations = [row for row in clinical if not _is_personal(row) and not _is_advice(row)]
+        clinical_html = self.paragraph(item.get('clinicalEvidence'))
+        if not clinical_html:
+            clinical_html = self.tags(observations)
+            advice = _recorded_advice(item)
+            if advice:
+                clinical_html += ''.join(f'<p>检查建议：{_e(quote)}</p>' for quote in advice)
+        microbiome_html = (self.paragraph(item.get('microbiomeEvidence'))
+                           or self.tags(item.get('microbiomeSignals'), microbiome=True))
         action = item.get('action') or next(
             (row.get('action') for row in self.conclusion_data.get('priorities') or ()
-             if row.get('id') == item.get('id') and row.get('action')), None,
+             if isinstance(row, dict) and row.get('id') == item.get('id') and row.get('action')), None,
         )
-        if action:
-            notes += f'<h5>处理方向</h5>{self.paragraph(action)}'
-        advice = [quote for quote in _advice_quotes(item) if quote not in _text(action)]
-        if advice:
-            notes += '<h5>检查建议</h5>' + ''.join(f'<p>{_e(quote)}</p>' for quote in advice)
+        parts = (
+            ('临床与影像证据', clinical_html),
+            ('菌群与代谢证据', microbiome_html),
+            ('对身体的影响与走向', self.paragraph(item.get('interpretation'), item)),
+            ('处理方向', self.paragraph(action)),
+        )
+        body = ''.join(f'<div><h5>{_e(title)}</h5>{content}</div>' for title, content in parts if content)
         root = f' id="{anchor}"' if anchor else ''
+        heading = f'集群 {identifier}：' if identifier else ''
         return (
-            f'<article class="as-cluster"{root}><header><span class="as-cid">{_e(identifier)}</span>'
-            f'<h4>{_e(_label(item.get("name")))}</h4>{_priority_chip(item.get("priority"))}</header>'
-            f'<div class="as-evidence">{evidence}</div>{f"<div class=notes>{notes}</div>" if notes else ""}</article>'
+            f'<article class="as-cluster"{root}><h4>{_e(heading)}{_e(_label(item.get("name")))}'
+            f'{_priority_chip(item.get("priority"))}</h4>{body}</article>'
         )
 
     def clusters(self):
         summary = self.paragraph(
             self.data.get('clusterSummary'), {'evidenceRefs': self.data.get('clusterSummaryEvidenceRefs')}
         )
-        cards = ''.join(self.cluster_card(item) for item in self.core_clusters)
-        if not cards:
-            cards = _note('未形成需集中干预的失衡集群。')
+        blocks = ''.join(self.cluster_block(item) for item in self.core_clusters)
+        if not blocks:
+            blocks = _note('未形成需集中干预的失衡集群。')
         return (
-            _subsection('5.1 个体化系统失衡集群定性与健康影响解读', summary + cards)
+            _subsection('5.1 个体化系统失衡集群定性与健康影响解读', summary + blocks)
             + _subsection('5.2 ATM 健康诱因全景复盘与健康认知校准', self.lifestyle())
         )
 
     def lifestyle(self):
-        factors = list(self.data.get('lifestyleFactors') or ())
+        factors = [factor for factor in self.data.get('lifestyleFactors') or () if isinstance(factor, dict)]
         background = [factor for factor in factors if factor.get('kind') in _BACKGROUND_KINDS]
         habits = [factor for factor in factors if factor not in background]
-        history = self.paragraph(self.data.get('lifestyleSummary'), {
-            'evidenceRefs': self.data.get('lifestyleSummaryEvidenceRefs')
-        })
-        history += ''.join(
-            f'<p><strong>{_e(factor.get("name"))}</strong>　{_e(factor.get("value"))}</p>'
-            + self.paragraph(factor.get('interpretation'), factor)
-            for factor in background
-        )
-        content = f'<h4 class="as-sub">先天背景与触发事件</h4>{history}' if history else ''
-        assigned = {code: [] for code, _, _ in _LIFESTYLE_DIMENSIONS}
-        others = []
-        for factor in habits:
-            text = _text(factor.get('name'))
-            code = next((code for code, _, pattern in _LIFESTYLE_DIMENSIONS if re.search(pattern, text)), None)
-            if code is None:
-                code = next((code for code, _, pattern in _LIFESTYLE_DIMENSIONS
-                             if re.search(pattern, _text(factor.get('value')))), None)
-            (assigned[code] if code else others).append(factor)
-        ids = [_text(item.get('id')) for item in self.core_clusters if item.get('id')]
-        head = ''.join(f'<th class="c">{_e(identifier)}</th>' for identifier in ids)
+        history = _text(self.data.get('lifestyleSummary')).strip()
+        content = ''
+        if history:
+            refs = self.refs({'evidenceRefs': self.data.get('lifestyleSummaryEvidenceRefs')})
+            content += f'<p><strong>先天背景与既往事件：</strong>{_e(history)}{refs}</p>'
+        for factor in background:
+            content += f'<p><strong>{_e(factor.get("name"))}：</strong>{_e(factor.get("value"))}</p>'
+            content += self.paragraph(factor.get('interpretation'), factor)
         rows = []
-        dimensions = [(code, label, assigned[code]) for code, label, _ in _LIFESTYLE_DIMENSIONS]
-        if others:
-            dimensions.append(('other', '其他生活因素', others))
-        for _, label, members in dimensions:
-            behaviour = ''.join(_qa_html(factor.get('value')) for factor in members)
-            behaviour = behaviour or '<span class="as-muted">未记录</span>'
-            linked = {identifier for factor in members for identifier in factor.get('clusterIds') or ()}
-            hit = '<span class="as-hit" role="img" aria-label="相关"></span>'
-            cells = ''.join(f'<td class="c">{hit if identifier in linked else ""}</td>' for identifier in ids)
-            names = '、'.join(_text(factor.get('name')) for factor in members)
-            rows.append(
-                f'<tr><td><b>{_e(label)}</b>{f"<br><small class=as-muted>{_e(names)}</small>" if names else ""}</td>'
-                f'<td>{behaviour}</td>{cells}</tr>'
-            )
-        width = max(46 - 5 * len(ids), 30)
-        cols = '<col style="width:20%">' + f'<col style="width:{width}%">' + ''.join(
-            '<col style="width:5em">' for _ in ids)
-        content += (
-            '<h4 class="as-sub">日常维持诱因与集群对应</h4>'
-            f'<table class="as-matrix as-lsm"><colgroup>{cols}</colgroup><thead><tr><th>诱因维度</th>'
-            f'<th>行为特征</th>{head}</tr></thead><tbody>{"".join(rows)}</tbody></table>'
-        )
-        if ids:
-            content += '<p class="as-small as-muted">圆点表示该维度与对应集群相关；集群编号见 5.1。</p>'
-        readings = ''.join(
-            f'<li><strong>{_e(factor.get("name"))}</strong>{self.paragraph(factor.get("interpretation"), factor)}</li>'
-            for factor in habits if factor.get('interpretation')
-        )
-        if readings:
-            content += f'<ul class="as-readings">{readings}</ul>'
+        for factor in habits:
+            behaviour = _answers_html(factor.get('value'))
+            ids = ''.join(self.cluster_chip(identifier) for identifier in factor.get('clusterIds') or ())
+            effect = self.paragraph(factor.get('interpretation'), factor)
+            if ids:
+                effect += f'<div class="as-facts">{ids}</div>'
+            if not behaviour and not effect:
+                continue
+            rows.append(f'<tr><td class="k">{_e(factor.get("name"))}</td><td>{behaviour or _DASH}</td>'
+                        f'<td>{effect or _DASH}</td></tr>')
+        table = _table(('生活方式维度', '行为特征', '正在维持的异常与对应集群'), (17, 33, 50), rows)
+        content += table or _note('本次未记录可对照的日常生活方式信息。')
         recognition = ''.join(
             f'<li><strong>{_e(row.get("name"))}</strong>{self.paragraph(row.get("text"), row)}</li>'
-            for row in self.data.get('lifestyleRecognition') or () if row.get('text')
+            for row in self.data.get('lifestyleRecognition') or () if isinstance(row, dict) and row.get('text')
         )
         if recognition:
-            content += f'<div class="as-note"><h5>健康认知校准</h5><ol>{recognition}</ol></div>'
+            content += _callout('健康认知校准', f'<ol>{recognition}</ol>')
         return content
 
     # ----- chapter six -----
 
-    def stage_items(self):
-        """Roadmap entries per stage: 1.3 items in the first stage, clusters by ``layers[].clusterIds``."""
-        stages = {code: [] for code, *_ in _STAGES}
+    def stage_columns(self):
         layers = {code: [] for code, *_ in _STAGES}
-        by_id = {item.get('id'): item for item in self.core_clusters}
-        placed = set()
-        for section in self.overview_data.get('priorityFindings') or ():
-            for item in section.get('items') or ():
-                name = _text(item.get('name') or item.get('title'))
-                if section.get('code') == 'gaps':
-                    name = f'补查 {name}'
-                when = (item.get('timeframe') or {}).get('text')
-                stages['s1'].append((name, item.get('priority'), when, _text(item.get('department'))))
-                if item.get('clusterId'):
-                    placed.add(item['clusterId'])
-
-        def add_cluster(stage, cluster):
-            placed.add(cluster.get('id'))
-            title = f'{_text(cluster.get("id"))} {_text(cluster.get("name"))}'
-            stages[stage].append((title, cluster.get('priority'), None, ''))
-
         for layer in self.conclusion_data.get('layers') or ():
-            stage = _LAYER_STAGES.get(layer.get('code'), 's3')
-            layers[stage].append(layer)
-            for identifier in layer.get('clusterIds') or ():
-                if identifier in by_id and identifier not in placed:
-                    add_cluster(stage, by_id[identifier])
-        for cluster in self.core_clusters:
+            if isinstance(layer, dict):
+                layers[_LAYER_STAGES.get(layer.get('code'), 'maintenance')].append(layer)
+        placed = {
+            identifier for group in layers.values() for layer in group for identifier in layer.get('clusterIds') or ()
+        }
+        extra = {code: [] for code in layers}
+        for cluster in self.core_clusters:  # older callbacks without layers place a cluster by its priority
             if cluster.get('id') not in placed:
-                add_cluster(_PRIORITY_STAGES.get(cluster.get('priority'), 's3'), cluster)
-        return stages, layers
+                extra[_PRIORITY_STAGES.get(cluster.get('priority'), 'maintenance')].append(cluster.get('id'))
+        columns = []
+        for code, level_name, timeframe, title, empty in _STAGES:
+            ids = [identifier for layer in layers[code] for identifier in layer.get('clusterIds') or ()] + extra[code]
+            for layer in layers[code]:
+                if match := _LAYER_NAME.match(_text(layer.get('name'))):
+                    level_name, title = match['level'], match['title']
+                    break
+            chips = ''.join(self.cluster_chip(identifier) for identifier in dict.fromkeys(ids) if identifier)
+            text = ''.join(self.paragraph(layer.get('text'), layer) for layer in layers[code])
+            columns.append(
+                f'<section class="as-stage {code}"><header><div class="t"><b>{_e(timeframe)}</b>'
+                f'<span>{_e(level_name)}</span></div><h4>{_e(title)}</h4></header>'
+                f'{f"<div class=ids>{chips}</div>" if chips else ""}{text or f"<p>{_e(empty)}</p>"}</section>'
+            )
+        return f'<div class="as-roadmap" aria-label="三阶段干预路线">{"".join(columns)}</div>'
 
     def conclusion(self):
         conclusion = self.conclusion_data
         summary = self.paragraph(conclusion.get('summary'), conclusion, css='as-lead')
-        stages, layers = self.stage_items()
-        columns, details = [], []
-        for code, level_name, timeframe, title, empty in _STAGES:
-            entries = ''.join(
-                f'<li><strong>{_e(_label(name))}</strong>'
-                + (f'{_priority_chip(priority)} ' if priority else '')
-                + (f'<span class="as-when">{_e(when)}</span> ' if when else '')
-                + (f'<span>{_e(detail)}</span>' if detail else '')
-                + '</li>'
-                for name, priority, when, detail in stages[code]
-            )
-            texts = [layer for layer in layers[code] if _text(layer.get('text')).strip()]
-            if entries:
-                body = f'<ul>{entries}</ul>'
-                details.extend(
-                    f'<h4>{_e(layer.get("name") or f"{level_name}（{timeframe}）")}</h4>'
-                    + self.paragraph(layer.get('text'), layer)
-                    for layer in texts
-                )
-            else:
-                # An empty stage keeps the projection's own sentence when it has one.
-                body = ''.join(self.paragraph(layer.get('text'), layer) for layer in texts) or f'<p>{_e(empty)}</p>'
-            columns.append(
-                f'<section class="as-stage {code}"><header><div class="t"><b>{_e(timeframe)}</b>'
-                f'<span>{_e(level_name)}</span></div><h4>{_e(title)}</h4></header>{body}</section>'
-            )
-        roadmap = f'<div class="as-roadmap" aria-label="三阶段干预路线">{"".join(columns)}</div>'
-        if details:
-            roadmap += f'<div class="as-layers">{"".join(details)}</div>'
         directions = []
         urgent = any(item.get('priority') == 'P0' for item in self.core_clusters) or any(
-            item.get('priority') == 'P0'
+            isinstance(item, dict) and item.get('priority') == 'P0'
             for section in self.overview_data.get('priorityFindings') or () for item in section.get('items') or ()
         )
         for row in conclusion.get('managementDirections') or ():
+            if not isinstance(row, dict):
+                continue
             children = ''.join(
                 f'<li><strong>{_e(child.get("name"))}</strong>{self.paragraph(child.get("text"), child)}</li>'
-                for child in row.get('items') or () if child.get('text')
+                for child in row.get('items') or () if isinstance(child, dict) and child.get('text')
             )
             text = self.paragraph(row.get('text'), row)
             title = _text(row.get('name'))
@@ -2170,21 +2022,27 @@ class _AssessmentRenderer:
                 directions.append(f'<div class="as-direction"><h4>{_e(title)}</h4>{text}{listed}</div>')
         management = ''.join(directions)
         if urgent and '第一层级' not in management:
-            management = '<p class="as-note">先完成第一层级的专科排查，再开始配方与生活方式干预。</p>' + management
+            management = '<p class="as-missing">先完成第一层级的专科排查，再开始配方与生活方式干预。</p>' + management
         if not directions:
             management += _note('本次资料不足以形成配方与生活方式干预方向。')
         return (
-            _subsection('6.1 核心健康风险分层总结', summary + roadmap)
+            _subsection('6.1 核心健康风险分层总结', summary + self.stage_columns())
             + _subsection('6.2 全周期微生态与生活方式协同管理方向', management)
         )
 
     # ----- appendix -----
 
     def reference_appendix(self):
+        # Works behind a printed citation mark, and the sources of the ideal targets
+        # (carried on the result rows, shown without a mark), in one continuous list.
         if not self.references:
             return ''
+        note = '正文方括号中的编号与下列文献对应。'
+        if set(self.references) - set(self.shown_refs):
+            note += '未在正文中标注编号的文献是相应指标理想目标的依据。'
         rows = []
-        for number, row in sorted(self.references.items()):
+        for number in sorted(self.references):
+            row = self.references[number]
             fields = [row.get('title'), row.get('year')]
             if row.get('doi'):
                 fields.append('DOI：' + _text(row['doi']))
@@ -2197,22 +2055,13 @@ class _AssessmentRenderer:
         return (
             '<section class="as-references" id="as-references" aria-labelledby="as-references-title">'
             '<h2 id="as-references-title">附录：参考文献</h2>'
-            '<p class="as-small as-muted">正文方括号中的编号与下列文献一一对应。</p>'
+            f'<p class="as-small as-muted">{note}</p>'
             f'<ol class="as-reference-list">{"".join(rows)}</ol></section>'
         )
 
 
-def _band_text(band):
-    low, high = band.get('low'), band.get('high')
-    if low is None:
-        return f'<{_fmt(high)}'
-    if high is None:
-        return f'>{_fmt(low)}'
-    return f'{_fmt(low)}–{_fmt(high)}'
-
-
 def assessment_cover(body, presentation):
-    """Cover: identity, the two source dates and whether they belong to one health cycle."""
+    """Header: title, subject line, the two source dates and one line on their interval."""
     subject = body.get('subject') or {}
     sample = body.get('sample') or {}
     timing = (presentation.get('overview') or {}).get('dataTiming') or {}
@@ -2223,19 +2072,23 @@ def assessment_cover(body, presentation):
     sampled = _text(timing.get('microbiomeSampleDate') or sample.get('sampleDate') or context.get('sampleDate'))
     received = _text(timing.get('microbiomeReceivedDate') or context.get('receivedDate'))
     reported = _text(timing.get('microbiomeReportDate') or sample.get('reportDate') or context.get('reportDate'))
-    gut_date, gut_label = (sampled, '菌群采样日期') if sampled else (
-        (received, '菌群收样日期') if received else (reported, '菌群报告日期'))
-    cells = [
+    gut_date, gut_label = (sampled, '肠道菌群采样日') if sampled else (
+        (received, '肠道菌群收样日') if received else (reported, '肠道菌群报告日'))
+    identity = [
         ('受检者', subject.get('name')),
         ('性别 / 年龄', ' · '.join(_text(value) for value in (subject.get('gender'),
                                                               f'{age} 岁' if age not in (None, '') else '') if value)),
-        ('档案编码', sample.get('sampleId')),
-        ('检测技术', sample.get('method')),
-        ('临床体检日期', '　'.join(part for part in (clinical_date, institution) if part)),
-        (gut_label, gut_date + ('（采样日期未注明）' if gut_date and not sampled else '')),
+        ('评估档案编码', sample.get('sampleId')),
     ]
-    rows = ''.join(f'<dt>{_e(label)}</dt><dd>{_e(value)}</dd>' for label, value in cells if value)
-    strip = ''
+    sep = '<span class="sep">|</span>'
+    lines = [sep.join(f'<b>{_e(label)}：</b>{_e(value)}' for label, value in identity if _text(value).strip())]
+    dates = []
+    if clinical_date:
+        dates.append(f'<b>临床体检基准日：</b>{_e(clinical_date)}{f"（{_e(institution)}）" if institution else ""}')
+    if gut_date:
+        method = _text(sample.get('method'))
+        dates.append(f'<b>{_e(gut_label)}：</b>{_e(gut_date)}{f"（{_e(method)}）" if method else ""}')
+    lines.append(sep.join(dates))
     days = _days_between(clinical_date, gut_date) if clinical_date and gut_date else None
     if days is not None:
         months = days / 30.44
@@ -2244,12 +2097,12 @@ def assessment_cover(body, presentation):
             verdict = '两份资料属同一健康周期，可交叉印证'
         else:
             verdict = '两份资料间隔超过 6 个月，结论以较新的资料为准'
-        strip = (
-            f'<div class="as-timing"><b>资料时效</b><span>临床体检与菌群检测间隔约 {_fmt(round(months, 1))} 个月'
-            f'{_e(basis)}</span><span>{_e(verdict)}</span></div>'
-        )
+        lines.append(f'<b>资料时效：</b>临床体检与肠道菌群检测间隔约 {_fmt(round(months, 1))} 个月{_e(basis)}，'
+                     f'{_e(verdict)}。')
+    body_html = ''.join(f'<p>{line}</p>' for line in lines if line)
     title = presentation.get('title') or '个体化全息健康与肠道微生态深度评估报告'
-    return f'<header class="as-cover"><h1>{_e(title)}</h1><dl class="as-id">{rows}</dl>{strip}</header>'
+    ident = f'<div class="as-ident">{body_html}</div>' if body_html else ''
+    return f'<header class="as-cover"><h1>{_e(title)}</h1>{ident}</header>'
 
 
 def assessment_chapters(data, presentation, *, status=None, partial_reasons=()):

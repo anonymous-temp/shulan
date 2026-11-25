@@ -501,45 +501,128 @@ def test_ordered_callback_passes_new_fields_through():
     assert assessment_view_for_rendering(data)['overview']['priorityFindings'] == view['overview']['priorityFindings']
 
 
-def test_sample_draws_the_spec_components():
-    page = _page(_view())
+def _cells(row_html):
+    """The cells after the row's first (question) cell."""
+    return re.findall(r'<td[^>]*>(.*?)</td>', row_html, re.S)[1:]
+
+
+def _table_row(page, name):
+    return re.search(rf'<tr[^>]*><td class="k">{re.escape(name)}</td>.*?</tr>', page, re.S).group(0)
+
+
+def _new_fields(view):
+    """The additive fields of the model-written callback on top of the synthetic view."""
+    view['overview']['phenotype'] = '血脂异常型超重'
+    view['overview']['bodySummary'] = '体重指数26.1 kg/m²属超重。'
+    view['overview']['systems'] = [
+        {
+            'code': 'cardiometabolic',
+            'name': '糖脂代谢与心脑血管系统',
+            'status': '重点关注',
+            'level': 'focus',
+            'keyFindings': '甘油三酯3.34 mmol/L；空腹血糖7.2 mmol/L',
+            'summary': '以血脂异常为主。',
+            'anchors': [],
+            'evidenceRefs': [],
+        },
+        {'code': 'hematologyImmune', 'name': '血液免疫', 'status': '未检测', 'level': 'notTested', 'anchors': []},
+    ]
+    group = view['clinical']['bodyGroups'][0]
+    group['status'] = '高于理想值'
+    group['comparisonReference'] = '体重指数<24 kg/m²'
+    cardio = view['clinical']['clinicalGroups'][0]
+    cardio['calibrationNote'] = '两处血压读数不一致，以后一组为准。'
+    cardio['templateRows'][0].update(status='低于理想值', comparisonReference='甘油三酯<1.7 mmol/L')
+    symptom = view['clinical']['symptoms'][0]
+    symptom.update(
+        history='自述容易疲劳，未记录持续时间。',
+        clinicalEvidence='甘油三酯3.34 mmol/L偏高。',
+        microbiomeEvidence='乳杆菌未检出。',
+        interpretationTitle='疲劳与血脂',
+    )
+    view['clusters'][1].update(clinicalEvidence='甘油三酯与体重指数偏高。', microbiomeEvidence='变形菌门偏高。')
+    return view
+
+
+def test_sample_follows_the_client_table_layout():
+    page = _page(_new_fields(_view()))
     for marker in (
         'class="as-cover"',
-        'class="as-legend"',
-        'class="as-mrow"',
+        'class="as-table"',
+        '<thead>',
         'class="band"',
-        'class="as-sys lv-',
-        'class="as-act p0"',
         'figure class="as-graph"',
-        'class="as-matrix"',
         'class="as-srow"',
         'class="as-cluster"',
-        'as-lsm',
         'class="as-roadmap"',
         'class="as-trend"',
-        'class="as-bandkey"',
     ):
         assert marker in page, marker
-    # Five fixed system cards, a system without data reads as not tested.
-    assert page.count('<article class="as-sys') == 5 and '本次资料未包含该系统的检查项目。' in page
-    # A cluster card has the three evidence columns and the reviewed reading.
-    assert all(title in page for title in ('临床与影像锚点', '微生态与代谢锚点', '相关生活因素', '健康影响'))
-    assert '先完成第一层级的专科排查' in page  # a P0 item precedes formula advice
+    # The client's fixed columns.
+    for heads in (
+        ('评估指标', '实测数值', '参考基准 / 理想目标', '状态', '生理与代谢意义'),
+        ('系统', '综合状态', '核心异常与关键实测值', '当前阶段评估结论'),
+        ('主诉', '持续时间与加重情境', '临床检验与影像关联信号', '菌群与功能代谢关联证据'),
+        ('检验 / 影像项目', '实测结果', '临床参考范围（理想目标）', '状态', '解读'),
+        ('评估维度', '检测结果', '参考基准', '状态', '解读'),
+        ('类别', '异常菌种 / 基因及方向', '已确认正常的部分', '功能影响与调节意义'),
+        ('代谢通路', '异常子项及评分', '通路内正常子项', '与临床指标及症状的交叉印证'),
+        ('生活方式维度', '行为特征', '正在维持的异常与对应集群'),
+    ):
+        assert '<thead><tr>' + ''.join(f'<th>{head}</th>' for head in heads) + '</tr></thead>' in page, heads
+    # No legend block and none of yesterday's cards, matrices or schedule.
+    for old in ('as-legend', 'class="as-sys', 'class="as-act', 'class="sched"', 'as-matrix', 'as-mrow', 'as-panel'):
+        assert old not in page, old
     for word in _FORBIDDEN:
         assert word not in page, word
-    assert '您' not in page  # questionnaire prompts are shown as impersonal labels
-    assert '最近每日睡眠时长：6至7小时' in page
+    assert '您' not in page
 
 
-def test_structured_clinical_fields_win_and_strings_are_the_fallback():
+def test_new_fields_fill_the_client_columns():
+    page = _page(_new_fields(_view()))
+    body = _cells(_table_row(page, '身高、体重与围度'))
+    assert '26.1</b>' in body[0] and 'class="band"' in body[0]  # a small range bar under a numeric value
+    assert '18.5-23.9' in body[1] and '<div class="ideal">理想：体重指数&lt;24 kg/m²</div>' in body[1]
+    assert 'lv-above' in body[2] and '高于理想值' in body[2]
+    assert '体重指数属超重。' in body[3]
+    assert '<strong>血脂异常型超重。</strong>体重指数26.1 kg/m²属超重。' in page
+    system = _cells(_table_row(page, '糖脂代谢与心脑血管系统'))
+    assert 'lv-focus' in system[0] and '甘油三酯3.34 mmol/L；空腹血糖7.2 mmol/L' in system[1]
+    untested = _cells(_table_row(page, '血液免疫'))
+    assert '未检测' in untested[0] and 'as-dash' in untested[1] and 'as-dash' in untested[2]
+    lipids = _cells(_table_row(page, '血脂'))
+    assert 'lv-below' in lipids[2] and '理想：甘油三酯&lt;1.7 mmol/L' in lipids[1]
+    assert 'TG 0.00-1.70' in lipids[1]  # the client's reference column uses the abbreviation
+    assert '<h4>数据校准说明</h4><p>两处血压读数不一致，以后一组为准。</p>' in page
+    symptom = _cells(_table_row(page, '<span class="as-cid">S1</span>容易疲劳'))
+    assert symptom[0] == '<p>自述容易疲劳，未记录持续时间。</p>'
+    assert symptom[1] == '<p>甘油三酯3.34 mmol/L偏高。</p>' and symptom[2] == '<p>乳杆菌未检出。</p>'
+    assert '<strong>疲劳与血脂</strong>' in page
+    cluster = re.search(r'<article class="as-cluster" id="as-cluster-C2">.*?</article>', page, re.S).group(0)
+    for title in ('临床与影像证据', '菌群与代谢证据', '对身体的影响与走向', '处理方向'):
+        assert f'<h5>{title}</h5>' in cluster, title
+    assert '甘油三酯与体重指数偏高。' in cluster and 'class="as-tag' not in cluster
+
+
+def test_older_callbacks_fall_back_to_signal_chips_and_targets():
     page = _page(_view())
-    glucose = re.search(r'<div class="as-mrow"><div class="nm">空腹葡萄糖\(Glu\).*?</div></div>', page).group(0)
-    assert 'class="dot lv-focus"' in glucose and 'class="tgt"' in glucose
-    assert '>6.1<' in glucose and '目标 4.4–6.1 mmol/L' in glucose and 'href="#ref-1"' in glucose
-    lipid = re.search(r'<div class="as-mrow"><div class="nm">甘油三酯\(TG\).*?</div></div>', page).group(0)
-    assert 'class="dot lv-focus"' in lipid and '参考 0.00-1.70' in lipid and '>1.7<' in lipid
-    # Normal members are compressed into one line instead of a drawn row.
-    assert '高密度脂蛋白胆固醇 <span class="num">1.30 mmol/L</span>' in page
+    glucose = _cells(_table_row(page, '血糖'))
+    assert 'class="dot lv-focus"' in glucose[0] and 'class="tgt"' in glucose[0]
+    assert '<div class="ideal">理想：4.4–6.1 mmol/L</div>' in glucose[1]  # no comparisonReference: row target
+    assert 'href="#ref-1"' not in glucose[1]  # never a citation next to an ideal number
+    assert '重点关注' in glucose[2]
+    lipids = _cells(_table_row(page, '血脂'))
+    assert '高密度脂蛋白胆固醇' in lipids[0] and '1.30' in lipids[0]
+    assert '甘油三酯升高。<span class="cite"><a href="#ref-1"' in lipids[3]
+    symptom = _cells(_table_row(page, '<span class="as-cid">S1</span>容易疲劳'))
+    assert '<li>最近每日睡眠时长：6至7小时</li>' in symptom[0]
+    assert 'class="as-tag lv-' in symptom[1] and 'class="as-tag lv-' in symptom[2]
+    cluster = re.search(r'<article class="as-cluster" id="as-cluster-C2">.*?</article>', page, re.S).group(0)
+    assert 'class="as-tag' in cluster and '<h5>处理方向</h5><p>三个月后复查血脂。</p>' in cluster
+    # Five fixed systems are listed; one without data reads as not tested.
+    systems = re.search(r'<th>当前阶段评估结论</th>.*?</table>', page, re.S).group(0)
+    assert systems.count('<tr') == 5 and '未检测' in systems
+    assert '<ol class="as-reference-list"><li id="ref-1" value="1">示例指南；2024</li></ol>' in page
 
 
 def test_empty_sections_show_their_missing_statements():
@@ -568,37 +651,43 @@ def test_empty_sections_show_their_missing_statements():
         '本次资料未包含可比较的历次结果。',
         '本次资料未包含肠道菌群检测。',
         '未形成需集中干预的失衡集群。',
+        '本次未记录可对照的日常生活方式信息。',
         '本次未发现需在首月内完成的专科排查或随访事项。',
         '本次资料不足以形成配方与生活方式干预方向。',
     ):
         assert sentence in page, sentence
-    assert page.count('本次资料未包含该系统的检查项目。') == 5
-    assert '2.2 主要异常与日常感受的关联' in page
-    assert page.count('<span class="as-muted">未记录</span>') == 5  # five lifestyle dimensions
+    systems = re.search(r'<th>当前阶段评估结论</th>.*?</table>', page, re.S).group(0)
+    assert systems.count('未检测') == 5
+    assert '3.1 本次未纳入的专项检测' in page and '3.2 历年指标演变趋势' in page  # numbering follows the groups
     for word in _FORBIDDEN:
         assert word not in page, word
 
 
-def test_priority_items_become_action_cards_schedule_and_roadmap():
+def test_priority_parts_are_a_callout_and_two_tables_and_layers_fill_the_roadmap():
     view = _view()
     view['overview']['priorityFindings'] = _priority_findings()
     view['conclusion']['layers'] = _layers()
     view['clinical']['baselineSummary'] = '肝肾功能与血常规在参考区间内。'
     page = _page(view)
-    card = re.search(r'<article class="as-act p0">.*?</article>', page).group(0)
-    assert all(part in card for part in ('粪便隐血阳性复查', '2 周内', '消化内科', '粪便隐血复查；肠镜评估'))
-    assert 'href="#as-cluster-C1"' in card and '>阳性<' in card
-    assert '建议2 周内至消化内科就诊' not in card  # the composed line repeats the drawn fields
-    schedule = re.search(r'<table class="sched">.*?</table>', page).group(0)
-    assert '胆囊息肉' in schedule and schedule.count('class="mk"') == 1 and schedule.count('mk re') == 1
-    assert '屈光不正' not in schedule and '建议眼科门诊验光。' in page  # no interval: listed, not scheduled
-    assert '同型半胱氨酸' in page and '评估一碳代谢' in page
-    stages = dict(re.findall(r'<section class="as-stage (s\d)">(.*?)</section>', page))
-    assert '粪便隐血阳性复查' in stages['s1'] and '胆囊息肉' in stages['s1'] and '补查 同型半胱氨酸' in stages['s1']
-    assert 'C1 粪便隐血阳性的复查' not in stages['s1']  # the P0 cluster is already its action card
-    assert 'C2 血脂异常与体重管理' in stages['s2']
-    assert '本次未形成需协同调理的失衡集群。' in stages['s3']
-    assert '肝肾功能与血常规在参考区间内。' in page
+    callout = re.search(r'<div class="as-callout urgent">.*?</div></div>', page, re.S).group(0)
+    assert '<h4>临床优先排查</h4>' in callout and '粪便隐血阳性复查' in callout
+    facts = ('<small>时限</small>2 周内', '<small>科室</small>消化内科', '<small>需完成</small>粪便隐血复查、肠镜评估')
+    for fact in facts:
+        assert fact in callout, fact
+    assert 'href="#as-cluster-C1"' in callout
+    routine = _cells(_table_row(page, '胆囊息肉'))
+    assert routine[:2] == ['肝胆外科', '每 6 个月'] and '肝胆外科随访' in routine[2]
+    eye = _cells(_table_row(page, '屈光不正'))
+    assert 'as-dash' in eye[0] and '建议眼科门诊验光。' in eye[2]  # the name is not repeated
+    gap = _cells(_table_row(page, '同型半胱氨酸'))
+    assert gap == ['<p>评估一碳代谢。</p>']
+    stages = dict(re.findall(r'<section class="as-stage (\w+)">(.*?)</section>', page, re.S))
+    assert 'as-cluster-C1' in stages['clinical'] and '先完成隐血复查。' in stages['clinical']
+    assert 'as-cluster-C2' in stages['core'] and '控制体重与血脂。' in stages['core']
+    assert '本次未形成需协同调理的失衡集群。' in stages['maintenance']
+    assert page.count('控制体重与血脂。') == 1  # the layer text appears once
+    assert '<h4>已确认的稳健基线</h4><p>肝肾功能与血常规在参考区间内。</p>' in page
+    assert '先完成第一层级的专科排查' in page  # a P0 item precedes formula advice
 
 
 def test_recorded_advice_is_read_from_its_kind_field():
@@ -606,19 +695,63 @@ def test_recorded_advice_is_read_from_its_kind_field():
     advice = {**_row('检查建议 · 体检结论：粪便隐血', '建议复查大便隐血。'), 'kind': 'advice', 'status': None}
     view['clusters'][0]['clinicalSignals'].append(advice)
     page = _page(view)
-    card = re.search(r'<article class="as-cluster" id="as-cluster-C1">.*?</article>', page).group(0)
-    assert '<h5>检查建议</h5><p>建议复查大便隐血。</p>' in card
-    assert '建议复查大便隐血' not in card.split('<h5>检查建议</h5>')[0]  # not drawn as a clinical anchor
+    card = re.search(r'<article class="as-cluster" id="as-cluster-C1">.*?</article>', page, re.S).group(0)
+    assert '<p>检查建议：建议复查大便隐血。</p>' in card
+    assert card.count('建议复查大便隐血') == 1  # not drawn as a clinical anchor too
 
 
-def test_relabelled_questionnaire_answers_are_split_into_lines():
+def test_questionnaire_answers_are_split_into_lines_and_prose_is_kept():
     view = _view()
     view['clinical']['symptoms'][0]['history'] = '最近通常每日睡眠时长：6至7小时；平时每周安排运动天数：没有运动'
     page = _page(view)
-    assert (
-        '<span class="qa">最近通常每日睡眠时长：6至7小时</span><span class="qa">平时每周安排运动天数：没有运动</span>'
-        in page
-    )
+    assert '<li>最近通常每日睡眠时长：6至7小时</li><li>平时每周安排运动天数：没有运动</li>' in page
+    view['clinical']['symptoms'][0]['history'] = '自述容易疲劳；未记录持续时间。'
+    assert '<p>自述容易疲劳；未记录持续时间。</p>' in _page(view)
+
+
+def test_status_chips_distinguish_the_five_labels():
+    from scripts.render_assessment_presentation import _status_chip
+
+    classes = {
+        label: re.search(r'lv-(\w+)', _status_chip(label)).group(1)
+        for label in ('重点关注', '亚临床边界', '高于理想值', '低于理想值', '稳健达标', '未检测')
+    }
+    assert len(set(classes.values())) == 6 and classes['未检测'] == 'notTested'
+    # A status outside the five labels keeps the level's chip and shows its own words beneath.
+    chip = _status_chip('I 度失调', 'focus')
+    assert 'lv-focus' in chip and '<span class="as-lvnote">I 度失调</span>' in chip
+    assert '<span class="as-lvnote">' not in _status_chip('重点关注：体重指数、腰围', 'focus')
+
+
+def test_tall_rows_may_break_across_pages_and_short_rows_stay_whole():
+    view = _view()
+    lipids = view['clinical']['clinicalGroups'][0]['templateRows'][0]
+    lipids['rows'] = lipids['rows'] * 2
+    page = _page(view)
+    assert re.search(r'<tr class=long><td class="k">血脂</td>', page)
+    assert re.search(r'<tr><td class="k">血糖</td>', page)
+    assert 'table.as-table tr:not(.long){break-inside:avoid}' in render_evaluation_html(_body(view))
+    assert 'thead{display:table-header-group}' in render_evaluation_html(_body(view))
+
+
+def test_every_part_tolerates_null_text_and_empty_lists():
+    view = _new_fields(_view())
+
+    def blank(node):
+        if isinstance(node, dict):
+            for key, value in node.items():
+                node[key] = None if isinstance(value, str) else blank(value)
+        elif isinstance(node, list):
+            node[:] = [blank(item) for item in node]
+        return node
+
+    for part in ('overview', 'clinical', 'conclusion', 'clusters', 'lifestyleFactors'):
+        blank(view[part])
+    view['overview']['priorityFindings'] = _priority_findings()
+    blank(view['overview']['priorityFindings'])
+    page = _page(view)
+    assert 'None' not in re.sub(r'<[^>]+>', '', page)
+    assert '本次资料未包含体格测量。' in page
 
 
 def test_overview_adds_sixth_system_only_for_abnormal_results_outside_five():
@@ -641,3 +774,36 @@ def test_overview_adds_sixth_system_only_for_abnormal_results_outside_five():
     assert [row['name'] for row in cardio] == ['双侧脑血流速度减慢', '动脉硬化检测(ABI/baPWV) · ABI：右下肢1.00']
     assert [row['name'] for row in other] == ['乙肝表面抗原', '骨龄测评']
     assert CARDIOMETABOLIC_DEVICE.search('糖尿病早期风险筛查(EZSCAN)')
+
+
+def test_page_without_microbiome_shows_one_statement_and_no_microbiome_column():
+    from scripts.render_assessment_presentation import _AssessmentRenderer
+
+    presentation = {
+        'clinical': {
+            'symptoms': [
+                {
+                    'code': 'S1',
+                    'name': '餐后腹胀',
+                    'history': '持续半年',
+                    'clinicalEvidence': '腹部超声未见异常。',
+                    'interpretation': '与进食速度有关。',
+                }
+            ],
+            'digestiveContext': [],
+        },
+        'microbiome': {'overviewSummary': '本次未提供肠道菌群检测结果，本章不作菌群评估。'},
+    }
+    renderer = _AssessmentRenderer({}, presentation)
+    chapter_two = renderer.symptoms()
+    assert '菌群与功能代谢关联证据' not in chapter_two and '临床检验与影像关联信号' in chapter_two
+    chapter_four = renderer.microbiome()
+    assert '本章不作菌群评估' in chapter_four
+    assert '4.1' not in chapter_four and '未包含口腔' not in chapter_four and '未包含肠道菌群检测' not in chapter_four
+
+
+def test_scientific_notation_units_are_printed_readably():
+    from scripts.render_assessment_presentation import _unit
+
+    assert _unit('10E9/L') == '×10⁹/L' and _unit('10^12/L') == '×10¹²/L' and _unit('×10E9/L') == '×10⁹/L'
+    assert _unit('kg/m2') == 'kg/m²' and _unit('mmol/L') == 'mmol/L' and _unit(None) == ''
